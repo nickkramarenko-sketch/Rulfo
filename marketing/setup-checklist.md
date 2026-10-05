@@ -166,3 +166,19 @@ self storage, storage unit, storage units, mini storage, rv storage, boat storag
 - Headlines: Pallet Storage in Reno, NV | 3PL Warehousing on I-80 | Written Rates in 1 Business Day | No Long-Term Contract | Every Pallet Photographed | 100–5,000 Pallet Projects
 - Descriptions: Short or long-term pallet storage in Reno–Sparks. Billed weekly, fully insured. Get a quote today. | Counted, photographed and tracked the day it arrives. 2 hours to Sacramento.
 - Call extension: CallRail Google Ads 800 number
+- Final URL: https://24hrwarehousing.com/#/pallet-storage-reno
+
+### Sample ad (container unloading / transload)
+- Headlines: Container Unloading in Reno | Transload on I-80 in Sparks | Unload, Store or Reload | Same-Day Reload Available | Photos of Every Container | Written Rates in 1 Business Day
+- Descriptions: Floor-loaded containers unloaded, palletized and wrapped. Store with us or reload same day. | Seal, count and condition photographed. Damage reported right away. Billed weekly.
+- Final URL: https://24hrwarehousing.com/#/transloading-reno
+
+### Sample ad (FBA prep)
+- Headlines: Amazon FBA Prep in Reno, NV | FNSKU Labels & Poly Bagging | Prepped to Amazon's Rules | Store Bulk, Ship to Amazon | Walmart WFS Prep Too | Get a Prep Quote Today
+- Descriptions: Amazon no longer preps FBA inventory. We label, bag, bundle and ship to Amazon from Reno. | Keep bulk stock in Reno and skip Amazon's long-term storage fees. Reply in one business day.
+- Final URL: https://24hrwarehousing.com/#/fba-prep-reno
+
+### Conversion tracking
+1. Google Ads → Goals → Conversions → New → Website → `24hrwarehousing.com`.
+2. Goal: "Submit lead form". Count: One. Trigger: page URL contains `/thanks.html`.
+3. Google gives a tag. Send it to Claude to paste into `site/thanks.html` (the spot is marked), or install it with Google Tag Manager.
