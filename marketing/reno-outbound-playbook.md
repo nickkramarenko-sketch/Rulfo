@@ -6,7 +6,28 @@ All numbers below are estimates. Replace them with real numbers after the first 
 ---
 
 
-## 0. The goal: $300k revenue a month in Reno
+## 0. The goal
+
+**2-year goal (monthly revenue by month 24):** Reno $300k, Harrisburg/Middletown PA $300k, Sacramento $100k = **$700k/month**, ~235 clients at ~$3k, ~2,900 leads total. Prove the system in Reno first, then copy it to PA and Sacramento.
+
+**Current budget: $5,000/month** = Google Ads $3,000 + cold email $1,000 + directories $1,000. Dial in subjects, keywords and offers, then scale.
+
+| Cold email ($1,000) | $/mo |
+|---|---|
+| Zapmail, 30 inboxes | ~99 |
+| Instantly Hypergrowth (Growth caps at 5,000 emails/mo) | ~97 |
+| Apollo Professional | ~100 |
+| Import data (ImportGenius or similar) | ~200–400 |
+| CallRail | ~65 |
+| Extra domains, verification, buffer | ~150–250 |
+
+| Directories ($1,000) | Cost |
+|---|---|
+| 3PL Hub listing | ~$99/year |
+| 3PL Hub paid leads | ~$299 each, 2–3/month. Keep only if ~1 in 4 becomes a client |
+| Free: Google Business Profile, Bing Places, Apple Maps, Yelp, Thomasnet, Warehouse Exchange, FLEXE | $0 |
+
+### Reno: $300k revenue a month
 
 | | Number |
 |---|---|
