@@ -5,6 +5,28 @@ All numbers below are estimates. Replace them with real numbers after the first 
 
 ---
 
+
+## 0. The goal: $300k revenue a month in Reno
+
+| | Number |
+|---|---|
+| Average client | ~$3k/month (range $1k–5k) |
+| Clients needed | 100 |
+| Lead → client | ~8% (40% qualified × 20% win) |
+| Total leads needed | ~1,250 |
+| Leads per month (12 months, +15% churn) | ~120 (~30 a week) |
+| Qualified calls per month | ~50 |
+| New clients per month | ~9–10 |
+
+Plan to get there:
+- **Months 1–3:** $5k/month budget. 35–70 leads/month. Measure real cost per client.
+- **Months 3–4:** at 20+ sales calls/month, hire salesperson #1. Raise budget to ~$10k/month (more Google Ads, 20 inboxes, ~600 emails/day) to reach ~120 leads/month.
+- **Months 6–12:** ~9–10 new clients/month → ~100 clients and ~$300k/month by month 12 if conversion holds (18 months is the safer estimate).
+
+Reno capacity check: 10,000 pallets at ~$22 storage + $8 in/$8 out ≈ $380k/month max at 1 turn. $300k fits.
+
+---
+
 ## 1. Budget ($5,000 a month)
 
 | Item | $/month | What it does |
