@@ -115,9 +115,22 @@ Prices are approximate (2026). Check at checkout.
 4. Connect HubSpot and Google Ads (Integrations tab).
 5. Text alert for every new first-time caller → your phone.
 
-### 8. Website (Claude builds, Nick deploys)
-1. Claude prepares the 24hrwarehousing.com site + 3 ad pages with the quote form wired to HubSpot.
-2. Nick: sign up at netlify.com with GitHub → import the repo → connect 24hrwarehousing.com (Netlify shows the Cloudflare settings to copy).
+### 8. Website (ready in the `site/` folder, Nick deploys, 20 min)
+The site is your artifact website, prepped for 24hrwarehousing.com: quote forms now really send (no more "opens your email"), a thank-you page for ad tracking, a new transload ad page, other locations moved to the footer. Ad pages:
+- `24hrwarehousing.com/#/pallet-storage-reno`
+- `24hrwarehousing.com/#/transloading-reno`
+- `24hrwarehousing.com/#/fba-prep-reno`
+
+Steps:
+1. Go to netlify.com → Sign up with GitHub.
+2. Add new site → Import from GitHub → pick the `rulfo` repo → branch `claude/admiring-bell-62bf5m` (or `main` after it's merged). Netlify reads `netlify.toml` and publishes the `site/` folder. Click Deploy.
+3. Site settings → Domain management → Add domain → `24hrwarehousing.com`. Follow Netlify's steps to point Cloudflare at it (Netlify adds free HTTPS).
+4. Forms → enable form detection → redeploy. Then Forms → Notifications → Email notification → 24hrcrossdock@gmail.com (or your Gmail).
+5. Test: fill the quote form on your phone. You should get the email, and the lead should show in HubSpot Contacts within a few minutes.
+6. If the lead does not show in HubSpot: HubSpot → Marketing → Forms → Non-HubSpot forms → turn on collection.
+7. Text alert: turn on push notifications for new contacts in the HubSpot phone app.
+
+Note: the artifact website and `site/` are now two copies. Make future website changes in `site/` (ask Claude).
 
 ### 9. Google Ads (Claude writes, Nick creates the account)
 1. Go to ads.google.com → sign up with your Gmail → **switch to Expert mode** (skip the "Smart campaign" setup; it wastes money).
