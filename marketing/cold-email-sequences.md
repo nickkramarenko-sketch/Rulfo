@@ -5,12 +5,11 @@ Sender: Nick Kramarenko. Variables: `{{firstName}}`, `{{companyName}}`.
 Turn on "Stop on reply" and "Stop for the whole company on reply" in Instantly.
 Turn OFF open tracking (it hurts inbox placement). Keep reply tracking on.
 
-**Signature (all emails):**
+**Signature (all emails):** no website for now. Add 24hrwarehousing.com once the new site is live.
 ```
 Nick Kramarenko
 24 HR Crossdock | Sparks, NV
 {{CallRail cold-email 800 number}}
-24hrwarehousing.com
 
 1095 Spice Islands Dr, Ste 105, Sparks, NV 89431
 Not the right person or not interested? Reply "no" and I won't email again.

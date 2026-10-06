@@ -58,14 +58,12 @@ Prices are approximate (2026). Check at checkout.
 
 ## Step-by-step (Nick does these, in this order)
 
-### 1. Buy the domains (Cloudflare, 15 min)
+### 1. Buy the cold-email domains (Cloudflare, 30 min)
 1. Go to dash.cloudflare.com → sign up with your Gmail.
-2. Domain Registration → Register Domains → search `24hrwarehousing.com` → buy.
-3. Buy 3 cold-email domains (if taken, ask Claude for others):
-   - `get24hrwarehousing.com`
-   - `24hrwarehousinghq.com`
-   - `try24hrwarehousing.com`
-4. Never send cold email from 24hrwarehousing.com or 24hrcrossdock.com.
+2. Domain Registration → Register Domains → buy ~45 domains from `cold-email-domains.md` (skip any that are taken).
+3. Never send cold email from 24hrcrossdock.com, 24HourCrossdock.com or 24hrwarehousing.com.
+4. **24hrwarehousing.com is on hold.** Emails show no website for now. Buy it when the new site is ready (or earlier just to lock in the name, ~$10/yr).
+5. Domain redirect: none for now. Point them at 24hrwarehousing.com once it's live.
 
 ### 2. Cold email inboxes (Zapmail, 20 min)
 1. Sign up at zapmail.ai → plan with 10 Google inboxes.
