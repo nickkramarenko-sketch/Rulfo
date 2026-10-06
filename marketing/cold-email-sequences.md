@@ -118,8 +118,10 @@ Want a written rate for your next few containers?
 |---|---|
 | Sending days | Mon–Fri |
 | Sending window | 7am–2pm Pacific (match your callback hours) |
-| Daily limit per inbox | Start 10, +5 a week, max 30 |
-| Campaign daily total | Start 100, +50 a week, max 300 |
+| Daily limit per inbox | 30 max (after 3 weeks warm-up) |
+| New people per day (all campaigns) | Start 300, +200 a week, up to 1,000 |
+| Inboxes | ~130 on ~45 domains (see cold-email-domains.md) |
+| Stop for whole company on reply | On |
 | Stop on reply | On |
 | Open tracking | Off |
 | Link tracking | Off |
@@ -130,4 +132,5 @@ Want a written rate for your next few containers?
 - [ ] Inboxes warmed 14–21 days
 - [ ] CallRail cold-email number added to the signature
 - [ ] Test email to your Gmail from each campaign. Check it lands in Primary, not Spam
-- [ ] Lists exported from Apollo with **verified** emails only
+- [ ] Lists exported from Apollo and checked in MillionVerifier (bounces under 2%)
+- [ ] Each company in only one campaign
