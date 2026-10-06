@@ -1,6 +1,6 @@
 # Setup Checklist: Cold Email, Tracking, Google Profile, Google Ads
 
-Reno only. $5,000 a month: Google Ads $3,000, cold email $1,000, directories $1,000 (updated). The tables below are the first version; where they differ, the budget in reno-outbound-playbook.md section 0 wins (30 inboxes, Instantly Hypergrowth, no Russian ads for now).
+Reno only. **Current plan: cold email at 1,000 new contacts a day (~130 inboxes, Instantly Light Speed) + directories. Google Ads paused until everything else is set up.** The tables below are the first version; where they differ, reno-outbound-playbook.md section 0 wins.
 
 ## Decisions
 

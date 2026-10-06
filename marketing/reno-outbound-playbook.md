@@ -10,16 +10,22 @@ All numbers below are estimates. Replace them with real numbers after the first 
 
 **2-year goal (monthly revenue by month 24):** Reno $300k, Harrisburg/Middletown PA $300k, Sacramento $100k = **$700k/month**, ~235 clients at ~$3k, ~2,900 leads total. Prove the system in Reno first, then copy it to PA and Sacramento.
 
-**Current budget: $5,000/month** = Google Ads $3,000 + cold email $1,000 + directories $1,000. Dial in subjects, keywords and offers, then scale.
+**Current plan (Nick full-time on this): Reno only, cold email all-in at 1,000 new contacts a day + directories. Google Ads paused until everything else is set up.** Budget cap stays $5,000/month; ~$2,500 is used, the rest is held for Google Ads later.
 
-| Cold email ($1,000) | $/mo |
+| Cold email (1,000 new/day, ~4,000 emails/day) | $/mo |
 |---|---|
-| Zapmail, 30 inboxes | ~99 |
-| Instantly Hypergrowth (Growth caps at 5,000 emails/mo) | ~97 |
-| Apollo Professional | ~100 |
-| Import data (ImportGenius or similar) | ~200–400 |
+| Zapmail, ~130 inboxes on ~45 domains | ~400–450 |
+| Domains (~$500/yr) | ~40 |
+| Instantly Light Speed (Hypergrowth is too small) | ~360 |
+| Apollo lead data, ~22,000 contacts/mo | ~400–600 |
+| Email verification (MillionVerifier or similar) | ~60–100 |
+| Import data (ImportGenius or similar) | ~200–300 |
 | CallRail | ~65 |
-| Extra domains, verification, buffer | ~150–250 |
+| **Total** | **~1,500–1,900** |
+
+**Ramp:** warm up 3 weeks → start 300/day → +200/day each week if replies look good → 1,000/day by about week 7.
+
+**Expected (at 1,000/day):** ~22,000 new contacts/mo → ~65–150 interested replies (3–7 a workday) → ~3–8 new clients/mo. Reno list (~100–150k people) lasts ~5–7 months; then re-email non-responders after 6 months with a new offer, plus ~2–3%/mo new contacts.
 
 | Directories ($1,000) | Cost |
 |---|---|
