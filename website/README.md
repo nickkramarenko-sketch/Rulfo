@@ -11,12 +11,16 @@ Both are live as Claude artifacts. The files here are copies.
 - The menu is always across the top, with no dropdown, on phones too.
 - A "Customer Sign In" button is in the header, in the phone's bottom bar, and on the home page ("Already a customer?"). There's also a Customers column in the footer.
 
-## Customer portal (rebuilt)
-The tabs across the top are: Home, Book a truck, My freight, Damage, Bills, Messages.
-- **Home**: a "Needs your answer" box, big buttons, and what's at the dock and coming up.
-- **Book a truck**: 4 steps. 1) Send a truck in, or pick up freight we hold. 2) Pallets, or pick the loads. 3) Day and time. 4) Truck info (optional). The full work order is still there for big multi-load bookings.
-- **Damage**: photos, what it costs to fix, and three choices: **Accept**, **Decline** (with a reason), or **Call / message us**. Every answer is saved on the load and sent to the office chat, tagged with the load number. Accepted extra charges go onto the load as adjustments.
-- **Office/crew side**: open the load, go to Exceptions, then "Charge estimate for the customer". Add rewrap, labor, a replacement pallet, disposal or a custom charge. The customer sees it right away. Rewrap pallets recorded at the door show up automatically.
+## Customer portal (rebuilt, schedule first)
+The tabs across the top are: Schedule, Trucks, On the floor, Damage, Bills, Messages.
+- **Schedule (first page)**: a week calendar (Mon to Sun, with previous and next week) showing every drop-off and pickup with time, pallets and live status. Tap a day to add a truck. Below it: what's on the floor now, and what's coming in. Alerts like damage waiting or loads near the end of free time are one slim line each.
+- **Schedule a truck**: one form. Day and time, then dropping off or picking up. For a drop-off, add one row per load on the trailer (load or PO number, pallets, and what happens after unload: stays in Reno, reloads to California, or storage), plus optional BOL, PO, deliver-by date and notes. The pallet total adds up as you type. For a pickup, tick the loads on the floor. Truck and driver details are optional.
+- **Truck screen** (tap any truck): its loads and pallet total, add or remove loads while it's still booked, change the time, message the dock about it, the work order, book it again next week, and cancel (confirmed on the page).
+- **Trucks**: at our dock now, booked, and past trucks, each with a plain status like "Unloading now at door D1, 2 of 3 loads off".
+- **On the floor**: every load with pallets, when it came in, where it goes, and its storage clock. Loads on trucks coming in, and a list of shipped loads.
+- **Damage**: photos, what it costs to fix, and three choices: **Accept**, **Decline** (with a reason), or **Call / message us**. Every answer is saved on the load and sent to the office chat. Accepted extra charges go onto the load.
+- **Office/crew side**: open the load, go to Exceptions, then "Charge estimate for the customer".
+- Bug fixed: "Cancel booking" never worked for customers, because the viewer always answers "no" to browser pop-ups.
 
 ## Forklift crew screen (rebuilt)
 - The big tabs across the top are **Now**, **Coming** and **Chat**, each with a count. A stat row shows trucks on site, moves, and time left.
@@ -33,4 +37,3 @@ The readable sources are `portal/customer-portal-source.js` (customer screens) a
 
 ## Known limits
 - Portal data is saved in each browser. A customer's booking on their phone does not reach the office's computer yet. Shared data is the next step.
-- The portal artifact is private until it's shared from its Share menu. Customers can't open it before that.
