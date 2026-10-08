@@ -112,6 +112,34 @@ Want a written rate for your next few containers?
 
 ---
 
+## Campaign 4: Drayage carriers, Oakland + LA/LB (List I)
+
+3 emails over 10 days. Small list (~600–900 companies), so run it as its own campaign and call the ones who open or reply. Dispatchers start early: send 6am–1pm.
+
+**Email 1 (Day 1). Subject: Reno transload for your containers**
+```
+Hi {{firstName}},
+
+We unload containers in Sparks, NV, 4 hours from Oakland on I-80. Dock is open 24 hours and the box is empty within 2 hours of arrival, so your driver turns right around.
+
+Do you pull any boxes headed to Reno or Nevada?
+```
+
+**Email 2 (Day 4). Subject: re: Reno transload**
+```
+{{firstName}}, when a receiver in Reno can't take a container on time, we take it, unload it and hold it. Your driver doesn't wait and you keep the customer.
+
+Want our rate sheet?
+```
+
+**Email 3 (Day 10). Subject: last one**
+```
+{{firstName}}, I'll stop here. Next time a container needs a dock in Reno, call or text {{CallRail cold-email 800 number}}. Open 24/7.
+```
+> Optional: add a referral fee per container in email 2 once Nick sets the number.
+
+---
+
 ## Instantly settings
 
 | Setting | Value |

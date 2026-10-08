@@ -143,6 +143,18 @@ Send limits: 30 emails per inbox per day max → 6 inboxes ≈ 180 a day ≈ 4,0
 - Size: 5–200 employees
 - Titles: Founder, Head of Operations
 
+### List I: Drayage carriers, Oakland + LA/Long Beach (transload referrals)
+Port truckers pull the container and decide where it gets unloaded. One yes = repeat boxes every week. Small list, run it once, follow up by phone.
+- Keywords: drayage, port trucking, container trucking, intermodal trucking, harbor trucking
+- Industry: Transportation / Trucking, Logistics and Supply Chain
+- Location, tier 1 (Oakland): Oakland, San Leandro, Hayward, Richmond, Fremont, Stockton, Tracy, Lathrop
+- Location, tier 2 (LA/LB): Long Beach, Wilmington, Carson, Compton, Rancho Dominguez, Fontana, Ontario
+- Size: 5–200 employees (1–4 are owner-operators with no email)
+- Titles: Owner, President, General Manager, Operations Manager, Dispatch Manager, Dispatcher
+- Expect ~150–300 Oakland companies, ~400–600 LA/LB. Role inboxes like dispatch@ are fine here.
+- Free backups if Apollo is thin: FMCSA SAFER / L&I search (cargo type "Intermodal Container", city = above), Harbor Trucking Association member directory (LA/LB), Google Maps "drayage Oakland".
+- Pitch: 24-hour dock, box empty within 2 hours so the driver turns around; we take the container when the Reno receiver can't; they keep the customer. Optional: referral fee per box (Nick decides).
+
 ### Cross-dock carriers (phone + Russian channels, not Apollo)
 - Apollo has few small carriers. Use FMCSA carrier data: 5–50 power units, based in IL, TN, GA, NC and the Sacramento area.
 - Post in Russian-language Telegram and Facebook trucking groups. Send them to the Russian landing page.

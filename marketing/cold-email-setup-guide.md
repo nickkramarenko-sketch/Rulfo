@@ -54,7 +54,7 @@ Do one step, tell Claude it's done, then the next.
 
 ## 6. Apollo: lists
 1. **apollo.io** → Sign up → paid plan with enough export credits (start small during warm-up, upgrade at week 4).
-2. Build 5 saved searches from `reno-outbound-playbook.md` section 4 (Lists A–E).
+2. Build the saved searches from `reno-outbound-playbook.md` section 4 (Lists A–E, plus List I: drayage carriers).
 3. Export verified emails only → CSV.
 
 ## 7. MillionVerifier
@@ -66,7 +66,7 @@ Do one step, tell Claude it's done, then the next.
 2. Put the company names in Apollo → find Import / Logistics Managers → export.
 
 ## 9. Instantly: campaigns
-1. Claude gives you the 3 campaigns ready to paste (from `cold-email-sequences.md`).
+1. Claude gives you the 4 campaigns ready to paste (from `cold-email-sequences.md`). Campaign 4 (drayage) is small: run it once, then phone the openers.
 2. Upload the checked CSVs. One company = one campaign only.
 3. Settings from `cold-email-sequences.md` (Mon–Fri 7am–2pm, 30/inbox/day, open tracking off, stop on reply).
 
