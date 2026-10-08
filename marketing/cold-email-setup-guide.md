@@ -1,5 +1,7 @@
 # Reno Cold Email: Setup Guide (do in order)
 
+> **Replaced by `cold-email-v2/` (Lead Gen Jay–style setup on Nick's computer: Inbox Insiders + Instantly via API). Zapmail was not bought. Steps below are kept for reference.**
+
 Goal: 1,000 new people a day. No website in emails for now. Google Ads paused.
 Do one step, tell Claude it's done, then the next.
 
