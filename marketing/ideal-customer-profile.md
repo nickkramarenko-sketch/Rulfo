@@ -12,7 +12,40 @@ A company that moves **full pallets** through or into Northern Nevada **every we
 4. We can reach the person who picks the warehouse (titles below).
 5. Pays on time (Net 30 or better, or card for the first 3 loads).
 
-## Ranked customer types
+## Long-term ranking: moving from cross-dock to 3PL + warehousing
+
+Goal: more transload, cross-dock and pallet storage, and customers who stay for years. Value-add services get added when a customer needs them. The best long-term customer stores inventory with us AND moves it in and out every week. Inventory in our building = they don't leave.
+
+| Rank | Customer | What they buy from us | Monthly (est.) | Why they stay |
+|---|---|---|---|---|
+| 1 | Importers / brands with steady containers (Asia → Oakland/LA → West) | Transload + storage + ship to their customers | $10–40k | Every container comes to us; inventory lives here |
+| 2 | California manufacturers + distributors needing a Nevada DC | Contract warehousing: store, pick pallets/cases, ship B2B | $8–30k | No inventory tax in NV, rent ~40% under Bay Area; 12–36 month contracts |
+| 3 | Brands shipping to big retailers (Walmart, Costco, Target, Home Depot DCs) | Storage + pallet build + labels + routing-guide compliance + appointments | $5–25k | Hard to switch once our team knows their retailer rules |
+| 4 | E-commerce / Amazon brands with bulk inventory | Bulk storage + FBA / Walmart WFS replenishment + prep | $4–20k | Steady replenishment every week; Amazon stopped doing prep in 2026 |
+| 5 | Building products + industrial distributors (tile, flooring, plumbing, MRO, mining supply) | Storage + job-site and branch delivery | $4–15k | Heavy, palletized, steady; growth in Washoe housing and mines |
+| 6 | Freight forwarders + customs brokers | Transload + short-term storage for many importers | $3–20k | One contact feeds many importers; turn their best importers into rank-1 customers |
+| 7 | Freight brokers + LTL carriers | Cross-dock, relay, overnight holds | $2–5k each | Fills the dock daily; low margin, keep as base volume |
+| 8 | Project freight (solar, data centers) | Staging storage + scheduled site delivery | $10–80k while a job runs | Big but ends with the project; refill with the next one |
+
+### Value-add services to offer (add as customers ask)
+- Pallet build, rework, re-wrap, re-label
+- Container unload: floor-loaded to pallets
+- Retail compliance: routing guides, appointment booking, GS1 labels
+- Amazon FBA / Walmart WFS prep and replenishment
+- Case pick and B2B order fulfillment
+- Kitting and simple assembly
+- Inspection with photos, inventory counts, returns processing
+- Local delivery and LTL consolidation
+- Later: EDI, customer inventory portal (already being built), bonded / FTZ storage, food-grade certification
+
+### What makes a customer long-term
+1. Inventory sits with us (storage, not only pass-through)
+2. 2+ services (e.g. unload + store + ship)
+3. Weekly activity
+4. Signed 12+ month agreement or monthly minimum
+5. Systems tied to us (portal login, EDI, retailer routing set up with our address)
+
+## Ranked customer types (for cold-email lists)
 
 | Rank | Type | List | Typical size | Monthly value (est.) | Why they're ideal |
 |---|---|---|---|---|---|
@@ -77,11 +110,13 @@ A company that moves **full pallets** through or into Northern Nevada **every we
 
 ## Say no (bad fit)
 - Under 10 pallets, storage only, one-time
-- Lithium cells or battery packs (Class 9 hazmat)
-- Food needing AIB / BRCGS certification or temperature control
-- Unit-level piece-picking (FBA prep, e-commerce orders) as the main job
+- Lithium cells or battery packs (Class 9 hazmat) until insurer OK, fire permit, separate area and hazmat training are in place
+- Food needing temperature control (no cold storage)
+- Food needing AIB / BRCGS certification, until we get certified
 - Floor-loaded containers at palletized prices
 - Customers who won't give a certificate of insurance or pay terms
+
+Piece-picking and FBA prep are fine as add-ons for storage customers, not as stand-alone work.
 
 ## Lead score (HubSpot property "Fit score", 0–100)
 
