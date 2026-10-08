@@ -1,0 +1,3 @@
+# Deploys the 24hrwarehousing.com site from the site/ folder.
+[build]
+  publish = "site"
