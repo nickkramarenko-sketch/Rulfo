@@ -1,8 +1,8 @@
-# Cold-Email Domains (buy ~45 on Cloudflare)
+# Cold-Email Domains (buy ~34)
 
 All `.com`. No hyphens. Never send from the main sites.
-Buy from the top down. If one is taken, skip it and take the next. Stop at 45.
-3 inboxes per domain → ~130 inboxes in Zapmail.
+Buy from the top down. If one is taken, skip it and take the next. Stop at 34.
+3 inboxes per domain → ~100 inboxes (3 emails per person at 1,000 new people/day = ~3,000 sends/day ÷ 30 per inbox). Names #35–55 are spares.
 
 | # | Domain | # | Domain | # | Domain |
 |---|---|---|---|---|---|

@@ -6,7 +6,7 @@ Replaces the hand-built Cloudflare + Zapmail plan. Claude Code on Nick's compute
 
 | # | Part | Tool | What Claude Code does | Nick approves |
 |---|---|---|---|---|
-| 1 | Domains + inboxes | Inbox Insiders + Instantly | Buys ~45 domains, sets DNS, creates ~135 inboxes, loads them into Instantly, starts warm-up | Every purchase |
+| 1 | Domains + inboxes | Inbox Insiders + Instantly | Buys ~34 domains, sets DNS, creates ~100 inboxes, loads them into Instantly, starts warm-up | Every purchase |
 | 2 | Leads | Apollo + Apify (Google Maps) + ImportYeti, verified with MillionVerifier | Pulls lists A–I, verifies, removes duplicates, scores fit | Which lists to pull |
 | 3 | Database | Supabase (free tier) | Stores every company, contact, send and reply (`supabase-schema.sql`) | — |
 | 4 | Copy | Claude | Writes campaigns from `customer-playbooks.md`, grades each email against `copy-rubric.md`, rewrites until it passes, makes A/B versions | Final copy before launch |

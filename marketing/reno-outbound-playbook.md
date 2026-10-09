@@ -14,7 +14,7 @@ All numbers below are estimates. Replace them with real numbers after the first 
 
 | Cold email (1,000 new/day, ~4,000 emails/day) | $/mo |
 |---|---|
-| Zapmail, ~130 inboxes on ~45 domains | ~400–450 |
+| Inboxes (Inbox Insiders), ~100 on ~34 domains, 3 emails per person | ~300 |
 | Domains (~$500/yr) | ~40 |
 | Instantly Light Speed (Hypergrowth is too small) | ~360 |
 | Apollo lead data, ~22,000 contacts/mo | ~400–600 |

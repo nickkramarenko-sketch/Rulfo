@@ -1,6 +1,6 @@
 # Cold Email Sequences (paste into Instantly)
 
-Short style. 4 emails over 14 days. Plain text, no images, no links in email 1.
+Short style. **3 emails over 10 days (Day 1, Day 4, Day 10).** Email 1 = their pain, email 2 = a free useful offer, email 3 = short breakup. Plain text, no images, no links in email 1.
 Sender: Nick Kramarenko. Variables: `{{firstName}}`, `{{companyName}}`.
 Turn on "Stop on reply" and "Stop for the whole company on reply" in Instantly.
 Turn OFF open tracking (it hurts inbox placement). Keep reply tracking on.
@@ -17,104 +17,86 @@ Not the right person or not interested? Reply "no" and I won't email again.
 
 ---
 
-## Campaign 1: Freight forwarders + brokers
+## Campaign 1: Freight forwarders + brokers (Lists A + B)
 
-**Email 1 (Day 1). Subject: Reno cross-dock**
+**Email 1 (Day 1). Subject: Reno dock for {{companyName}}**
 ```
 Hi {{firstName}},
 
-We cross-dock, store and transload freight in Sparks, NV on I-80. Photos of every pallet same day, billed weekly, no contract.
+When a load or container hits Reno before the receiver is ready, we unload it, hold it and reload it on your schedule. Sparks, NV, on I-80, open 24/7, every pallet photographed.
 
-Any loads going through Reno?
+Do you move freight through Reno?
 ```
 
-**Email 2 (Day 3). Subject: re: Reno cross-dock**
+**Email 2 (Day 4). Subject: Reno receiving guide**
 ```
-{{firstName}}, send me the load details and you'll have a rate within the hour.
+{{firstName}}, I put together a one-page Reno receiving guide: dock hours, appointment rules, and what to do when Donner closes.
 
-Most brokers start with one load to test us.
+Want me to send it over?
 ```
-> Only promise "within the hour" during sending hours (7am–2pm). Reply fast.
+> Build the guide before launch. Reply with it as plain text or a PDF only after they say yes.
 
-**Email 3 (Day 7). Subject: containers landing early?**
+**Email 3 (Day 10). Subject: last one**
 ```
-{{firstName}}, when a container or trailer lands before the receiver is ready, we unload it, hold it and reload it when they are.
-
-Who at {{companyName}} handles that?
-```
-
-**Email 4 (Day 14). Subject: last one**
-```
-{{firstName}}, I'll stop here. If a load ever needs a dock in Reno, call or text me at {{CallRail cold-email 800 number}}.
+{{firstName}}, I'll stop here. Next time something needs a dock in Reno, call or text {{CallRail cold-email 800 number}}. We answer 24/7.
 ```
 
 ---
 
-## Campaign 2: California manufacturers + brands (contract storage)
+## Campaign 2: California manufacturers + brands (List C)
 
-**Email 1 (Day 1). Subject: overflow storage near Sacramento**
+**Email 1 (Day 1). Subject: overflow space near Sacramento**
 ```
 Hi {{firstName}},
 
-We store pallets in Sparks, NV, 2 hours from Sacramento. California companies use us when their warehouse is full or rent is too high.
+California companies keep overflow and slow-moving stock with us in Sparks, NV, 2 hours from Sacramento. Space here rents for far less than the Bay Area, and Nevada has no inventory tax.
 
-Short on space this year?
+Is {{companyName}} short on warehouse space this year?
 ```
 
-**Email 2 (Day 3). Subject: re: overflow storage**
+**Email 2 (Day 4). Subject: storage cost check**
 ```
-{{firstName}}, you pay only for the pallets you store, billed weekly. Every pallet is photographed and tracked from the day it lands.
+{{firstName}}, if you tell me roughly how many pallets you store, I'll send a side-by-side of what that space costs in the Bay Area vs Reno, using public market rents.
 
-Nevada also has no corporate income tax, and its Freeport law can exempt inventory that ships out of state.
-```
-
-**Email 3 (Day 7). Subject: quick question**
-```
-{{firstName}}, roughly how many pallets does {{companyName}} keep in storage?
-
-I can send written rates in one business day.
+No call needed. Want one?
 ```
 
-**Email 4 (Day 14). Subject: last one**
+**Email 3 (Day 10). Subject: last one**
 ```
 {{firstName}}, I'll leave it here. If space gets tight, we're on I-80 in Sparks: {{CallRail cold-email 800 number}}.
 ```
 
 ---
 
-## Campaign 3: Importers (container unloading + storage)
+## Campaign 3: Importers (List D)
 
-**Email 1 (Day 1). Subject: your containers after the port**
+**Email 1 (Day 1). Subject: your containers after Oakland**
 ```
 Hi {{firstName}},
 
-We unload containers in Reno, palletize and store them, then ship to your customers or Amazon FBA.
+We unload containers in Sparks, NV the day they arrive, so the empty goes back fast and detention stops running. Then we store the pallets and ship to your customers, retailers or Amazon.
 
-Do your containers ever land before the receiver is ready?
-```
-
-**Email 2 (Day 3). Subject: re: your containers**
-```
-{{firstName}}, seal, count and condition are photographed the day we unload. Damage is reported right away, not at ship-out.
+Do your containers ever sit waiting for a dock?
 ```
 
-**Email 3 (Day 7). Subject: Reno warehouse rates**
+**Email 2 (Day 4). Subject: your container count**
 ```
-{{firstName}}, Reno is about 4 hours from Oakland on I-80, and Nevada has no corporate income tax.
+{{firstName}}, from public shipping records I can put together a quick snapshot of how many containers {{companyName}} landed on the West Coast last year and roughly how many pallets that is.
 
-Want a written rate for your next few containers?
+Want me to send it?
 ```
+> Build the snapshot from ImportYeti only after they say yes.
 
-**Email 4 (Day 14). Subject: last one**
+**Email 3 (Day 10). Subject: last one**
 ```
-{{firstName}}, if you ever need a place to unload and hold containers in Nevada, call or text {{CallRail cold-email 800 number}}.
+{{firstName}}, I'll stop here. If you ever need containers unloaded and stored in Nevada, call or text {{CallRail cold-email 800 number}}.
 ```
 
 ---
 
 ## Campaign 4: Drayage carriers, Oakland + LA/LB (List I)
 
-3 emails over 10 days. Small list (~600–900 companies), so run it as its own campaign and call the ones who open or reply. Dispatchers start early: send 6am–1pm.
+Small list (~600–900 companies): run it as its own campaign and call the ones who reply. Dispatchers start early: send 6am–1pm.
 
 **Email 1 (Day 1). Subject: Reno transload for your containers**
 ```
@@ -131,12 +113,12 @@ Do you pull any boxes headed to Reno or Nevada?
 
 Want our rate sheet?
 ```
+> Optional: add a referral fee per container once Nick sets the number.
 
 **Email 3 (Day 10). Subject: last one**
 ```
 {{firstName}}, I'll stop here. Next time a container needs a dock in Reno, call or text {{CallRail cold-email 800 number}}. Open 24/7.
 ```
-> Optional: add a referral fee per container in email 2 once Nick sets the number.
 
 ---
 
@@ -148,7 +130,8 @@ Want our rate sheet?
 | Sending window | 7am–2pm Pacific (match your callback hours) |
 | Daily limit per inbox | 30 max (after 3 weeks warm-up) |
 | New people per day (all campaigns) | Start 300, +200 a week, up to 1,000 |
-| Inboxes | ~130 on ~45 domains (see cold-email-domains.md) |
+| Inboxes | ~100 on ~34 domains (see cold-email-domains.md) |
+| Emails per person | 3 (Day 1, 4, 10) → ~3,000 sends/day at 1,000 new people |
 | Stop for whole company on reply | On |
 | Stop on reply | On |
 | Open tracking | Off |
@@ -162,3 +145,4 @@ Want our rate sheet?
 - [ ] Test email to your Gmail from each campaign. Check it lands in Primary, not Spam
 - [ ] Lists exported from Apollo and checked in MillionVerifier (bounces under 2%)
 - [ ] Each company in only one campaign
+- [ ] Reno receiving guide written (Campaign 1, email 2)

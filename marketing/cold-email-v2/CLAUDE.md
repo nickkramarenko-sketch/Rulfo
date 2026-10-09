@@ -19,10 +19,10 @@ You run the 24 HR Crossdock cold email system for Nick Kramarenko. Keep answers 
 - Customer knowledge: `../customer-playbooks.md`. Lists A–I: `../reno-outbound-playbook.md` section 4. Ranking and fit score: `../ideal-customer-profile.md`.
 
 ## Steps (run when Nick says "run setup step N")
-1. **Infrastructure.** Check domain availability from `../cold-email-domains.md`, show Nick the list and total cost, wait for OK. Then buy ~45 domains, set SPF/DKIM/DMARC, create 3 inboxes per domain (nick@, nkramarenko@, n.kramarenko@, name "Nick Kramarenko"), connect to Instantly, turn on warm-up. Report anything that failed.
+1. **Infrastructure.** Check domain availability from `../cold-email-domains.md`, show Nick the list and total cost, wait for OK. Then buy ~34 domains, set SPF/DKIM/DMARC, create 3 inboxes per domain (nick@, nkramarenko@, n.kramarenko@, name "Nick Kramarenko"), connect to Instantly, turn on warm-up. Report anything that failed.
 2. **Database.** Create the Supabase tables from `supabase-schema.sql`. Confirm with a test insert and delete.
 3. **Leads.** For the list Nick picks: pull from Apollo (or Apify Google Maps / ImportYeti CSV), verify every email with MillionVerifier (keep "ok" only), drop duplicates against Supabase, score fit, save to Supabase. Show counts before exporting paid credits.
-4. **Copy.** For each campaign: write 4 emails from the customer playbook, grade with `copy-rubric.md`, rewrite until every email scores 85+, write an A and B version of email 1. Show Nick the final copy.
+4. **Copy.** For each campaign: write 3 emails (Day 1 pain, Day 4 free offer, Day 10 breakup) from the customer playbook, grade with `copy-rubric.md`, rewrite until every email scores 85+, write an A and B version of email 1. Show Nick the final copy.
 5. **Personalize.** For each lead write one true, specific first line (city, port, product, recent news). If nothing true can be found, use the list-level line. Never invent facts.
 6. **Launch.** After Nick's OK: create the Instantly campaign, upload leads, set schedule (Mon–Fri 7am–2pm Pacific; drayage 6am–1pm), confirm limits.
 
