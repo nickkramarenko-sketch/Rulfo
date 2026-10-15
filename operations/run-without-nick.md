@@ -9,7 +9,7 @@ Monday and Tuesday are the busiest days. Nick's days off should be **Wednesdayâ€
 ## To-do list (in order)
 
 ### Week 1: tools
-- [ ] **1. Fix how the crew gets online.** Pick one:
+- [x] **1. Fix how the crew gets online.** (Done: QuickBooks "Dock / Forklift" role, no reports or banking.) Pick one:
   - Best: put the **QuickBooks app on each driver's phone** with their own limited user login (no access to bank, reports or payroll).
   - Backup: iPad at the dock. Fix the Wi-Fi with a mesh Wi-Fi system (extender in the dock area), or get an iPad with a cellular plan (no Wi-Fi needed).
   - Check your QuickBooks plan's user limit (Simple Start 1 user, Essentials 3, Plus 5, Advanced 25). Don't share one login, it breaks Intuit's terms and you can't see who did what.
