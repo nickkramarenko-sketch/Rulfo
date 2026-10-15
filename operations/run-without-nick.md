@@ -13,7 +13,7 @@ Monday and Tuesday are the busiest days. Nick's days off should be **Wednesdayâ€
   - Best: put the **QuickBooks app on each driver's phone** with their own limited user login (no access to bank, reports or payroll).
   - Backup: iPad at the dock. Fix the Wi-Fi with a mesh Wi-Fi system (extender in the dock area), or get an iPad with a cellular plan (no Wi-Fi needed).
   - Check your QuickBooks plan's user limit (Simple Start 1 user, Essentials 3, Plus 5, Advanced 25). Don't share one login, it breaks Intuit's terms and you can't see who did what.
-- [ ] **2. Set up QuickBooks products/services** so drivers pick from a list, never type prices:
+- [x] **2. Set up QuickBooks products/services** (Done: incl. Final Mile Delivery â€“ Reno/Sparks $300, loading billed separately.) so drivers pick from a list, never type prices:
   - Reno delivery: **$300**
   - Cross-dock per pallet, full trailer transfer, restack/re-wrap, storage, labor per hour (use the rate sheet once prices are approved)
 - [ ] **3. Teach invoicing** (SOP 1). Each driver makes 3 practice invoices while Nick watches.
