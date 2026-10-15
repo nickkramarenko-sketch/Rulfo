@@ -78,22 +78,28 @@ Everything else: the shift lead decides and writes it in the end-of-day text.
 - Work only. No jokes, memes or personal stuff in work chats.
 - Never promise a price or a time in the chat that isn't approved.
 
-## SOP 4: First thing in the morning
-1. Unlock, lights on, check the building: anything broken, wet, or out of place since last night?
-2. **Forklift check** (OSHA requires a check every shift): tires, forks, chains, horn, lights, brakes, battery or propane, no leaks. Write it on the forklift checklist. If something's wrong, don't use it, tell the shift lead.
-3. Charge phones/iPad, open QuickBooks and the group chats.
-4. Read the group chat from overnight. Who's coming today?
-5. Walk the dock: doors clear, pallets stacked, wrap, labels and pallet jacks ready.
-6. Post in the group chat: "OPEN: [name], [number] trucks expected today."
+## SOP 4: Opening (first thing in the morning)
+1. Walk in, open the computer and **clock in**.
+2. Check today's **delivery and pickup schedule**. Write down the deliveries so they don't get missed.
+3. Go outside and **open all the warehouse doors**.
+4. Work clients in this order: **cross-dock first**, unless the shift lead or Nick says otherwise.
+5. Do the scheduled deliveries on time.
 
-## SOP 5: Last thing at night
-1. Every truck done today has an invoice sent (SOP 1).
-2. Freight staying overnight: counted, wrapped, labeled with customer name and date.
-3. 15-minute sweep of the dock and the aisles.
-4. Forklifts parked, forks down, keys out, charging or propane off.
-5. Trash out, dock doors closed and locked, lights off, alarm on.
-6. **End-of-day text to Nick:**
-   "END OF DAY [date]: Trucks: [#]. Invoiced: $[total]. Paid today: $[total]. Problems: [none / what happened]. Tomorrow: [# trucks expected]."
+Suggested adds (Nick to approve):
+- Daily forklift check before first use (OSHA requires one every shift).
+- Post in the group chat: "OPEN: [name], [#] trucks today."
+
+## SOP 5: Closing (end of shift / end of day)
+1. **Clean the warehouse**: sweep and blow out the floor and dock.
+2. **Put everything back** where it belongs: pallet jacks, wrap, tools, empty pallets.
+3. **Park forklifts** in their spot: forks down, keys out, charging or propane off.
+4. **Check the lanes** for any unmarked loads. Every load must be labeled with customer and date.
+5. **Paperwork**: BOLs and papers filed in their place.
+6. **Computer**: everything done today is marked off (received, shipped, invoiced).
+7. **Close all the doors.**
+
+Suggested add (Nick to approve):
+- End-of-day text to Nick: "END OF DAY [date]: Trucks: [#]. Invoiced: $[total]. Problems: [none / what]. Tomorrow: [#] trucks."
 
 ## SOP 6: Cleaning schedule
 Monday and Tuesday are busy, so deep cleaning happens Wednesday–Friday.
