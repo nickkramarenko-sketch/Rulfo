@@ -22,15 +22,20 @@ The tabs across the top are: Schedule, Trucks, On the floor, Damage, Bills, Mess
 - **Office/crew side**: open the load, go to Exceptions, then "Charge estimate for the customer".
 - Bug fixed: "Cancel booking" never worked for customers, because the viewer always answers "no" to browser pop-ups.
 
-## Forklift crew screen (rebuilt)
-- The big tabs across the top are **Now**, **Coming** and **Chat**, each with a count. A stat row shows trucks on site, moves, and time left.
-- **Now** is grouped by what to do next: **Working now**, then **Ready at a door**, then **In the yard (needs a door)**, then **Finished (waiting on the office)**. The truck cards and buttons are the same as before.
-- New labels are in English, Spanish and Russian. Each crew member's language is set in the office.
-- Bugs fixed:
-  - The job briefing box stuck to the top of the truck screen and covered step 1, including the BOL photo and seal buttons.
-  - A truck opened halfway down the page.
-  - "Give it a door first" was a dead button. It now opens the door picker.
-  - The "Wrap up & send" button text was cramped.
+## Forklift crew screen (guided, with leaderboard)
+The tabs across the top are **Next job**, **All trucks**, **Leaderboard** and **Chat**.
+- **Next job** (opens first): one big card for the truck the driver should work now, with the door, customer, pallet moves, time estimate and the job instructions, plus one big button: Continue / Start unloading / Start loading / Pick a door. It picks the job in this order: your own truck in progress, then trucks ready at a door, then trucks someone else started, then trucks in the yard. "Then" shows the next 3 jobs. "Your day" shows your pallets, trucks, photos and your rank today.
+- **Inside a truck**: a step bar at the top ("Step 2 of 5: Unload & count") stays visible while scrolling. Done steps show a check, and tapping a step jumps to it. All the original steps, photos, counts and wrap-up are unchanged.
+- **All trucks**: everything on site, grouped as working now, ready at a door, in the yard, and finished, plus booked trucks and late trucks.
+- **Leaderboard**: today, this week or this month. Points are 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo, and 5 per damage report. There are badges for 100+ pallets, 5+ trucks, Sharp eye (reported damage), Photo pro and Counter.
+- The new labels are in English, Spanish and Russian. Bug fixes from before are kept: the briefing box no longer covers steps, trucks open at the top, the door button opens the picker, and the wrap-up button isn't cramped.
+
+## Office: Crew tab (new)
+In the office, between Chat and Setup:
+- **Driver stats** for today, the last 7 days or the last 30 days: points, pallets moved, trucks finished, average truck time, loads counted, photos, put in rows, reports, and last active.
+- **What they reported**: every damage or problem report by a driver, with the customer's answer. Tap one to open the load.
+- **Crew logins**: add a driver (name, 4 to 6 digit PIN or "Make one", language), edit the name, PIN or language, show or hide the PIN, and remove a driver (confirmed on the page). Drivers sign in at Staff, then Forklift crew.
+- Stats come from what the app already stamps on every load: who received, counted, photographed, put away and loaded it, who finished each truck, and who reported damage.
 
 ## Editing the portal
 The readable sources are `portal/customer-portal-source.js` (customer screens) and `portal/crew-source.js` (crew home). `python3 portal/build.py <original-portal.html> <out.html>` injects them into the original app bundle.

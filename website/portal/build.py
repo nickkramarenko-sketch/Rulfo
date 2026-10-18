@@ -19,6 +19,11 @@ once('disabled:!Se,onClick:()=>r.crewStart(l.id),children:R(Se?"Start \\u2014 pu
      'onClick:()=>Se?r.crewStart(l.id):G(!0),children:R(Se?"Start \\u2014 put this truck in progress":"Pick a door for this truck")')
 once('addTrailer:P=>{let{lines:E=[],customerName:x,pickupIds:b=[],...D}=P',
   'zzAddLoad:(P,E)=>S(x=>{let b=x.trailers.find(k=>k.id===P);if(!b||b.stage!=="scheduled")return null;let T=gm({ref:(E.ref||"").trim()||`${b.truck||"TRK"}-${x.shipments.filter(k=>k.trailerInId===P).length+1}`,customerId:b.customerId||null,trailerInId:P,lane:E.lane||"reno",service:E.lane==="other"?"storage":"crossdock",units:In(E.units),dest:E.lane==="reno"?"Reno, NV":E.lane==="sac"?"Sacramento, CA":""});x.shipments=[...x.shipments,T];return C(x,L(),"schedule",`Added ${T.ref} (${$e(T)}) to truck ${b.truck||"\\u2014"}`)}),zzRemoveLoad:P=>S(x=>{let s=x.shipments.find(k=>k.id===P);if(!s||s.receivedAt)return null;x.shipments=x.shipments.filter(k=>k.id!==P);return C(x,L(),"schedule",`Removed ${s.ref} from its truck`)}),addTrailer:P=>{let{lines:E=[],customerName:x,pickupIds:b=[],...D}=P')
+once('nb&&(0,i.jsxs)(hm,{','(0,i.jsx)(ZZSteps,{steps:Wt,cur:ua,go:P}),nb&&(0,i.jsxs)(hm,{')
+once('{k:"settings",label:"Setup",icon:uu}]','{k:"crew",label:"Crew",icon:bi},{k:"settings",label:"Setup",icon:uu}]')
+once('children:[l==="board"&&(0,i.jsxs)(i.Fragment,{children:[(0,i.jsx)("div",{className:"grid grid-cols-2 lg:grid-cols-4 gap-3"',
+     'children:[l==="crew"&&(0,i.jsx)(ZZCrewOffice,{doc:e,now:t,actions:a,openShipment:n}),l==="board"&&(0,i.jsxs)(i.Fragment,{children:[(0,i.jsx)("div",{className:"grid grid-cols-2 lg:grid-cols-4 gap-3"')
+once('addCrewMember:(P,E)=>{','zzAddCrew:(P,E,Z2)=>S(x=>{let b=(x.settings?.crewMembers||[]).filter(D=>D.name.toLowerCase()!==P.toLowerCase());x.settings={...(x.settings||{}),crewMembers:[...b,{id:Ce(),name:P,pin:String(E),lang:Z2||"en",createdAt:ye(Date.now())}]};return C(x,L(),"setup",`Crew login added for ${P}`)}),zzUpdateCrew:(P,E)=>S(x=>(x.settings={...(x.settings||{}),crewMembers:(x.settings?.crewMembers||[]).map(b=>b.id===P?{...b,...E}:b)},C(x,L(),"setup",`Crew login updated: ${E.name||""}`))),addCrewMember:(P,E)=>{')
 open(out,'w').write(s)
 a=s.index('<script>\n(()=>{'); b=s.index('</script>',a); open('/tmp/app-check.js','w').write(s[a+8:b])
 print('ok',len(s))
