@@ -44,3 +44,10 @@ The readable sources are `portal/customer-portal-source.js` (customer screens) a
 
 ## Known limits
 - Portal data is saved in each browser. A customer's booking on their phone does not reach the office's computer yet. Shared data is the next step.
+
+## Locations (three docks)
+- New top menu item **Locations** (#/locations): cards for Sparks NV, North Highlands CA and Middletown PA, plus "Coast to coast, one process".
+- Location pages: #/sacramento (North Highlands, CA) and #/middletown (Middletown, PA), each with services, drive times and quote buttons.
+- Quote forms have a **Location** field. Links like #/quote?loc=Middletown%2C%20PA pre-fill it.
+- The footer lists all three locations. The bottom banner text changes per location page.
+- **To confirm:** the CA and PA street addresses (the site says "sent with your dock appointment" for now) and the services offered at each.

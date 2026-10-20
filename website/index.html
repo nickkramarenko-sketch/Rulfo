@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>24 HR Crossdock | 3PL Warehousing &amp; Pallet Storage in Reno–Sparks, NV</title>
-<meta name="description" content="3PL warehousing, pallet storage, order fulfillment, Amazon FBA prep and cross-dock in Sparks, Nevada. 50,000 sq ft on I-80. Call 916-616-3481.">
+<meta name="description" content="3PL warehousing, pallet storage, fulfillment and cross-dock in Sparks, NV, with cross-docks in North Highlands, CA and Middletown, PA. Call 916-616-3481.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230F3B44'/%3E%3Crect x='8' y='8' width='48' height='48' rx='6' fill='%23A95A24'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-family='Arial Narrow,Arial' font-weight='800' font-size='30' fill='white'%3E24%3C/text%3E%3C/svg%3E"><link rel="canonical" href="https://24hrcrossdock.com/"><meta name="robots" content="index,follow"><meta property="og:type" content="website"><meta property="og:site_name" content="24 HR Crossdock"><meta property="og:title" content="3PL Warehousing &amp; Pallet Storage in Reno–Sparks, NV | 24 HR Crossdock"><meta property="og:description" content="Pallet storage, fulfillment, Amazon FBA prep and cross-dock on I-80. 50,000 sq ft, photo-verified receiving, real-time inventory. Call 916-616-3481."><meta property="og:url" content="https://24hrcrossdock.com/"><meta name="twitter:card" content="summary"><meta name="theme-color" content="#0F3B44">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,7 @@
 "name":"24 HR Crossdock","url":"https://24hrcrossdock.com","telephone":"+1-916-616-3481","email":"24hrcrossdock@gmail.com",
 "address":{"@type":"PostalAddress","streetAddress":"1095 Spice Islands Dr, Suites 105-106","addressLocality":"Sparks","addressRegion":"NV","postalCode":"89431","addressCountry":"US"},
 "openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Tuesday","Wednesday","Thursday","Friday"],"opens":"06:00","closes":"22:00"}],
-"areaServed":["Reno","Sparks","Northern Nevada","Northern California","Western United States"],
+"areaServed":["Reno","Sparks","Northern Nevada","Sacramento","Northern California","Harrisburg","Pennsylvania","Western United States"],
 "description":"3PL warehousing, pallet storage, order fulfillment, Amazon FBA prep and cross-dock in Reno–Sparks, Nevada.",
 "hasOfferCatalog":{"@type":"OfferCatalog","name":"Warehouse services","itemListElement":[
 {"@type":"Offer","itemOffered":{"@type":"Service","name":"Pallet storage and 3PL warehousing"}},
@@ -69,7 +69,7 @@ nav.main a[aria-current="page"]{color:#fff;background:var(--navy2)}
 .signin svg{width:17px;height:17px;fill:none;stroke:var(--cop);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
 .signin:hover{background:var(--cop);color:#0F2F36}.signin:hover svg{stroke:#0F2F36}
 .bar .btn{padding:11px 18px;font-size:15px;white-space:nowrap}
-@media (max-width:1180px){
+@media (max-width:1520px){
   .bar{flex-wrap:wrap;gap:10px 14px;padding-top:10px;padding-bottom:0;min-height:0}
   .logo{flex:1}
   nav.main{order:3;flex-basis:100%;justify-content:space-between;border-top:1px solid #22575F;padding:4px 0}
@@ -80,8 +80,8 @@ nav.main a[aria-current="page"]{color:#fff;background:var(--navy2)}
   .mbar a{padding:12px 6px;font-size:15px;white-space:nowrap}
   .bar .btn.r{display:none}
   .signin{padding:8px 11px;font-size:14px}
-  nav.main{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:2px 0 4px}
-  nav.main a{font-size:14px;padding:7px 4px}
+  nav.main{display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:2px 0 4px}
+  nav.main a{font-size:14px;padding:7px 2px}
 }
 
 /* page system */
@@ -335,6 +335,18 @@ header{transition:box-shadow .3s}
 .pillars.dark3 p{color:var(--mut)}
 .network{display:flex;flex-wrap:wrap;gap:14px 34px;align-items:center;margin-top:30px;padding-top:24px;border-top:1px solid #22575F;color:var(--onnavymut);font-size:15px}
 .network b{color:#fff;margin-right:6px}
+.network a{color:var(--onnavymut);text-decoration:none}.network a:hover b{text-decoration:underline}
+.loccards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.loccards article{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--navy);border-radius:4px;padding:28px;display:flex;flex-direction:column;gap:10px}
+.loccards article:first-child{border-top-color:var(--red)}
+.loccards h3{font-size:30px;margin:0}
+.loccards .lsub{color:var(--mut);font-size:16px;margin:0}
+.loccards ul{margin:4px 0;padding-left:18px;color:var(--mut);font-size:15px}.loccards li{margin:3px 0}
+.loccards .laddr{font-size:14.5px;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+.lbtns{display:flex;gap:8px;flex-wrap:wrap}.lbtns .btn{padding:10px 14px;font-size:15px}
+.crumb a{color:inherit}
+@media(max-width:900px){.loccards{grid-template-columns:1fr}}
+
 .nl,.nl2{font:700 15px Barlow,sans-serif;color:var(--cop)}
 .inds{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:36px}
 .inds span:not(.nl2){border:1px solid var(--line);background:var(--card);border-radius:40px;padding:7px 14px;font-size:14px;font-weight:600}
@@ -467,6 +479,7 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
       <a href="#/fulfillment" data-go="fulfillment">Fulfillment</a>
       <a href="#/cross-dock" data-go="cross-dock">Cross-Dock</a>
       <a href="#/technology" data-go="technology">Technology</a>
+      <a href="#/locations" data-go="locations">Locations</a>
       <a href="#/company" data-go="company">Company</a>
       <a href="#/get-started" data-go="get-started">Get Started</a>
     </nav>
@@ -502,7 +515,8 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
       <label>Email<input name="Email" type="email" required autocomplete="email"></label>
       <label>Phone<input name="Phone" type="tel" autocomplete="tel"></label>
       <label>Pallets<input name="Pallets" inputmode="numeric" placeholder="e.g. 500"></label>
-      <label class="f">Service<select name="Service"><option>Pallet storage / warehousing</option><option>Container unloading / transload</option><option>Order fulfillment</option><option>Amazon FBA / Walmart prep</option><option>Delivery</option><option>Cross-dock</option></select></label>
+      <label>Service<select name="Service"><option>Pallet storage / warehousing</option><option>Container unloading / transload</option><option>Order fulfillment</option><option>Amazon FBA / Walmart prep</option><option>Delivery</option><option>Cross-dock</option></select></label>
+      <label>Location<select name="Location"><option>Sparks, NV</option><option>North Highlands, CA</option><option>Middletown, PA</option><option>Not sure</option></select></label>
       <button class="btn r" type="submit">Get my quote</button>
     </form>
   </div>
@@ -603,9 +617,9 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
     </div>
     <div class="network">
       <span class="nl">Our network</span>
-      <span><b>Sparks, NV</b> 3PL warehousing and cross-dock</span>
-      <span><b>North Highlands, CA</b> Sacramento-area cross-dock</span>
-      <span><b>Middletown, PA</b> East Coast cross-dock</span>
+      <a href="#/" data-go="warehousing"><b>Sparks, NV</b> 3PL warehousing and cross-dock</a>
+      <a href="#/sacramento" data-go="sacramento"><b>North Highlands, CA</b> Sacramento-area cross-dock</a>
+      <a href="#/middletown" data-go="middletown"><b>Middletown, PA</b> East Coast cross-dock</a>
     </div>
   </div>
 </section>
@@ -1126,6 +1140,132 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
 </div>
 
 <!-- ============ QUOTE / CONTACT ============ -->
+<div class="page" data-page="locations">
+<section class="hero sm">
+  <div class="w grid"><div>
+    <span class="crumb">Locations</span>
+    <h1>Three docks. <span>One standard.</span></h1>
+    <p class="sub">Sparks, Nevada. North Highlands, California. Middletown, Pennsylvania. The same receiving, photo and count process at every door, and one number to call: 916-616-3481.</p>
+    <div class="ctas"><a class="btn r" href="#/quote" data-go="quote">Get a quote</a><a class="btn o" href="tel:+19166163481">Call 916-616-3481</a></div>
+  </div></div>
+</section>
+
+<section class="s">
+  <div class="w">
+    <div class="loccards rv">
+      <article>
+        <span class="tag">Reno–Sparks, Nevada</span>
+        <h3>Sparks, NV</h3>
+        <p class="lsub">3PL warehouse and cross-dock on I-80</p>
+        <ul><li>50,000 sq ft warehouse</li><li>Pallet storage, short and long term</li><li>Cross-dock, transload and container unloading</li><li>Order fulfillment and Amazon FBA prep</li><li>Reno-area delivery</li></ul>
+        <p class="laddr">1095 Spice Islands Dr, Suites 105–106<br>Sparks, NV 89431</p>
+        <div class="lbtns"><a class="btn r" href="#/" data-go="warehousing">Sparks services</a><a class="btn o" href="#/quote?loc=Sparks%2C%20NV" data-go="quote">Quote Sparks</a></div>
+      </article>
+      <article>
+        <span class="tag">Sacramento area, California</span>
+        <h3>North Highlands, CA</h3>
+        <p class="lsub">Cross-dock for Sacramento and Northern California</p>
+        <ul><li>Cross-dock: unload, split and reload</li><li>Transload and consolidation</li><li>Short-term pallet staging</li><li>Restack and rewrap at the door</li><li>Next to I-80 and Business 80</li></ul>
+        <p class="laddr">North Highlands, CA<br>Street address sent with your dock appointment</p>
+        <div class="lbtns"><a class="btn r" href="#/sacramento" data-go="sacramento">North Highlands</a><a class="btn o" href="#/quote?loc=North%20Highlands%2C%20CA" data-go="quote">Quote CA</a></div>
+      </article>
+      <article>
+        <span class="tag">Harrisburg area, Pennsylvania</span>
+        <h3>Middletown, PA</h3>
+        <p class="lsub">East Coast cross-dock and order staging</p>
+        <ul><li>Cross-dock: unload, split and reload</li><li>Order staging for local delivery partners</li><li>Short-term pallet staging</li><li>Restack and rewrap at the door</li><li>Near I-76, I-283, I-83 and I-81</li></ul>
+        <p class="laddr">Middletown, PA<br>Street address sent with your dock appointment</p>
+        <div class="lbtns"><a class="btn r" href="#/middletown" data-go="middletown">Middletown</a><a class="btn o" href="#/quote?loc=Middletown%2C%20PA" data-go="quote">Quote PA</a></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="s a">
+  <div class="w split">
+    <div class="l">
+      <h2>Coast to coast, one process</h2>
+      <p>Freight moves between the East Coast and the West every week. With docks in Pennsylvania, Nevada and California, a consolidator can hand off in Middletown, split in Reno, and finish in Sacramento, with the same count, photos and paperwork at every stop.</p>
+      <p>You see every load in one customer portal, whichever dock it's sitting on.</p>
+      <p style="margin-top:24px"><a class="btn o" href="https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv">Customer sign in</a></p>
+    </div>
+    <ul class="rows">
+      <li><b>Same receiving standard</b><span>Seal checked, counted against the BOL, photographed at the door</span></li>
+      <li><b>Same damage process</b><span>Photos and a cost to fix, and nothing is charged until you approve it</span></li>
+      <li><b>Same portal</b><span>Book trucks, see inventory and approve charges for every location</span></li>
+      <li><b>Same billing</b><span>Itemized, billed weekly, no long contract</span></li>
+      <li><b>One phone number</b><span>916-616-3481 reaches the people running the docks</span></li>
+    </ul>
+  </div>
+</section>
+</div>
+
+<div class="page" data-page="sacramento">
+<section class="hero sm">
+  <div class="w grid"><div>
+    <span class="crumb"><a href="#/locations" data-go="locations">Locations</a> / North Highlands, CA</span>
+    <h1>Cross-dock in Sacramento, <span>North Highlands.</span></h1>
+    <p class="sub">Unload, split and reload for freight headed into Sacramento and Northern California. Every load counted against the BOL and photographed at the door.</p>
+    <div class="ctas"><a class="btn r" href="#/quote?loc=North%20Highlands%2C%20CA" data-go="quote">Get a quote</a><a class="btn o" href="tel:+19166163481">Call 916-616-3481</a></div>
+  </div></div>
+</section>
+<section class="s">
+  <div class="w split">
+    <div class="l">
+      <h2>What we do in North Highlands</h2>
+      <p>Our California dock serves carriers, brokers and consolidators moving freight into the Sacramento area. Trailers are worked by appointment, and freight bound for Nevada or the East can move through our Sparks dock on I-80.</p>
+      <div class="facts3">
+        <div><b>~15 min</b><span>to downtown Sacramento</span></div>
+        <div><b>~2 hrs</b><span>to the Bay Area</span></div>
+        <div><b>~2 hrs</b><span>to our Sparks dock</span></div>
+        <div><b>I-80</b><span>and Business 80 nearby</span></div>
+      </div>
+      <p class="fine">Drive times are approximate and depend on traffic.</p>
+    </div>
+    <ul class="rows">
+      <li><b>Cross-dock</b><span>Unload, split by destination and reload</span></li>
+      <li><b>Transload</b><span>Floor-loaded freight palletized and reloaded</span></li>
+      <li><b>Consolidation</b><span>Multiple shippers built into one outbound load</span></li>
+      <li><b>Short-term staging</b><span>Freight held until the receiver is ready</span></li>
+      <li><b>Restack and rewrap</b><span>Leaning or damaged pallets fixed, with photos and your approval</span></li>
+    </ul>
+  </div>
+</section>
+</div>
+
+<div class="page" data-page="middletown">
+<section class="hero sm">
+  <div class="w grid"><div>
+    <span class="crumb"><a href="#/locations" data-go="locations">Locations</a> / Middletown, PA</span>
+    <h1>Cross-dock in Harrisburg, <span>Middletown, PA.</span></h1>
+    <p class="sub">East Coast cross-dock and order staging in the Harrisburg area, a day's drive from most of the Northeast. Every load counted, photographed and tracked.</p>
+    <div class="ctas"><a class="btn r" href="#/quote?loc=Middletown%2C%20PA" data-go="quote">Get a quote</a><a class="btn o" href="tel:+19166163481">Call 916-616-3481</a></div>
+  </div></div>
+</section>
+<section class="s">
+  <div class="w split">
+    <div class="l">
+      <h2>What we do in Middletown</h2>
+      <p>Our Pennsylvania dock handles westbound consolidation and local order staging. Freight can be split here for East Coast delivery or built into trailers headed to our Nevada and California docks.</p>
+      <div class="facts3">
+        <div><b>~2 hrs</b><span>to Philadelphia and Baltimore</span></div>
+        <div><b>~3 hrs</b><span>to New York and New Jersey</span></div>
+        <div><b>~2 hrs</b><span>to Washington, DC</span></div>
+        <div><b>I-76</b><span>I-283, I-83 and I-81 nearby</span></div>
+      </div>
+      <p class="fine">Drive times are approximate and depend on traffic.</p>
+    </div>
+    <ul class="rows">
+      <li><b>Cross-dock</b><span>Unload, split by destination and reload</span></li>
+      <li><b>Order staging</b><span>Orders held and released to your delivery partner on schedule</span></li>
+      <li><b>Westbound consolidation</b><span>Loads built for Reno and California</span></li>
+      <li><b>Short-term staging</b><span>Freight held until the receiver is ready</span></li>
+      <li><b>Restack and rewrap</b><span>Leaning or damaged pallets fixed, with photos and your approval</span></li>
+    </ul>
+  </div>
+</section>
+</div>
+
 <div class="page" data-page="quote">
 <section class="s">
   <div class="w contact">
@@ -1144,6 +1284,7 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
       <label>Your name<input name="Name" required autocomplete="name"></label>
       <label>Phone<input name="Phone" type="tel" autocomplete="tel"></label>
       <label>Email<input name="Email" type="email" required autocomplete="email"></label>
+      <label>Location<select name="Location"><option>Sparks, NV</option><option>North Highlands, CA</option><option>Middletown, PA</option><option>Not sure</option></select></label>
       <label>Service<select name="Service">
         <option>Pallet storage / warehousing</option><option>Container unloading / transload</option><option>Order fulfillment</option><option>Amazon FBA / Walmart prep</option><option>Delivery</option><option>Cross-dock</option><option>Refrigerated trailer storage</option><option>Trailer parking</option><option>Not sure yet</option>
       </select></label>
@@ -1162,7 +1303,7 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
 <!-- CTA shown on every page except quote -->
 <section class="cta" id="cta">
   <div class="w">
-    <div><h2>Need space in Reno?</h2><p>Tell us what you've got. Quote within one business day.</p></div>
+    <div><h2 id="ctah">Need space in Reno?</h2><p>Tell us what you've got. Quote within one business day.</p></div>
     <div class="btns"><a class="btn wht" href="#/quote" data-go="quote">Get a quote</a><a class="btn o" href="tel:+19166163481">916-616-3481</a></div>
   </div>
 </section>
@@ -1172,14 +1313,14 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
 <footer>
   <div class="w">
     <div class="cols">
-      <div><a class="logo" href="#/" data-go="warehousing"><i>24</i>HR Crossdock</a><p style="margin-top:14px">3PL warehousing, pallet storage, fulfillment and cross-dock in Reno–Sparks, Nevada.</p></div>
+      <div><a class="logo" href="#/" data-go="warehousing"><i>24</i>HR Crossdock</a><p style="margin-top:14px">3PL warehousing and cross-dock in Sparks, NV, with cross-docks in North Highlands, CA and Middletown, PA.</p></div>
       <div><h4>Services</h4><p><a href="#/" data-go="warehousing">Warehousing</a></p><p><a href="#/fulfillment" data-go="fulfillment">Fulfillment &amp; FBA prep</a></p><p><a href="#/cross-dock" data-go="cross-dock">Cross-dock</a></p><p><a href="#/technology" data-go="technology">Technology</a></p><p><a href="#/company" data-go="company">Company</a></p></div>
       <div><h4>Customers</h4><p><a href="https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv">Customer sign-in</a></p><p><a href="https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv">Book a pickup</a></p><p><a href="https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv">Track a load</a></p><p><a href="https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv">Open an account</a></p></div>
       <div><h4>Visit</h4><p>1095 Spice Islands Dr</p><p>Suites 105–106</p><p>Sparks, NV 89431</p><p>Mon–Fri 6am–10pm</p></div>
-      <div><h4>Service area</h4><p>Reno, Sparks, Fernley, Carson City</p><p>Sacramento and Northern California</p><p>Shippers nationwide</p></div>
+      <div><h4>Locations</h4><p><a href="#/" data-go="warehousing">Sparks, NV</a></p><p><a href="#/sacramento" data-go="sacramento">North Highlands, CA</a></p><p><a href="#/middletown" data-go="middletown">Middletown, PA</a></p><p><a href="#/locations" data-go="locations">All locations</a></p></div>
       <div><h4>Contact</h4><p><a href="tel:+19166163481">916-616-3481</a></p><p><a href="mailto:24hrcrossdock@gmail.com">24hrcrossdock@gmail.com</a></p><p><a href="#/get-started" data-go="get-started">Get started</a></p></div>
     </div>
-    <p class="copy">© 2026 24 HR Crossdock. Fully insured. Sparks, Nevada.</p>
+    <p class="copy">© 2026 24 HR Crossdock. Fully insured. Sparks, NV · North Highlands, CA · Middletown, PA.</p>
   </div>
   <div class="wordmark" aria-hidden="true">24 HR CROSSDOCK</div>
 </footer>
@@ -1190,16 +1331,18 @@ footer .copy{margin-top:34px;padding-top:18px;border-top:1px solid #22575F;font-
   var pages=[].slice.call(document.querySelectorAll('.page')),
       links=[].slice.call(document.querySelectorAll('nav.main a')),
       cta=document.getElementById('cta'),nav=document.getElementById('nav'),
-      titles={'warehousing':'3PL Warehousing & Pallet Storage in Reno–Sparks, NV','fulfillment':'Order Fulfillment & Amazon FBA Prep in Reno, NV','cross-dock':'Cross-Dock in Reno–Sparks on I-80','technology':'WMS, EDI & E-commerce Integrations','get-started':'How to Get Started','quote':'Get a Quote','company':'About Us, Our Standards and Team','pallet-storage-reno':'Pallet Storage in Reno–Sparks, NV','fba-prep-reno':'Amazon FBA Prep in Reno, NV'};
+      titles={'warehousing':'3PL Warehousing & Pallet Storage in Reno–Sparks, NV','fulfillment':'Order Fulfillment & Amazon FBA Prep in Reno, NV','cross-dock':'Cross-Dock in Reno–Sparks on I-80','technology':'WMS, EDI & E-commerce Integrations','get-started':'How to Get Started','quote':'Get a Quote','company':'About Us, Our Standards and Team','pallet-storage-reno':'Pallet Storage in Reno–Sparks, NV','fba-prep-reno':'Amazon FBA Prep in Reno, NV','locations':'Locations: Sparks NV, North Highlands CA, Middletown PA','sacramento':'Cross-Dock in North Highlands, CA (Sacramento)','middletown':'Cross-Dock in Middletown, PA (Harrisburg)'};
   function route(){
     var raw=location.hash||'#/',anchor=null,h;
     if(raw.indexOf('#/')!==0&&raw.length>1){anchor=document.getElementById(raw.slice(1));var pg=anchor&&anchor.closest('.page');h=pg?pg.dataset.page:'warehousing';}
     else h=raw.replace(/^#\/?/,'').split('?')[0]||'warehousing';
     if(!titles[h])h='warehousing';
     pages.forEach(function(p){p.classList.toggle('on',p.dataset.page===h)});
-    links.forEach(function(a){a.dataset.go===h?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current')});
+    var nh=(h==='sacramento'||h==='middletown')?'locations':h;links.forEach(function(a){a.dataset.go===nh?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current')});
     cta.style.display=h==='quote'?'none':'';
+    document.getElementById('ctah').textContent=h==='sacramento'?'Need a dock in Sacramento?':h==='middletown'?'Need a dock in Pennsylvania?':h==='locations'?'Need a dock?':'Need space in Reno?';
     document.title='24 HR Crossdock | '+titles[h];
+    var lq=(raw.split('?')[1]||'').match(/loc=([^&]+)/);if(lq){var lv=decodeURIComponent(lq[1]);[].forEach.call(document.querySelectorAll('select[name=Location]'),function(sl){sl.value=lv})}
     if(anchor)anchor.scrollIntoView();else window.scrollTo(0,0);
   }
   window.addEventListener('hashchange',route);route();
