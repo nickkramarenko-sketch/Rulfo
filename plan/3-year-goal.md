@@ -8,6 +8,13 @@
 
 That's **~$2.5M per site**.
 
+## Capacity (what we can handle)
+- **120,000 pallets a month out the door**, across 4 sites: ~30,000 per site a month, ~6,900 per site a week. **Plus storage** (spot count per site: to be confirmed).
+- Cross-dock at full capacity = 120,000 × $12 × 12 = **~$17M a year**, before storage.
+- The $10M plan below uses only **~22%** of that (26,000 pallets a month).
+- **Capacity is not the problem. Customers are.** The job for 3 years is sales and storage customers.
+- Marketing line (only once it's true at all 4 sites): *"Capacity to move 120,000 pallets a month, plus storage, across 4 locations coast to coast."*
+
 All prices below use the draft rate sheet (cross-dock $12/pallet, storage $19/pallet/month + $6 in + $6 out). CA and PA may price a little different once local rates are checked.
 
 ---
