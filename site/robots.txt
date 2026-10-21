@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /thanks.html
-Sitemap: https://24hrwarehousing.com/sitemap.xml
+Disallow: /thanks/
+Sitemap: https://24hrcrossdock.com/sitemap.xml
