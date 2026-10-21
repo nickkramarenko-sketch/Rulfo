@@ -22,8 +22,15 @@ These are Netlify Forms (`data-netlify`). In Netlify, go to Forms, then Notifica
 - `hub.html`, `transload.html`, `delivery.html` and `trailers.html` are new.
 - Edit these, then rebuild.
 
+## Facts used (from Nick)
+- **Sparks, NV:** 1095 Spice Islands Dr, Suites 105–106, 89431. 40,000 sq ft, 8 doors. Our most flexible 3PL: storage, cross-dock, transload, fulfillment, FBA prep, delivery and trailers.
+- **North Highlands, CA:** 3036 Orange Grove Ave, 95660. 40,000 sq ft, 8 doors. Cross-dock, transload and pallet storage (short and long term). Growing to about 100,000 sq ft in about 2 years.
+- **Middletown, PA:** 2811 Turnpike Industrial Dr, 17057. 25,000 sq ft, 50 doors. Cross-dock, transload, pallet storage and order staging. Growing to 50,000–60,000 sq ft in about 2 years.
+- **Hours:** 6am–10pm at every dock. 10pm–6am is by appointment with a $100 after-hours fee.
+- **Totals:** 105,000 sq ft and 66 doors.
+- **Site managers:** fill in `MANAGERS` in `build.py` (name, title, phone, email and photo in `assets/team/`).
+
 ## To confirm
-- Street addresses for North Highlands and Middletown.
-- Services at each dock.
-- Hours, given the "24 HR" name.
-- Figures: "400+ accounts", "3,000+ pallets/month", Extensiv WMS, EDI.
+- Street suffix and zip: "Orange Grove **Ave**, 95660" and "Turnpike Industrial **Dr**, 17057".
+- Hours: every day, or Mon–Fri? There are no opening hours in the schema until this is confirmed.
+- Monthly pallet volume: the site shows no number until a real one is confirmed.
