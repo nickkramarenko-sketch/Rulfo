@@ -495,3 +495,14 @@ details.mgr{border-bottom:1px solid var(--line)}
 footer{padding-bottom:96px}
 @media (max-width:700px){.mbar .mb-l{display:none}.mbar a{flex:1;padding:13px 6px}.mbar a.c{font-size:0}.mbar a.c::before{content:"Call";font-size:15px}}
 @media (max-width:640px){nav.main.n6{grid-template-columns:repeat(3,1fr)}}
+/* phones and tablets: when scrolling down, slide the logo/sign-in row away and keep the menu row */
+@media (max-width:900px){
+  header{transition:transform .25s ease,box-shadow .3s}
+  header.compact{transform:translateY(calc(-1 * var(--toph,0px)))}
+}
+/* hero video (drop files in assets/video/) */
+.hero.hasv{isolation:isolate}
+.hero .hv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:.55}
+.hero.hasv::before{z-index:-1;background:linear-gradient(90deg,rgba(15,59,68,.94) 0%,rgba(15,59,68,.78) 55%,rgba(15,59,68,.55) 100%)}
+@media (prefers-reduced-motion:reduce){.hero .hv{display:none}}
+@media (max-width:640px){.cband ul{flex:1 1 100%;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}}

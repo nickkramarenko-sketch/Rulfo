@@ -109,7 +109,20 @@ ICON = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0
         "font-weight='800' font-size='30' fill='white'%3E24%3C/text%3E%3C/svg%3E")
 
 
+# Hero videos: put short, silent, looping MP4s (about 10-20 s, under 5 MB, 1920x1080) in assets/video/
+# with a matching .jpg still, named after the section: main.mp4, reno.mp4, sac.mp4, pa.mp4.
+def hero_video(body, section):
+    for name in (section, 'main'):
+        mp4 = os.path.join(ROOT, 'assets', 'video', name + '.mp4')
+        if os.path.exists(mp4):
+            poster = '/assets/video/%s.jpg' % name if os.path.exists(mp4[:-4] + '.jpg') else ''
+            v = '<video class="hv" autoplay muted loop playsinline preload="metadata"%s aria-hidden="true"><source src="/assets/video/%s.mp4" type="video/mp4"></video>' % (' poster="%s"' % poster if poster else '', name)
+            return re.sub(r'<section class="hero([^"]*)">', lambda m: '<section class="hero%s hasv">\n  %s' % (m.group(1), v), body, count=1)
+    return body
+
+
 def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None):
+    body = hero_video(body, section)
     loc = section if section in LOC else None
     nav = NAV_RENO if section == 'reno' else NAV_MAIN
     logo = LOC['reno']['home'] if section == 'reno' else '/'

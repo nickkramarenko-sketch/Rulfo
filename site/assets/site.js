@@ -1,6 +1,14 @@
 (function(){
   var hd=document.querySelector('header');
-  window.addEventListener('scroll',function(){hd.classList.toggle('sc',scrollY>8)},{passive:true});
+  var nav=document.getElementById('nav'),last=0;
+  function toph(){hd.style.setProperty('--toph',(nav?nav.offsetTop:0)+'px')}
+  toph();window.addEventListener('resize',toph);
+  window.addEventListener('scroll',function(){
+    var y=scrollY;hd.classList.toggle('sc',y>8);
+    // scrolling down past the top: hide the logo row (phones/tablets only, see CSS); scrolling up: show it again
+    if(y>140&&y>last+4)hd.classList.add('compact');else if(y<last-4||y<140)hd.classList.remove('compact');
+    last=y;
+  },{passive:true});
   var rm=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if('IntersectionObserver' in window&&!rm){
     var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}})},{rootMargin:'0px 0px -8% 0px'});

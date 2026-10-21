@@ -34,3 +34,9 @@ These are Netlify Forms (`data-netlify`). In Netlify, go to Forms, then Notifica
 - Street suffix and zip: "Orange Grove **Ave**, 95660" and "Turnpike Industrial **Dr**, 17057".
 - Hours: every day, or Mon–Fri? There are no opening hours in the schema until this is confirmed.
 - Pallet volume: Nick says about 30–35k a month across all docks, NVK included. The site says "30,000+".
+
+## Phone header
+On screens up to 900px wide, scrolling down slides the logo and Sign In row away and keeps the menu row. Scrolling up brings it back.
+
+## Hero videos
+Put silent, looping MP4s in `assets/video/`: `main.mp4` (main page), `reno.mp4`, `sac.mp4`, `pa.mp4`. Add a matching `.jpg` still for each. Then rebuild. Keep each one 10–20 seconds, 1920x1080, under 5 MB, with no audio. Pages with no video of their own use `main.mp4`.
