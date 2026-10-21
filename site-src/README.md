@@ -33,4 +33,4 @@ These are Netlify Forms (`data-netlify`). In Netlify, go to Forms, then Notifica
 ## To confirm
 - Street suffix and zip: "Orange Grove **Ave**, 95660" and "Turnpike Industrial **Dr**, 17057".
 - Hours: every day, or Mon–Fri? There are no opening hours in the schema until this is confirmed.
-- Monthly pallet volume: the site shows no number until a real one is confirmed.
+- Pallet volume: Nick says about 30–35k a month across all docks, NVK included. The site says "30,000+".

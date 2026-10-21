@@ -373,7 +373,7 @@ def locations():
   <div class="w grid"><div>
     <span class="crumb">Locations</span>
     <h1>Three docks. <span>One standard.</span></h1>
-    <p class="sub">105,000 square feet and 66 dock doors in Sparks, Nevada; North Highlands, California; and Middletown, Pennsylvania. Cross-dock, transload and pallet storage at every one, open {HOURS}.</p>
+    <p class="sub">30,000+ pallets a month through 105,000 square feet and 66 dock doors in Sparks, Nevada; North Highlands, California; and Middletown, Pennsylvania. Cross-dock, transload and pallet storage at every one, open {HOURS}.</p>
     <div class="ctas"><a class="btn r" href="/quote/">Get a quote</a><a class="btn o" href="{TEL}">Call {PHONE}</a></div>
   </div></div>
 </section>
@@ -422,7 +422,7 @@ def build():
     R = 'reno'
     pages = [
         ('/', '24 HR Crossdock | Cross-Dock & Warehousing in Reno, Sacramento and Harrisburg',
-         'Cross-dock, pallet storage, transload and fulfillment at three docks: Reno–Sparks NV, North Highlands CA and Middletown PA. Call 916-616-3481.',
+         '30,000+ pallets a month through three docks: Reno–Sparks NV, North Highlands CA and Middletown PA. Cross-dock, pallet storage, transload and fulfillment. Call 916-616-3481.',
          frag('hub.html'), 'main', [ORG], None),
         ('/reno/', '3PL Warehousing & Cross-Dock in Reno–Sparks, NV | 24 HR Crossdock',
          'Pallet storage, cross-dock, container unloading, fulfillment and FBA prep in Sparks, NV. 40,000 sq ft, 8 dock doors on I-80. Call 916-616-3481.',
