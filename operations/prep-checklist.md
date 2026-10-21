@@ -1,5 +1,7 @@
 # PREP: Be Fully Set Up Before Any Outreach
 
+Big goal: $10M a year in warehouse revenue in 3 years, Reno + Chicago (see `plan/3-year-goal.md`). Prep is step one.
+
 Rule: **no outreach until Prep is done.** No calls, cold email or ads. When a new customer looks us up, everything should look legit, and when they say yes, the crew already knows exactly what to do.
 
 Who: **Claude** = Claude writes or builds it. **Nick** = Nick does it (accounts, money, signatures).
