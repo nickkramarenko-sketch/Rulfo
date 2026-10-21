@@ -12,18 +12,18 @@ DOMAIN = 'https://24hrcrossdock.com'
 PORTAL = 'https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv'
 PHONE, TEL, EMAIL = '916-616-3481', 'tel:+19166163481', '24hrcrossdock@gmail.com'
 
-HOURS = '6am–10pm'
-AFTER = '10pm–6am by appointment, $100 after-hours fee'
+HOURS = 'Mon–Fri 6am–10pm'
+AFTER = 'nights and weekends by appointment, $100 fee for 10pm–6am'
 LOC = {
     'reno': dict(key='reno', city='Sparks', region='NV', short='Reno–Sparks, NV', label='Reno, NV', q='Sparks, NV',
                  street='1095 Spice Islands Dr, Suites 105-106', zip='89431', home='/reno/', sqft='40,000', doors='8',
-                 bar='1095 Spice Islands Dr, Sparks, NV · Open 6am–10pm'),
+                 bar='1095 Spice Islands Dr, Sparks, NV · Mon–Fri 6am–10pm'),
     'sac': dict(key='sac', city='North Highlands', region='CA', short='Sacramento area, CA', label='Sacramento, CA', q='North Highlands, CA',
                 street='3036 Orange Grove Ave', zip='95660', home='/sacramento/', sqft='40,000', doors='8',
-                bar='3036 Orange Grove Ave, North Highlands, CA · Open 6am–10pm'),
+                bar='3036 Orange Grove Ave, North Highlands, CA · Mon–Fri 6am–10pm'),
     'pa': dict(key='pa', city='Middletown', region='PA', short='Harrisburg area, PA', label='Harrisburg, PA', q='Middletown, PA',
                street='2811 Turnpike Industrial Dr', zip='17057', home='/middletown/', sqft='25,000', doors='50',
-               bar='2811 Turnpike Industrial Dr, Middletown, PA · Open 6am–10pm'),
+               bar='2811 Turnpike Industrial Dr, Middletown, PA · Mon–Fri 6am–10pm'),
 }
 # Site managers: fill in name, title, phone, email and a photo path (e.g. /assets/team/reno.jpg) when ready.
 MANAGERS = {
@@ -89,6 +89,8 @@ def biz(loc, url):
     d = {'@context': 'https://schema.org', '@type': 'LocalBusiness', 'additionalType': 'https://schema.org/Warehouse',
          'name': '24 HR Crossdock – ' + L['short'], 'url': DOMAIN + url, 'telephone': '+1-916-616-3481', 'email': EMAIL,
          'address': addr, 'parentOrganization': {'@type': 'Organization', 'name': '24 HR Crossdock', 'url': DOMAIN + '/'}}
+    d['openingHoursSpecification'] = [{'@type': 'OpeningHoursSpecification', 'dayOfWeek': ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+                                        'opens': '06:00', 'closes': '22:00'}]
     if loc == 'reno':
         d['areaServed'] = ['Reno', 'Sparks', 'Northern Nevada', 'Northern California']
     return d
@@ -133,7 +135,7 @@ def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None
         bar = '<b>%s</b><span>%s</span>' % (LOC[loc]['short'], LOC[loc]['bar'])
     else:
         bar = '<b>Three docks</b><span>Sparks, NV · North Highlands, CA · Middletown, PA</span>'
-    mbl = {'reno': 'Reno–Sparks dock', 'sac': 'Sacramento dock', 'pa': 'Harrisburg dock'}.get(section, 'Three docks: NV · CA · PA') + ', open 6am–10pm'
+    mbl = {'reno': 'Reno–Sparks dock', 'sac': 'Sacramento dock', 'pa': 'Harrisburg dock'}.get(section, 'Three docks: NV · CA · PA') + ', Mon–Fri 6am–10pm'
     qurl = '/quote/' + ('?loc=' + LOC[loc]['q'].replace(' ', '%20').replace(',', '%2C') if loc else '')
     cta = cta or ({'reno': 'Need space in Reno?', 'sac': 'Need a dock in Sacramento?', 'pa': 'Need a dock in Pennsylvania?'}.get(section, 'Need a dock?'))
     ld = ''.join('<script type="application/ld+json">%s</script>\n' % json.dumps(s, ensure_ascii=False) for s in list(schema) + ([crumbs(trail)] if trail else []))
@@ -192,7 +194,7 @@ FOOTER = f'''<footer>
       <div><h4>Our docks</h4><p><a href="/reno/">1095 Spice Islands Dr, Sparks, NV 89431</a></p><p><a href="/sacramento/">3036 Orange Grove Ave, North Highlands, CA 95660</a></p><p><a href="/middletown/">2811 Turnpike Industrial Dr, Middletown, PA 17057</a></p></div>
       <div><h4>Customers</h4><p><a href="{PORTAL}">Customer sign-in</a></p><p><a href="{PORTAL}">Book a truck</a></p><p><a href="{PORTAL}">See your inventory</a></p><p><a href="/get-started/">Get started</a></p></div>
       <div><h4>Company</h4><p><a href="/about/">About us</a></p><p><a href="/technology/">Technology</a></p><p><a href="/quote/">Get a quote</a></p></div>
-      <div><h4>Contact</h4><p><a href="{TEL}">{PHONE}</a></p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p><p>Open 6am–10pm</p><p>After-hours by appointment</p></div>
+      <div><h4>Contact</h4><p><a href="{TEL}">{PHONE}</a></p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p><p>Mon–Fri 6am–10pm</p><p>Nights and weekends by appointment</p></div>
     </div>
     <p class="copy">© 2026 24 HR Crossdock. Fully insured. Sparks, NV · North Highlands, CA · Middletown, PA.</p>
   </div>
@@ -402,7 +404,7 @@ def locations():
       <li><b>Same receiving</b><span>Seal checked, counted against the BOL, photographed at the door</span></li>
       <li><b>Same damage process</b><span>Photos and a cost to fix, and nothing is charged until you approve it</span></li>
       <li><b>Same portal</b><span>Book trucks, see inventory and approve charges for every location</span></li>
-      <li><b>Same hours</b><span>{HOURS} at every dock, {AFTER}</span></li>
+      <li><b>Same hours</b><span>{HOURS} at every dock; {AFTER}</span></li>
       <li><b>One number</b><span>{PHONE} reaches the people running the docks</span></li>
     </ul>
   </div>
