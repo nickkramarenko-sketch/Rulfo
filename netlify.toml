@@ -1,0 +1,20 @@
+# Deploys the 24hrcrossdock.com site from the site/ folder (built by site-src/build.py).
+[build]
+  publish = "site"
+
+[[redirects]]
+  from = "/thanks.html"
+  to = "/thanks/"
+  status = 301
+[[redirects]]
+  from = "/north-highlands/*"
+  to = "/sacramento/"
+  status = 301
+[[redirects]]
+  from = "/harrisburg/*"
+  to = "/middletown/"
+  status = 301
+[[redirects]]
+  from = "/sparks/*"
+  to = "/reno/"
+  status = 301
