@@ -18,3 +18,11 @@
   from = "/sparks/*"
   to = "/reno/"
   status = 301
+[[redirects]]
+  from = "/technology/*"
+  to = "/client-portal/"
+  status = 301
+[[redirects]]
+  from = "/reno/trailers/*"
+  to = "/reno/"
+  status = 301

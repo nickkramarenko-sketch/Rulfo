@@ -14,16 +14,22 @@ PHONE, TEL, EMAIL = '916-616-3481', 'tel:+19166163481', '24hrcrossdock@gmail.com
 
 HOURS = 'Mon–Fri 6am–10pm'
 AFTER = 'nights and weekends by appointment, $100 fee for 10pm–6am'
+SINCE = '2015'
+SMS = 'sms:+19166163481'
+BOOK = ''   # Google Calendar booking-page link. The "Book a call" buttons appear once this is filled in.
+GA_ID = ''  # Google Analytics 4 ID (G-XXXXXXXXXX). Visit tracking turns on once this is filled in.
+# Real customer quotes for the home page: ('Quote text', 'Name, title', 'Company'). Only with the customer's OK.
+TESTIMONIALS = []
 LOC = {
     'reno': dict(key='reno', city='Sparks', region='NV', short='Reno–Sparks, NV', label='Reno, NV', q='Sparks, NV',
                  street='1095 Spice Islands Dr, Suites 105-106', zip='89431', home='/reno/', sqft='40,000', doors='8',
-                 bar='1095 Spice Islands Dr, Sparks, NV · Mon–Fri 6am–10pm'),
+                 bar='1095 Spice Islands Dr, Sparks, NV · Docks Mon–Fri 6am–10pm · Phone 24/7'),
     'sac': dict(key='sac', city='North Highlands', region='CA', short='Sacramento area, CA', label='Sacramento, CA', q='North Highlands, CA',
                 street='3036 Orange Grove Ave', zip='95660', home='/sacramento/', sqft='40,000', doors='8',
-                bar='3036 Orange Grove Ave, North Highlands, CA · Mon–Fri 6am–10pm'),
+                bar='3036 Orange Grove Ave, North Highlands, CA · Docks Mon–Fri 6am–10pm · Phone 24/7'),
     'pa': dict(key='pa', city='Middletown', region='PA', short='Harrisburg area, PA', label='Harrisburg, PA', q='Middletown, PA',
                street='2811 Turnpike Industrial Dr', zip='17057', home='/middletown/', sqft='25,000', doors='50',
-               bar='2811 Turnpike Industrial Dr, Middletown, PA · Mon–Fri 6am–10pm'),
+               bar='2811 Turnpike Industrial Dr, Middletown, PA · Docks Mon–Fri 6am–10pm · Phone 24/7'),
 }
 # Site managers: fill in name, title, phone, email and a photo path (e.g. /assets/team/reno.jpg) when ready.
 MANAGERS = {
@@ -33,14 +39,13 @@ MANAGERS = {
 }
 
 NAV_MAIN = [('/reno/', 'Reno, NV'), ('/sacramento/', 'Sacramento, CA'), ('/middletown/', 'Harrisburg, PA'),
-            ('/technology/', 'Technology'), ('/about/', 'About'), ('/get-started/', 'Get Started')]
+            ('/services/', 'Services'), ('/client-portal/', 'Client Portal'), ('/about/', 'About')]
 NAV_RENO = [('/reno/pallet-storage/', 'Storage'), ('/reno/cross-dock/', 'Cross-Dock'), ('/reno/fulfillment/', 'Fulfillment'),
-            ('/reno/transload/', 'Transload'), ('/reno/delivery/', 'Delivery'), ('/reno/trailers/', 'Trailers'),
-            ('/locations/', 'Locations')]
+            ('/reno/transload/', 'Transload'), ('/reno/delivery/', 'Delivery'), ('/locations/', 'Locations')]
 
 # old single-page hash links -> real URLs
 HASH = {'#/': '/reno/', '#/fulfillment': '/reno/fulfillment/', '#/cross-dock': '/reno/cross-dock/',
-        '#/technology': '/technology/', '#/get-started': '/get-started/', '#/company': '/about/',
+        '#/technology': '/client-portal/', '#/get-started': '/get-started/', '#/company': '/about/',
         '#/quote': '/quote/', '#/locations': '/locations/', '#/sacramento': '/sacramento/',
         '#/middletown': '/middletown/', '#/pallet-storage-reno': '/reno/pallet-storage/', '#/fba-prep-reno': '/reno/fba-prep/'}
 
@@ -66,18 +71,46 @@ def locsel(default):
     return '<label>Location<select name="Location">%s</select></label>' % opts
 
 
+SVC = ['Cross-dock', 'Long-term pallet storage', 'Short-term pallet storage', 'Transload / container unloading',
+       'Restack / rework', 'Fulfillment / FBA prep (Reno)', 'Delivery', 'Not sure yet']
+NEXT = ('<div class="next"><b>What happens next</b><ol><li>We call you back within one hour, day or night.</li>'
+        '<li>We confirm the details. About 10 minutes.</li><li>You get your rates in writing.</li></ol></div>')
+
+
 def forms(html, page, default_loc):
-    """Make every quote form a Netlify form that emails the office, with a location field."""
+    """Every quote form is the same two-step Netlify form: four quick fields, then optional details.
+    Netlify emails each submission to the office (set the notification up in Netlify > Forms)."""
     def one(m):
         attrs, body = m.group(1), m.group(2)
         src = re.search(r'data-src="([^"]*)"', attrs)
-        name = 'quote-' + re.sub(r'[^a-z0-9]+', '-', (src.group(1) if src else page).lower()).strip('-')
+        src = src.group(1) if src else page
+        name = 'quote-' + re.sub(r'[^a-z0-9]+', '-', src.lower()).strip('-')
         attrs = re.sub(r'\s(id|data-src)="[^"]*"', '', attrs)
-        body = re.sub(r'<label>Location<select name="Location">.*?</select></label>\s*', '', body, flags=re.S)
-        hidden = ('<input type="hidden" name="form-name" value="%s"><input type="hidden" name="Page" value="%s">'
-                  '<p class="hp"><label>Leave this empty<input name="bot-field"></label></p>' % (name, page))
-        body = body.replace('<button', locsel(default_loc) + '\n      <button', 1)
-        return '<form%s name="%s" method="POST" action="/thanks/" data-netlify="true" netlify-honeypot="bot-field">%s%s</form>' % (attrs, name, hidden, body)
+        head = '\n      '.join(re.findall(r'<h2>.*?</h2>|<p class="fs">.*?</p>', body))
+        svc = 'Long-term pallet storage' if 'storage' in src.lower() else 'Fulfillment / FBA prep (Reno)' if 'FBA' in src else 'Cross-dock'
+        svcs = ''.join('<option%s>%s</option>' % (' selected' if v == svc else '', v) for v in SVC)
+        fba = ('\n        <label>Units per month<input name="Units per month" inputmode="numeric" placeholder="5,000"></label>'
+               '\n        <label>SKUs<input name="SKUs" inputmode="numeric" placeholder="25"></label>') if 'FBA' in src else ''
+        return f'''<form{attrs} name="{name}" method="POST" action="/thanks/" data-netlify="true" netlify-honeypot="bot-field">
+      <input type="hidden" name="form-name" value="{name}"><input type="hidden" name="Page" value="{page}">
+      <p class="hp"><label>Leave this empty<input name="bot-field"></label></p>
+      {head}
+      <label>Your name<input name="Name" required autocomplete="name"></label>
+      <label>Phone<input name="Phone" type="tel" required autocomplete="tel"></label>
+      {locsel(default_loc)}
+      <label>Service<select name="Service">{svcs}</select></label>
+      <details class="more"><summary>Add details <span>(optional)</span></summary><div class="mgrid">
+        <label>Company<input name="Company" autocomplete="organization"></label>
+        <label>Email<input name="Email" type="email" autocomplete="email"></label>
+        <label>Pallets<input name="Pallets" inputmode="numeric" placeholder="e.g. 26"></label>
+        <label>How long to store<select name="How long"><option>Not sure</option><option>Not storing</option><option>Under 1 month</option><option>1 to 3 months</option><option>3 to 12 months</option><option>Over a year</option></select></label>
+        <label>Inbound<select name="Inbound type"><option>Palletized trailer</option><option>Floor-loaded container</option><option>Floor-loaded trailer</option><option>Mixed / not sure</option></select></label>{fba}
+        <label class="f">Anything else<textarea name="Details" placeholder="Commodity, pallet size and weight, pickup and delivery cities, dates"></textarea></label>
+      </div></details>
+      <button class="btn r" type="submit">Get my quote</button>
+      <p class="fnote">We call you back within one hour, 24/7. Or call <a href="{TEL}">{PHONE}</a>.</p>
+      {NEXT if '<div class="next">' in body else ''}
+    </form>'''
     return re.sub(r'<form([^>]*)>(.*?)</form>', one, html, flags=re.S)
 
 
@@ -106,8 +139,8 @@ def crumbs(trail):
             'itemListElement': [{'@type': 'ListItem', 'position': i + 1, 'name': n, 'item': DOMAIN + u} for i, (u, n) in enumerate(trail)]}
 
 
-ICON = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230F3B44'/%3E"
-        "%3Crect x='8' y='8' width='48' height='48' rx='6' fill='%23A95A24'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-family='Arial Narrow,Arial' "
+ICON = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230B1B30'/%3E"
+        "%3Crect x='8' y='8' width='48' height='48' rx='6' fill='%23C2410C'/%3E%3Ctext x='32' y='43' text-anchor='middle' font-family='Arial Narrow,Arial' "
         "font-weight='800' font-size='30' fill='white'%3E24%3C/text%3E%3C/svg%3E")
 
 
@@ -123,6 +156,11 @@ def hero_video(body, section):
     return body
 
 
+GA = ('''<script async src="https://www.googletagmanager.com/gtag/js?id=%s"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','%s');</script>
+''' % (GA_ID, GA_ID)) if GA_ID else ''
+
+
 def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None):
     body = hero_video(body, section)
     loc = section if section in LOC else None
@@ -135,16 +173,15 @@ def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None
         bar = '<b>%s</b><span>%s</span>' % (LOC[loc]['short'], LOC[loc]['bar'])
     else:
         bar = '<b>Three docks</b><span>Sparks, NV · North Highlands, CA · Middletown, PA</span>'
-    mbl = {'reno': 'Reno–Sparks dock', 'sac': 'Sacramento dock', 'pa': 'Harrisburg dock'}.get(section, 'Three docks: NV · CA · PA') + ', Mon–Fri 6am–10pm'
     qurl = '/quote/' + ('?loc=' + LOC[loc]['q'].replace(' ', '%20').replace(',', '%2C') if loc else '')
     cta = cta or ({'reno': 'Need space in Reno?', 'sac': 'Need a dock in Sacramento?', 'pa': 'Need a dock in Pennsylvania?'}.get(section, 'Need a dock?'))
     ld = ''.join('<script type="application/ld+json">%s</script>\n' % json.dumps(s, ensure_ascii=False) for s in list(schema) + ([crumbs(trail)] if trail else []))
     ctah = '' if url.startswith('/quote/') or url.startswith('/thanks/') else '''<section class="cta">
   <div class="w">
-    <div><h2>%s</h2><p>Tell us what you've got. Quote within one business day.</p></div>
-    <div class="btns"><a class="btn wht" href="%s">Get a quote</a><a class="btn o" href="%s">%s</a></div>
+    <div><h2>%s</h2><p>Call 24/7, or send four quick fields and we call you back within one hour.</p></div>
+    <div class="btns"><a class="btn wht" href="%s">Call %s</a><a class="btn o" href="%s">Get a quote</a><a class="btn o" href="%s">Text us</a>%s</div>
   </div>
-</section>''' % (cta, qurl, TEL, PHONE)
+</section>''' % (cta, TEL, PHONE, qurl, SMS, '<a class="btn o" href="%s" rel="noopener">Book a call</a>' % BOOK if BOOK else '')
     return f'''<!doctype html>
 <html lang="en">
 <head>
@@ -156,11 +193,11 @@ def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None
 <link rel="icon" href="{ICON}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="24 HR Crossdock">
 <meta property="og:title" content="{title}"><meta property="og:description" content="{desc}"><meta property="og:url" content="{DOMAIN}{url}">
-<meta name="theme-color" content="#0F3B44">
+<meta name="theme-color" content="#0B1B30">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
-{ld}</head>
+{ld}{GA}</head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div class="locbar"><div class="w">{bar}<a href="/locations/">{'Other locations' if loc else 'All locations'}</a></div></div>
@@ -170,15 +207,15 @@ def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None
     <nav class="main{' n6' if len(nav) == 6 else ''}" id="nav" aria-label="Main">
 {navh}
     </nav>
-    <a class="signin" href="{PORTAL}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span><span class="sl">Customer </span>Sign In</span></a>
-    <a class="btn r" href="{qurl}">Get a quote</a>
+    <a class="signin" href="{PORTAL}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span><span class="sl">Client </span>Sign In</span></a>
+    <a class="btn r hcall" href="{TEL}"><span>Call 24/7</span> {PHONE}</a>
   </div>
 </header>
 <main id="content">
 {body}
 {ctah}
 </main>
-<div class="mbar" aria-label="Quick contact"><span class="mb-l">{mbl}</span><a href="{TEL}" class="c">Call {PHONE}</a><a href="{PORTAL}" class="s">Sign in</a><a href="{qurl}" class="q">Get a quote</a></div>
+<div class="mbar" aria-label="Call us"><a href="{TEL}" class="c"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>Call 24/7: {PHONE}</a></div>
 {FOOTER}
 <script src="/assets/site.js" defer></script>
 </body>
@@ -189,14 +226,14 @@ def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None
 FOOTER = f'''<footer>
   <div class="w">
     <div class="cols">
-      <div><a class="logo" href="/"><i>24</i>HR Crossdock</a><p style="margin-top:14px">Cross-dock and warehousing in Reno–Sparks, NV, Sacramento, CA and Harrisburg, PA.</p></div>
-      <div><h4>Reno–Sparks, NV</h4><p><a href="/reno/">Reno home</a></p><p><a href="/reno/pallet-storage/">Pallet storage</a></p><p><a href="/reno/cross-dock/">Cross-dock</a></p><p><a href="/reno/fulfillment/">Fulfillment</a></p><p><a href="/reno/fba-prep/">FBA prep</a></p><p><a href="/reno/transload/">Transload</a></p><p><a href="/reno/delivery/">Delivery</a></p><p><a href="/reno/trailers/">Trailers</a></p></div>
+      <div><a class="logo" href="/"><i>24</i>HR Crossdock</a><p style="margin-top:14px">Cross-dock, transload and pallet storage in Reno–Sparks, NV, Sacramento, CA and Harrisburg, PA. Since 2015.</p></div>
+      <div><h4>Reno–Sparks, NV</h4><p><a href="/reno/">Reno home</a></p><p><a href="/reno/pallet-storage/">Pallet storage</a></p><p><a href="/reno/cross-dock/">Cross-dock</a></p><p><a href="/reno/fulfillment/">Fulfillment</a></p><p><a href="/reno/fba-prep/">FBA prep</a></p><p><a href="/reno/transload/">Transload</a></p><p><a href="/reno/delivery/">Delivery</a></p></div>
       <div><h4>Our docks</h4><p><a href="/reno/">1095 Spice Islands Dr, Sparks, NV 89431</a></p><p><a href="/sacramento/">3036 Orange Grove Ave, North Highlands, CA 95660</a></p><p><a href="/middletown/">2811 Turnpike Industrial Dr, Middletown, PA 17057</a></p></div>
-      <div><h4>Customers</h4><p><a href="{PORTAL}">Customer sign-in</a></p><p><a href="{PORTAL}">Book a truck</a></p><p><a href="{PORTAL}">See your inventory</a></p><p><a href="/get-started/">Get started</a></p></div>
-      <div><h4>Company</h4><p><a href="/about/">About us</a></p><p><a href="/technology/">Technology</a></p><p><a href="/quote/">Get a quote</a></p></div>
-      <div><h4>Contact</h4><p><a href="{TEL}">{PHONE}</a></p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p><p>Mon–Fri 6am–10pm</p><p>Nights and weekends by appointment</p></div>
+      <div><h4>Clients</h4><p><a href="{PORTAL}">Client sign-in</a></p><p><a href="{PORTAL}">Book a truck</a></p><p><a href="{PORTAL}">See your inventory</a></p><p><a href="/get-started/">Get started</a></p></div>
+      <div><h4>Company</h4><p><a href="/about/">About us</a></p><p><a href="/services/">Services</a></p><p><a href="/client-portal/">Client portal</a></p><p><a href="/locations/">Locations</a></p><p><a href="/quote/">Get a quote</a></p></div>
+      <div><h4>Contact</h4><p><a href="{TEL}">{PHONE}</a> (24/7)</p><p><a href="{SMS}">Text us</a></p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p><p>Docks Mon–Fri 6am–10pm</p><p>Nights and weekends by appointment</p></div>
     </div>
-    <p class="copy">© 2026 24 HR Crossdock. Fully insured. Sparks, NV · North Highlands, CA · Middletown, PA.</p>
+    <p class="copy">© 2026 24 HR Crossdock. Since 2015. Fully insured. Sparks, NV · North Highlands, CA · Middletown, PA.</p>
   </div>
   <div class="wordmark" aria-hidden="true">24 HR CROSSDOCK</div>
 </footer>'''
@@ -222,32 +259,21 @@ def reno_home():
     ''' + manager('reno') + '''
   </div>
 </section>'''
+    b = b.replace('<h1>Reno 3PL warehousing, <span>done right.</span></h1>', '<h1>Reno cross-dock and warehousing, <span>done right.</span></h1>')
+    b = b.replace('<p class="sub">Pallet storage, container unloading, fulfillment and delivery on I-80 in Sparks, Nevada.',
+                  '<p class="sub">Cross-dock, long-term pallet storage, container unloading, fulfillment and delivery on our own trucks, on I-80 in Sparks, Nevada.')
+    b = b.replace('<section class="s a">\n  <div class="w split">\n    <div class="l">\n      <h2>Talk to the Sparks dock</h2>', storage('reno') + '\n<section class="s a">\n  <div class="w split">\n    <div class="l">\n      <h2>Talk to the Sparks dock</h2>')
     b = b.replace('href="#hq"', 'href="#quote"').replace('<form id="hq"', '<form id="quote"')
     b = b.replace('Already a customer?</b>\n  <ul><li>Book a pickup</li><li>Track your loads</li>', 'Already a customer?</b>\n  <ul><li>Book a truck</li><li>See your inventory</li>')
     return b
 
 
-def technology():
+def client_portal():
     b = frag('_old_technology.html')
-    # the customer portal is what customers actually use today; say so plainly
-    b = b.replace('upload a spreadsheet through your WMS login.', 'upload a spreadsheet through the customer portal.')
-    b += f'''
-<section class="s a">
-  <div class="w split">
-    <div class="l">
-      <h2>The customer portal</h2>
-      <p>Every customer gets a login to our portal. It's where you book trucks, see what's in our warehouse and on the way, approve damage charges, make requests and message the dock.</p>
-      <p style="margin-top:24px"><a class="btn r" href="{PORTAL}">Customer sign in</a></p>
-    </div>
-    <ul class="rows">
-      <li><b>Schedule</b><span>A week view of every drop-off and pickup, with live status</span></li>
-      <li><b>Inventory</b><span>Pallets and weight on our floor, for pickup and for delivery</span></li>
-      <li><b>Requests</b><span>Photos, dimensions, delivery and trailer requests</span></li>
-      <li><b>Damage</b><span>Photos and a cost to fix. Accept, decline or call us</span></li>
-      <li><b>Bills</b><span>Charges by load and every invoice</span></li>
-    </ul>
-  </div>
-</section>'''
+    b = b.replace('<span class="crumb">Technology</span>', '<span class="crumb">Client portal</span>')
+    b = b.replace('Every client gets a login to our client portal.', 'Every client gets a login to our client portal.')
+    b = b.replace('>Client sign in<', '>Client sign in<').replace('>Talk to us about integration<', '>Get a quote<')
+    b = b.replace('a third-party delivery or a trailer rental.', 'a delivery or anything special.')
     return b
 
 
@@ -294,27 +320,30 @@ def manager(loc):
 </details>"""
 
 
-GROW = {'sac': 'Growing to about 100,000 sq ft over the next two years.',
-        'pa': 'Growing to 50,000–60,000 sq ft over the next two years.',
-        'reno': ''}
+# One line per dock on the locations page (growth plans stay private)
+LINE = {'reno': 'Our most flexible dock: cross-dock, storage, fulfillment and delivery.',
+        'sac': 'Cross-dock and long-term pallet storage for Northern California.',
+        'pa': '50 doors for cross-dock, restack and rework on the East Coast.'}
 
 SERVICES = {
-    'reno': [('Pallet storage', 'Short and long term, floor and racked, billed weekly', '/reno/pallet-storage/'),
-             ('Cross-dock', 'Unload, split and reload, with photos at the door', '/reno/cross-dock/'),
-             ('Transload and container unloading', 'Floor-loaded containers and trailers palletized and wrapped', '/reno/transload/'),
+    'reno': [('Cross-dock', 'Unload, split and reload the same day, with photos at the door', '/reno/cross-dock/'),
+             ('Long-term pallet storage', 'Floor and racked, a week or a year, billed weekly', '/reno/pallet-storage/'),
+             ('Transload and container unloading', 'Floor-loaded and palletized containers unloaded and wrapped', '/reno/transload/'),
              ('Fulfillment and FBA prep', 'Pick, pack and ship, Amazon and Walmart prep', '/reno/fulfillment/'),
-             ('Reno-area delivery', 'Reno, Sparks, Fernley and Carson City', '/reno/delivery/'),
-             ('Trailers', 'Trailer parking, reefer storage and rental per drop', '/reno/trailers/')],
-    'sac': [('Cross-dock', 'Unload, split by destination and reload', ''),
-            ('Transload and container unloading', 'Floor-loaded freight palletized, wrapped and reloaded', ''),
-            ('Pallet storage', 'Short and long term, for Sacramento and Northern California', ''),
-            ('Consolidation', 'Multiple shippers built into one outbound load', ''),
-            ('Restack and rewrap', 'Leaning or damaged pallets fixed, with photos and your approval', '')],
-    'pa': [('Cross-dock', 'Unload, split by destination and reload, with 50 dock doors', ''),
-           ('Transload and container unloading', 'Floor-loaded freight palletized, wrapped and reloaded', ''),
-           ('Pallet storage', 'Short and long term on the East Coast', ''),
-           ('Order staging', 'Orders held and released to your delivery partner on schedule', ''),
-           ('Westbound consolidation', 'Loads built for our Nevada and California docks', '')],
+             ('Delivery, our own trucks', 'Local or long distance, with signed proof of delivery', '/reno/delivery/'),
+             ('Restack, shrink wrap and labeling', 'Pallets rebuilt, wrapped and labeled for the next carrier', '')],
+    'sac': [('Cross-dock', 'Unload, split by destination and reload the same day', ''),
+            ('Long-term pallet storage', 'Floor and racked, a week or a year, for Northern California', ''),
+            ('Transload and container unloading', 'Floor-loaded and palletized freight unloaded, wrapped and reloaded', ''),
+            ('Restack and rework', 'Leaning or damaged pallets rebuilt, with photos and your approval', ''),
+            ('Shrink wrap and labeling', 'Pallets wrapped and labeled for the next carrier', ''),
+            ('Consolidation', 'Multiple shippers built into one outbound load', '')],
+    'pa': [('Restack and rework', 'Leaning, damaged or mixed pallets rebuilt, sorted and wrapped, with photos and your approval', ''),
+           ('Cross-dock', 'Unload, split by destination and reload, with 50 dock doors', ''),
+           ('Long-term pallet storage', 'Floor and racked, a week or a year, on the East Coast', ''),
+           ('Transload and container unloading', 'Floor-loaded and palletized freight unloaded, wrapped and reloaded', ''),
+           ('Shrink wrap and labeling', 'Pallets wrapped and labeled for the next carrier or the receiver', ''),
+           ('Order staging', 'Orders held and released to your carrier on schedule', '')],
 }
 
 REACH = {
@@ -327,20 +356,42 @@ def rows(loc):
     return '\n'.join('      <li><b>%s</b><span>%s</span></li>' % ('<a href="%s">%s</a>' % (u, t) if u else t, d) for t, d, u in SERVICES[loc])
 
 
+def storage(loc):
+    L = LOC[loc]
+    q = '/quote/?loc=%s&amp;svc=Long-term%%20pallet%%20storage' % L['q'].replace(' ', '%20').replace(',', '%2C')
+    rel = 'Full or partial, any carrier or our own trucks' if loc == 'reno' else 'Full or partial, to any carrier'
+    return f"""<section class="s store">
+  <div class="w split">
+    <div class="l">
+      <span class="tag">Long-term storage</span>
+      <h2>Long-term pallet storage in {L['label'].split(',')[0]}</h2>
+      <p>Store one pallet for a week or a truckload for a year. Dry, floor and racked, counted and photographed on arrival, and visible in your client portal. Billed weekly, no minimums, no long contract.</p>
+      <p style="margin-top:24px"><a class="btn r" href="{q}">Get a storage quote</a></p>
+    </div>
+    <ul class="rows">
+      <li><b>Floor and racked</b><span>Block-stacked or in pallet racking</span></li>
+      <li><b>Any length</b><span>A week, a month or a year</span></li>
+      <li><b>No minimums</b><span>One pallet or a thousand</span></li>
+      <li><b>Releases</b><span>{rel}</span></li>
+      <li><b>Fully insured</b><span>Certificate of insurance on request</span></li>
+    </ul>
+  </div>
+</section>"""
+
+
 def location_page(loc):
     L = LOC[loc]
-    head = {'sac': ('Cross-dock and pallet storage in Sacramento, <span>North Highlands.</span>',
-                    'A 40,000 sq ft dock with 8 doors for freight moving into Sacramento and Northern California. Cross-dock, transload and pallet storage, short or long term, with every load counted and photographed.'),
-            'pa': ('Cross-dock and pallet storage in Harrisburg, <span>Middletown, PA.</span>',
-                   'A 25,000 sq ft dock with 50 doors, built for fast turns on the East Coast. Cross-dock, transload, order staging and pallet storage, a day\'s drive from most of the Northeast.')}[loc]
+    head = {'sac': ('Cross-dock and long-term storage in <span>Sacramento.</span>',
+                    'A 40,000 sq ft dock with 8 doors in North Highlands, 15 minutes from downtown Sacramento. Trailers cross-docked the same day and pallets stored for a week or a year, every load counted and photographed.'),
+            'pa': ('Cross-dock, restack and rework in <span>Harrisburg.</span>',
+                   'A 25,000 sq ft dock with 50 doors in Middletown, PA, built for fast turns and pallet rework on the East Coast. Leaning, damaged or mixed pallets rebuilt, sorted, labeled and wrapped, then cross-docked or stored.')}[loc]
     reach = ''.join('<div><b>%s</b><span>%s</span></div>' % r for r in REACH[loc])
-    grow = '<p class="grow"><b>Built to grow.</b> %s</p>' % GROW[loc] if GROW[loc] else ''
     return f"""<section class="hero sm">
   <div class="w grid"><div>
     <span class="crumb"><a href="/locations/">Locations</a> / {L['city']}, {L['region']}</span>
     <h1>{head[0]}</h1>
     <p class="sub">{head[1]}</p>
-    <div class="ctas"><a class="btn r" href="/quote/">Get a quote</a><a class="btn o" href="{TEL}">Call {PHONE}</a></div>
+    <div class="ctas"><a class="btn r" href="{TEL}">Call 24/7: {PHONE}</a><a class="btn o" href="/quote/">Get a quote</a></div>
   </div></div>
 </section>
 {facts(loc)}
@@ -349,7 +400,6 @@ def location_page(loc):
     <div class="l">
       <h2>What we do in {L['city']}</h2>
       <p>The same receiving standard as every 24 HR Crossdock dock: seal checked, counted against the BOL, photographed at the door, and in your customer portal the same day.</p>
-      {grow}
       <div class="facts3">{reach}</div>
       <p class="fine">Drive times are approximate and depend on traffic.</p>
     </div>
@@ -358,6 +408,7 @@ def location_page(loc):
     </ul>
   </div>
 </section>
+{storage(loc)}
 <section class="s a">
   <div class="w split">
     <div class="l">
@@ -373,7 +424,7 @@ def locations():
     cards = ''
     for k, L in LOC.items():
         lst = ''.join('<li>%s</li>' % t for t, d, u in SERVICES[k][:5])
-        grow = '<p class="lgrow">%s</p>' % GROW[k] if GROW[k] else '<p class="lgrow">Our most flexible 3PL warehouse.</p>'
+        grow = '<p class="lgrow">%s</p>' % LINE[k]
         cards += f"""
       <article>
         <span class="tag">{L['short']}</span>
@@ -388,8 +439,8 @@ def locations():
   <div class="w grid"><div>
     <span class="crumb">Locations</span>
     <h1>Three docks. <span>One standard.</span></h1>
-    <p class="sub">30,000+ pallets a month through 105,000 square feet and 66 dock doors in Sparks, Nevada; North Highlands, California; and Middletown, Pennsylvania. Cross-dock, transload and pallet storage at every one, open {HOURS}.</p>
-    <div class="ctas"><a class="btn r" href="/quote/">Get a quote</a><a class="btn o" href="{TEL}">Call {PHONE}</a></div>
+    <p class="sub">30,000+ pallets a month through 105,000 square feet and 66 dock doors in Sparks, Nevada; North Highlands, California; and Middletown, Pennsylvania. Cross-dock, transload and long-term pallet storage at every one.</p>
+    <div class="ctas"><a class="btn r" href="{TEL}">Call 24/7: {PHONE}</a><a class="btn o" href="/quote/">Get a quote</a></div>
   </div></div>
 </section>
 <section class="s"><div class="w"><div class="loccards rv">{cards}
@@ -397,16 +448,49 @@ def locations():
 <section class="s a">
   <div class="w split">
     <div class="l">
-      <h2>Room to grow with you</h2>
-      <p>We're growing into more space as our customers grow. North Highlands is set to reach about 100,000 sq ft and Middletown 50,000–60,000 sq ft over the next two years. Sparks stays our flexible 3PL warehouse for storage, fulfillment and FBA prep.</p>
+      <h2>One standard at every dock</h2>
+      <p>Hand off in Harrisburg, split in Reno, finish in Sacramento. Same count, same photos and the same paperwork at every stop, and one client portal for all of it.</p>
     </div>
     <ul class="rows">
       <li><b>Same receiving</b><span>Seal checked, counted against the BOL, photographed at the door</span></li>
       <li><b>Same damage process</b><span>Photos and a cost to fix, and nothing is charged until you approve it</span></li>
       <li><b>Same portal</b><span>Book trucks, see inventory and approve charges for every location</span></li>
       <li><b>Same hours</b><span>{HOURS} at every dock; {AFTER}</span></li>
-      <li><b>One number</b><span>{PHONE} reaches the people running the docks</span></li>
+      <li><b>One number</b><span>{PHONE}, answered 24/7 by the people running the docks</span></li>
     </ul>
+  </div>
+</section>"""
+
+
+SVCMAP = [('Cross-dock', 'Unload, split and reload the same day', 'all', '/reno/cross-dock/'),
+          ('Long-term pallet storage', 'Floor and racked, a week or a year', 'all', '/reno/pallet-storage/'),
+          ('Transload and container unloading', 'Floor-loaded and palletized', 'all', '/reno/transload/'),
+          ('Restack and rework', 'Leaning, damaged or mixed pallets rebuilt', 'all', '/middletown/'),
+          ('Shrink wrap and labeling', 'Ready for the next carrier or the receiver', 'all', ''),
+          ('Fulfillment and FBA prep', 'Pick, pack and ship, Amazon and Walmart prep', 'reno', '/reno/fulfillment/'),
+          ('Delivery, our own trucks', 'Local or long distance, signed proof of delivery', 'reno', '/reno/delivery/')]
+
+
+def services():
+    tick = '<td class="y">✓</td>'
+    trs = ''.join('<tr><th scope="row">%s<span>%s</span></th>%s</tr>' % (
+        '<a href="%s">%s</a>' % (u, t) if u else t, d,
+        tick * 3 if w == 'all' else tick + '<td class="n">–</td>' * 2) for t, d, w, u in SVCMAP)
+    return f"""<section class="hero sm">
+  <div class="w grid"><div>
+    <span class="crumb">Services</span>
+    <h1>Cross-dock, storage and rework. <span>Three docks.</span></h1>
+    <p class="sub">Dry freight of any kind, one pallet or a thousand. No minimums, no long contracts, billed weekly. Here's what each dock does.</p>
+    <div class="ctas"><a class="btn r" href="{TEL}">Call 24/7: {PHONE}</a><a class="btn o" href="/quote/">Get a quote</a></div>
+  </div></div>
+</section>
+<section class="s">
+  <div class="w">
+    <div class="tbl"><table class="svct">
+      <thead><tr><th scope="col">Service</th><th scope="col"><a href="/reno/">Reno, NV</a></th><th scope="col"><a href="/sacramento/">Sacramento, CA</a></th><th scope="col"><a href="/middletown/">Harrisburg, PA</a></th></tr></thead>
+      <tbody>{trs}</tbody>
+    </table></div>
+    <p class="fine" style="margin-top:14px">Docks open {HOURS}; {AFTER}. Phone answered 24/7.</p>
   </div>
 </section>"""
 
@@ -414,7 +498,7 @@ def locations():
 THANKS = '''<section class="hero sm"><div class="w grid"><div>
   <span class="crumb">Thank you</span>
   <h1>Got it. <span>We'll be in touch.</span></h1>
-  <p class="sub">Your request is in. We usually reply the same business day. Need us sooner? Call 916-616-3481.</p>
+  <p class="sub">Your request is in. We'll call you back within one hour, day or night. Need us right now? Call 916-616-3481.</p>
   <div class="ctas"><a class="btn r" href="/">Back to the home page</a><a class="btn o" href="tel:+19166163481">Call 916-616-3481</a></div>
 </div></div></section>'''
 
@@ -424,6 +508,26 @@ NOTFOUND = '''<section class="hero sm"><div class="w grid"><div>
   <p class="sub">Pick your location to keep going.</p>
   <div class="ctas"><a class="btn r" href="/reno/">Reno–Sparks, NV</a><a class="btn o" href="/sacramento/">Sacramento, CA</a><a class="btn o" href="/middletown/">Harrisburg, PA</a></div>
 </div></div></section>'''
+
+
+def hub():
+    b = frag('hub.html')
+    d = os.path.join(ROOT, 'assets', 'logos')
+    logos = sorted(f for f in os.listdir(d) if f.lower().endswith(('.png', '.svg', '.jpg', '.webp'))) if os.path.isdir(d) else []
+    if logos:
+        imgs = ''.join('<img src="/assets/logos/%s" alt="%s" loading="lazy">' % (f, os.path.splitext(f)[0].replace('-', ' ').title()) for f in logos)
+        b = b.replace('<!--LOGOS-->', '<section class="logos"><div class="w"><p>Trusted by</p><div class="lg">%s</div></div></section>' % imgs)
+    quotes = ''.join('<figure><blockquote>“%s”</blockquote><figcaption><b>%s</b>%s</figcaption></figure>' % (q, n, c) for q, n, c in TESTIMONIALS)
+    links = ''.join('<a href="https://www.google.com/maps/search/?api=1&amp;query=%s" rel="noopener"><b>%s dock</b><span>Read our Google reviews →</span></a>' % (
+        ('24 HR Crossdock ' + L['street'].split(',')[0] + ' ' + L['city'] + ' ' + L['region']).replace(' ', '+').replace(',', ''), L['label'].split(',')[0]) for L in LOC.values())
+    b = b.replace('<!--REVIEWS-->', f"""<section class="s a reviews">
+  <div class="w">
+    <div class="intro rv"><h2>What customers say</h2><p>Real reviews from the brokers, carriers and shippers we move freight for.</p></div>
+    {'<div class="quotes">%s</div>' % quotes if quotes else ''}
+    <div class="revlinks">{links}</div>
+  </div>
+</section>""")
+    return b
 
 
 def build():
@@ -436,9 +540,9 @@ def build():
     shutil.copytree(os.path.join(ROOT, 'assets'), os.path.join(OUT, 'assets'))
     R = 'reno'
     pages = [
-        ('/', '24 HR Crossdock | Cross-Dock & Warehousing in Reno, Sacramento and Harrisburg',
-         '30,000+ pallets a month through three docks: Reno–Sparks NV, North Highlands CA and Middletown PA. Cross-dock, pallet storage, transload and fulfillment. Call 916-616-3481.',
-         frag('hub.html'), 'main', [ORG], None),
+        ('/', '24 HR Crossdock | Cross-Dock, Transload & Pallet Storage in Reno, Sacramento and Harrisburg',
+         '3 docks, 66 doors, 30,000+ pallets a month: Reno–Sparks NV, North Highlands CA and Middletown PA. Cross-dock, transload, rework and long-term pallet storage. Call 24/7: 916-616-3481.',
+         hub(), 'main', [ORG], None),
         ('/reno/', '3PL Warehousing & Cross-Dock in Reno–Sparks, NV | 24 HR Crossdock',
          'Pallet storage, cross-dock, container unloading, fulfillment and FBA prep in Sparks, NV. 40,000 sq ft, 8 dock doors on I-80. Call 916-616-3481.',
          reno_home(), R, [biz(R, '/reno/')], [('/', 'Home'), ('/reno/', 'Reno–Sparks, NV')]),
@@ -460,29 +564,29 @@ def build():
         ('/reno/delivery/', 'Pallet Delivery in Reno, Sparks & Carson City | 24 HR Crossdock',
          'Final-mile pallet delivery from Sparks to Reno, Fernley and Carson City with signed proof of delivery.',
          frag('delivery.html'), R, [biz(R, '/reno/')], [('/', 'Home'), ('/reno/', 'Reno–Sparks, NV'), ('/reno/delivery/', 'Delivery')]),
-        ('/reno/trailers/', 'Trailer Parking & Reefer Trailer Storage in Sparks, NV | 24 HR Crossdock',
-         'Trailer parking, locked refrigerated trailer storage and trailer rental per drop in Sparks, NV, right off I-80.',
-         frag('trailers.html'), R, [biz(R, '/reno/')], [('/', 'Home'), ('/reno/', 'Reno–Sparks, NV'), ('/reno/trailers/', 'Trailers')]),
         ('/sacramento/', 'Cross-Dock in Sacramento – North Highlands, CA | 24 HR Crossdock',
-         'Cross-dock, transload and short-term staging in North Highlands, CA for Sacramento and Northern California. Call 916-616-3481.',
+         'Cross-dock and long-term pallet storage in North Highlands, CA for Sacramento and Northern California. Call 24/7: 916-616-3481.',
          location_page('sac'), 'sac', [biz('sac', '/sacramento/')], [('/', 'Home'), ('/sacramento/', 'Sacramento, CA')]),
-        ('/middletown/', 'Cross-Dock in Harrisburg – Middletown, PA | 24 HR Crossdock',
-         'East Coast cross-dock and order staging in Middletown, PA, near Harrisburg on I-76, I-283, I-83 and I-81. Call 916-616-3481.',
+        ('/middletown/', 'Cross-Dock, Restack & Rework in Harrisburg – Middletown, PA | 24 HR Crossdock',
+         'Pallet restack and rework, cross-dock and long-term storage in Middletown, PA, near Harrisburg. 50 dock doors. Call 24/7: 916-616-3481.',
          location_page('pa'), 'pa', [biz('pa', '/middletown/')], [('/', 'Home'), ('/middletown/', 'Harrisburg, PA')]),
         ('/locations/', 'Locations: Reno NV, Sacramento CA, Harrisburg PA | 24 HR Crossdock',
          'Three docks, one standard: Sparks NV, North Highlands CA and Middletown PA.',
          locations(), 'main', [ORG], [('/', 'Home'), ('/locations/', 'Locations')]),
-        ('/technology/', 'Customer Portal, WMS & Integrations | 24 HR Crossdock',
-         'Our customer portal, warehouse system and integrations: e-commerce, EDI, API and spreadsheet upload.',
-         technology(), 'main', [ORG], [('/', 'Home'), ('/technology/', 'Technology')]),
+        ('/services/', 'Services: Cross-Dock, Pallet Storage, Transload & Rework | 24 HR Crossdock',
+         'What each 24 HR Crossdock dock does: cross-dock, long-term pallet storage, transload, restack and rework, fulfillment and delivery.',
+         services(), 'main', [ORG], [('/', 'Home'), ('/services/', 'Services')]),
+        ('/client-portal/', 'Client Portal | 24 HR Crossdock',
+         'Book trucks, see your inventory, approve damage charges and message the dock, for all three docks in one place.',
+         client_portal(), 'main', [ORG], [('/', 'Home'), ('/client-portal/', 'Client portal')]),
         ('/about/', 'About Us, Our Standards and Team | 24 HR Crossdock',
-         'Built on the dock floor. Our operating standards for receiving, storage, shipping and damage, at all three docks.',
+         'Moving freight since 2015. Our story and operating standards for receiving, storage, shipping and damage, at all three docks.',
          frag('_old_company.html'), 'main', [ORG], [('/', 'Home'), ('/about/', 'About')]),
         ('/get-started/', 'How to Get Started | 24 HR Crossdock',
          'Onboarding step by step: quote, account setup, first inbound and go-live.',
          frag('_old_get-started.html'), 'main', [ORG], [('/', 'Home'), ('/get-started/', 'Get started')]),
         ('/quote/', 'Get a Quote | 24 HR Crossdock',
-         'Request a quote for cross-dock, storage, transload, fulfillment or delivery. Reply within one business day.',
+         'Request a quote for cross-dock, storage, transload, rework, fulfillment or delivery. We call you back within one hour.',
          frag('_old_quote.html'), 'main', [ORG], [('/', 'Home'), ('/quote/', 'Get a quote')]),
         ('/thanks/', 'Thank You | 24 HR Crossdock', 'Your request was received.', THANKS, 'main', [], None),
     ]
