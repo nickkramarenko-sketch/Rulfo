@@ -20,13 +20,13 @@ PATCHES = [
 
     ('A03',
      r'var gA=async()=>{try{',
-     r'var gA=async()=>{if(ZZsync.mode==="db")return ZZsync.read();try{',
-     'gA read: shared mode reads the live copy (and skips the ZZt10 demo injection).'),
+     r'var gA=async()=>{if(ZZsync.mode!=="local")return ZZsync.read();try{',
+     'gA read: shared mode (db, and db-offline look-only) reads the live copy and skips the ZZt10 demo injection; local mode unchanged.'),
 
     ('A04',
      r'yA=async e=>(await window.storage.set(Rj,JSON.stringify(e),!0),e)',
-     r'yA=async e=>(ZZsync.mode==="db"?await ZZsync.write(e):await window.storage.set(Rj,JSON.stringify(e),!0),e)',
-     'yA write: shared mode writes through ZZsync.write; local mode unchanged.'),
+     r'yA=async e=>(ZZsync.mode!=="local"?await ZZsync.write(e):await window.storage.set(Rj,JSON.stringify(e),!0),e)',
+     'yA write: shared mode writes through ZZsync.write (which refuses changes while offline or look-only, so nothing lands on this device by mistake); local mode unchanged.'),
 
     ('A05',
      r'let t=await gA()||tx()',

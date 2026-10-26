@@ -16,8 +16,9 @@
      own writes             appear at once in this page's listeners (hasPendingWrites:true), then confirmed
      errors                 plain {code, message} objects (DbError); bodies over 256 KiB (UTF-8) or 32 levels reject
                             invalid_argument; 64 subscriptions per page max (resource_exhausted on the error callback)
-   The store lives in localStorage '__mockdb' ({docPath: body}), so pages in one browser context share it
-   (two pages = two devices; changes reach the other page through the storage event).
+   The "server" is IndexedDB '__mockdb_idb' (one atomic read-modify-write per write, like a real server, even when two
+   pages write the same document at the same moment), mirrored to localStorage '__mockdb' ({docPath: body}). Pages in
+   one browser context share it (two pages = two devices); a BroadcastChannel tells the other pages what changed.
 
    Options, set before this script runs: window.__MOCK = {
      caps: ['db','user'],           // which namespaces claude.use() serves (add 'assets' to test asset photos)
@@ -29,27 +30,79 @@
      serverDelay: 15,               // ms before the first server (fromCache:false) snapshot
      neverServer: false,            // never send a server snapshot (offline start)
      writeDelay: 10,                // ms a write takes
+     ackDelay: 0,                   // ms between the server storing a write and the call resolving (other pages may hear first)
      useDelay: 20, useNever: false, // claude.use() answer time; useNever: resolves null after 10 s (host never answers)
      seed: null                     // {docPath: body} written once if the store is empty
    }
-   Test hooks: window.__mockdb = {dump(), writes, overlaps, stats(), reset(seed), failNext(code, n, op?), leases(),
+   Test hooks: window.__mockdb = {dump() (Promise), writes ([{op, path, bytes, data, sent}] of this page), overlaps, stats(),
+     reset(seed), failNext(code, n, op?) (op: set | update | delete | get | listen; none = any write), leases() (Promise),
      listeners(), setOffline(bool), killListeners(code), opts} */
 (function () {
   'use strict';
   var opts = Object.assign({ caps: ['db', 'user'], isOwner: true, canEdit: true, can: true, userId: 'u_test', canWrite: true,
     cachedFirst: false, serverDelay: 15, neverServer: false, writeDelay: 10, useDelay: 20, useNever: false, seed: null }, window.__MOCK || {});
-  var KEY = '__mockdb', LKEY = '__mockdb_leases', MAX = 256 * 1024;
+  var KEY = '__mockdb', IDB = '__mockdb_idb', MAX = 256 * 1024;
   var OPS = ['==', '!=', '<', '<=', '>', '>=', 'in', 'not-in', 'array-contains'];
-  function load(k) { try { return JSON.parse(localStorage.getItem(k || KEY) || 'null'); } catch (e) { return null; } }
-  function persist(s, k) { localStorage.setItem(k || KEY, JSON.stringify(s)); }
   function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
   function deepFreeze(o) { if (o && typeof o === 'object' && !Object.isFrozen(o)) { Object.freeze(o); Object.keys(o).forEach(function (k) { deepFreeze(o[k]); }); } return o; }
   function dbErr(code, msg) { return { code: code, message: msg || code }; }
   function later(fn, ms) { setTimeout(fn, ms || 0); }
   function utf8(s) { try { return new TextEncoder().encode(s).length; } catch (e) { return s.length; } }
-  if (!load()) persist(opts.seed ? clone(opts.seed) : {});
   var writes = [], overlaps = [], fails = [], listeners = [], seq = 0, overlay = {}, wseq = 0;
   var stat = { inflight: 0, maxInflight: 0, busy: {} };
+
+  /* ---------- the server: IndexedDB, mirrored to localStorage ---------- */
+  var store = {};   // this page's copy of the server store
+  try { store = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { store = {}; }
+  function mirror() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
+  var idbP = null, bc = null;
+  try { bc = new BroadcastChannel('__mockdb'); } catch (e) {}
+  function idb() {
+    return idbP || (idbP = new Promise(function (res, rej) {
+      var r = indexedDB.open(IDB, 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('docs'); r.result.createObjectStore('leases'); };
+      r.onsuccess = function () { res(r.result); };
+      r.onerror = function () { rej(r.error); };
+    }));
+  }
+  function txn(os, mode, body) {   // body(objectStore) issues requests and returns a getter for the result
+    return idb().then(function (d) { return new Promise(function (res, rej) {
+      var t = d.transaction(os, mode), out = body(t.objectStore(os));
+      t.oncomplete = function () { res(out()); };
+      t.onerror = t.onabort = function () { rej(t.error); };
+    }); });
+  }
+  /* one atomic read-modify-write of one key: fn(current) -> {put: value} | {del: true} | anything else (no change) */
+  function rmw(os, key, fn) {
+    return txn(os, 'readwrite', function (st) {
+      var out = null, g = st.get(key);
+      g.onsuccess = function () { out = fn(g.result); if (out && out.put !== undefined) st.put(out.put, key); else if (out && out.del) st.delete(key); };
+      return function () { return out; };
+    });
+  }
+  function readAll(os) {
+    return txn(os, 'readonly', function (st) {
+      var ks = st.getAllKeys(), vs = st.getAll();
+      return function () { var o = {}; ks.result.forEach(function (k, i) { o[k] = vs.result[i]; }); return o; };
+    });
+  }
+  function loadAll() { return readAll('docs').then(function (o) { store = o; mirror(); return o; }); }
+  var ready = txn('docs', 'readwrite', function (st) {   // seed once, even when several pages start together
+    var seed = opts.seed ? clone(opts.seed) : null, c = st.count();
+    c.onsuccess = function () { if (!c.result && seed) Object.keys(seed).forEach(function (k) { st.put(seed[k], k); }); };
+    return function () {};
+  }).then(loadAll).catch(function (e) { console.error('mock-db', e); });
+  function announce(paths) { try { bc && bc.postMessage({ paths: paths }); } catch (e) {} }
+  if (bc) bc.onmessage = function (ev) {   // another page committed: refresh those documents
+    var m = ev.data || {};
+    if (m.all) return loadAll().then(function () { deliverAll(); });
+    if (!m.paths) return;
+    txn('docs', 'readonly', function (st) {
+      var got = {};
+      m.paths.forEach(function (p) { var r = st.get(p); r.onsuccess = function () { got[p] = r.result; }; });
+      return function () { return got; };
+    }).then(function (got) { m.paths.forEach(function (p) { if (got[p] === undefined) delete store[p]; else store[p] = got[p]; }); mirror(); deliverAll(); });
+  };
 
   /* ---------- paths (TypeError at build time, as the contract says) ---------- */
   var SEG = /^[A-Za-z0-9_\-.~:@+]+$/;
@@ -73,16 +126,26 @@
 
   /* this page's view: the server store plus this page's own writes that are not confirmed yet */
   function view() {
-    var s = load() || {};
+    var s = Object.assign({}, store);
     Object.keys(overlay).forEach(function (p) { if (overlay[p].del) delete s[p]; else s[p] = overlay[p].body; });
     return s;
   }
 
   /* ---------- writes ---------- */
   function depth(v, d) { if (!v || typeof v !== 'object') return d; var m = d; Object.keys(v).forEach(function (k) { m = Math.max(m, depth(v[k], d + 1)); }); return m; }
+  /* failNext(code, n, op): the next n calls of that kind reject with code. op: set | update | delete (writes; no op =
+     any write), get (one-time reads), listen (new subscriptions end at once on their error callback) */
+  function injected(op) {
+    for (var k = 0; k < fails.length; k++) {
+      var f = fails[k];
+      var hit = f.op ? f.op === op : (op === 'set' || op === 'update' || op === 'delete');
+      if (hit) { f.n--; if (f.n <= 0) fails.splice(k, 1); return dbErr(f.code, 'injected ' + f.code); }
+    }
+    return null;
+  }
   function checkBody(data, op, path) {
-    var f = fails.length && fails[0];
-    if (f && (!f.op || f.op === op)) { f.n--; if (f.n <= 0) fails.shift(); return dbErr(f.code, 'injected ' + f.code); }
+    var inj = injected(op);
+    if (inj) return inj;
     if (opts.canWrite === false) return dbErr('invalid_argument', 'this viewer cannot write shared documents');
     if (op === 'delete') return null;
     if (!data || typeof data !== 'object' || Array.isArray(data)) return dbErr('invalid_argument', 'body must be a plain object');
@@ -100,11 +163,12 @@
     });
     return out;
   }
-  function commit(op, path, body) {
-    var store = load() || {};
+  /* after the server stored it: this page's copy, the mirror, the other pages, and the writes log
+     (data = the stored document after the write, sent = what the caller passed; update: only the changed fields) */
+  function committed(op, path, body, sent) {
     if (op === 'delete') delete store[path]; else store[path] = body;
-    persist(store);
-    writes.push({ op: op, path: path, bytes: body ? utf8(JSON.stringify(body)) : 0, at: Date.now(), data: clone(body) });
+    mirror(); announce([path]);
+    writes.push({ op: op, path: path, bytes: body ? utf8(JSON.stringify(body)) : 0, at: Date.now(), data: clone(body), sent: sent === undefined ? undefined : clone(sent) });
   }
   function write(op, path, data) {
     var e = checkBody(data, op, path);
@@ -122,16 +186,19 @@
       later(function () {
         var drop = function () { if (overlay[path] && overlay[path].seq === my) delete overlay[path]; };
         if (opts.offline) { drop(); done(); deliverAll(); return rej(dbErr('unavailable', 'offline')); }
-        var store = load() || {};
-        if (op === 'update' && store[path] === undefined) { drop(); done(); deliverAll(); return rej(dbErr('invalid_argument', 'update needs an existing document: ' + path)); }
-        commit(op, path, op === 'update' ? merge(store[path], data) : op === 'set' ? clone(data) : null);
-        drop(); done();
-        deliverAll();
-        res();
+        rmw('docs', path, function (cur) {
+          if (op === 'update' && cur === undefined) return { missing: true };
+          return op === 'delete' ? { del: true } : { put: op === 'update' ? merge(cur, data) : clone(data) };
+        }).then(function (out) {
+          if (out.missing) { drop(); done(); deliverAll(); return rej(dbErr('invalid_argument', 'update needs an existing document: ' + path)); }
+          committed(op, path, out.del ? null : out.put, data);
+          drop(); done();
+          deliverAll();
+          if (opts.ackDelay) later(res, opts.ackDelay); else res();
+        }, function (e) { drop(); done(); deliverAll(); rej(dbErr('unavailable', String(e))); });
       }, opts.writeDelay);
     });
   }
-  window.addEventListener('storage', function (e) { if (e.key === KEY) deliverAll(); });
 
   /* ---------- snapshots ---------- */
   function meta(pending) { return { fromCache: !!opts.offline, hasPendingWrites: !!pending }; }
@@ -206,6 +273,8 @@
   function subscribe(l, next, error) {
     if (listeners.filter(function (x) { return !x.dead; }).length >= 64) { later(function () { error && error(dbErr('resource_exhausted', 'more than 64 subscriptions in this view')); }, 1); return function () {}; }
     l.next = next; l.error = error; l.id = ++seq;
+    var inj = injected('listen');
+    if (inj) { l.dead = true; later(function () { if (error) error(inj); }, 2); return function () {}; }
     listeners.push(l);
     if (opts.cachedFirst) later(function () {
       if (l.dead || l.server) return;
@@ -213,7 +282,7 @@
       if (l.kind === 'doc') next(Object.freeze({ id: idOf(l.path), exists: false, data: function () { return undefined; }, metadata: md }));
       else next(Object.freeze({ docs: [], size: 0, empty: true, docChanges: function () { return []; }, metadata: md }));
     }, 5);
-    if (!opts.neverServer) later(function () { if (l.dead) return; l.server = true; deliver(l, true); }, opts.serverDelay);
+    if (!opts.neverServer) ready.then(function () { later(function () { if (l.dead) return; l.server = true; deliver(l, true); }, opts.serverDelay); });
     return function () { l.dead = true; };
   }
 
@@ -222,7 +291,11 @@
     docPath(path);
     return {
       id: idOf(path), path: path,
-      get: function () { return new Promise(function (r, rej) { later(function () { if (opts.offline) return rej(dbErr('unavailable', 'offline')); r(makeDocSnap(idOf(path), view()[path], meta(!!overlay[path]))); }, 3); }); },
+      get: function () { return new Promise(function (r, rej) { later(function () {
+        if (opts.offline) return rej(dbErr('unavailable', 'offline'));
+        var inj = injected('get'); if (inj) return rej(inj);
+        ready.then(loadAll).then(function () { r(makeDocSnap(idOf(path), view()[path], meta(!!overlay[path]))); }, function () { rej(dbErr('unavailable', 'store')); });
+      }, 3); }); },
       set: function (data) { return write('set', path, data); },
       update: function (data) { return write('update', path, data); },
       delete: function () { return write('delete', path); },
@@ -233,12 +306,17 @@
           if (opts.canWrite === false) return later(function () { rej(dbErr('invalid_argument', 'this viewer cannot write shared documents')); }, 1);
           later(function () {
             if (opts.offline) return rej(dbErr('unavailable', 'offline'));
-            var L = load(LKEY) || {}, now = Date.now(), cur = L[path], ttl = Math.min(600000, Math.max(1000, o.ttlMs || 30000));
-            if (cur && cur.expiresAt > now && cur.holder !== o.holder) return res({ acquired: false, expiresAt: new Date(cur.expiresAt).toISOString() });
-            L[path] = { holder: o.holder, expiresAt: now + ttl, version: ((cur && cur.version) || 0) + 1 };
-            persist(L, LKEY);
-            if (o.data) { var st = load() || {}; commit('set', path, merge(st[path] || {}, o.data)); deliverAll(); }
-            res({ acquired: true, version: L[path].version, expiresAt: new Date(now + ttl).toISOString(), holder: o.holder });
+            var ttl = Math.min(600000, Math.max(1000, o.ttlMs || 30000));
+            rmw('leases', path, function (cur) {   // set-if-not-busy, atomic across pages
+              var now = Date.now();
+              if (cur && cur.expiresAt > now && cur.holder !== o.holder) return { busy: cur };
+              return { put: { holder: o.holder, expiresAt: now + ttl, version: ((cur && cur.version) || 0) + 1 } };
+            }).then(function (out) {
+              if (out.busy) return res({ acquired: false, expiresAt: new Date(out.busy.expiresAt).toISOString() });
+              var granted = { acquired: true, version: out.put.version, expiresAt: new Date(out.put.expiresAt).toISOString(), holder: o.holder };
+              if (!o.data) return res(granted);
+              rmw('docs', path, function (cur) { return { put: merge(cur || {}, o.data) }; }).then(function (o2) { committed('set', path, o2.put, o.data); deliverAll(); res(granted); });
+            }, function (e) { rej(dbErr('unavailable', String(e))); });
           }, 3);
         });
       },
@@ -273,8 +351,8 @@
       get: function () { return new Promise(function (r, rej) { later(function () {
         if (bad) return rej(bad);
         if (opts.offline) return rej(dbErr('unavailable', 'offline'));
-        var s = view(), paths = runQuery(q, s);
-        r(querySnap({}, paths, s, meta(false)).snap);
+        var inj = injected('get'); if (inj) return rej(inj);
+        ready.then(loadAll).then(function () { var s = view(), paths = runQuery(q, s); r(querySnap({}, paths, s, meta(false)).snap); }, function () { rej(dbErr('unavailable', 'store')); });
       }, 3); }); },
       onSnapshot: function (next, error) {
         if (bad) { later(function () { if (error) error(bad); else console.error('onSnapshot', bad); }, 1); return function () {}; }
@@ -331,10 +409,15 @@
   window.__mockdb = {
     opts: opts, writes: writes, overlaps: overlaps,
     stats: function () { return { inflight: stat.inflight, maxInflight: stat.maxInflight, assets: an }; },
-    dump: function () { return clone(load() || {}); },
-    reset: function (seed) { persist(clone(seed || {})); persist({}, LKEY); deliverAll(); },
+    dump: function () { return ready.then(loadAll).then(clone); },
+    reset: function (seed) {
+      seed = clone(seed || {});
+      return Promise.all([txn('docs', 'readwrite', function (st) { st.clear(); Object.keys(seed).forEach(function (k) { st.put(seed[k], k); }); return function () {}; }),
+        txn('leases', 'readwrite', function (st) { st.clear(); return function () {}; })])
+        .then(loadAll).then(function () { try { bc && bc.postMessage({ all: true }); } catch (e) {} deliverAll(); });
+    },
     failNext: function (code, count, op) { fails.push({ code: code, n: count || 1, op: op || null }); },
-    leases: function () { return clone(load(LKEY) || {}); },
+    leases: function () { return readAll('leases'); },
     listeners: function () { return listeners.filter(function (l) { return !l.dead; }).length; },
     setOffline: function (on) { opts.offline = !!on; deliverAll(true); },
     killListeners: function (code) { listeners.forEach(function (l) { if (!l.dead) { l.dead = true; if (l.error) l.error(dbErr(code || 'unavailable', 'listener ended')); } }); }
