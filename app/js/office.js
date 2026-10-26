@@ -34,8 +34,7 @@
 
   /* ================= small helpers ================= */
   var TAP = 'min-height:44px';    // every tap target at least 44 px tall (gloves, phones)
-  var TRACK_OPTS = [['link', 'Send the driver a link (they update the ETA)'], ['samsara', 'Samsara: paste the live share link'], ['gps', 'Other GPS app: paste the share link'],
-    ['self', 'The customer updates the ETA'], ['none', 'No ETA updates']];
+  var TRACK_OPTS = [['link', 'Driver ETA link'], ['samsara', 'Samsara live link'], ['gps', 'Other GPS app link'], ['self', 'Customer updates the ETA'], ['none', 'No ETA updates']];
   function trim(v) { return v === undefined || v === null ? '' : String(v).trim(); }
   function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
   /* blank, or a number 0 or more (typed in a text box) */
@@ -346,10 +345,10 @@
   function comingCard(all, now) {
     return function (t) {
       var appt = t.apptAt ? Date.parse(t.apptAt) : null, eta = t.eta && t.eta.at ? Date.parse(t.eta.at) : null, at = eta || appt;
-      var tone = 'ok', line;
+      var tone = 'ok', line, apptTxt = t.apptAt ? (App.isToday(t.apptAt) ? App.fmt.time(t.apptAt) : App.fmt.dayTime(t.apptAt)) : '';
       if (at && at < now) { tone = 'late'; line = '<span class="small bad-t bold">Late: ' + h(dur(now - at)) + ' past the ' + (eta ? 'ETA' : 'appointment') + '</span>'; }
-      else if (eta && appt && eta - appt > 15 * 60000) { tone = 'soon'; line = '<span class="small warn-t bold">Running ' + h(dur(eta - appt)) + ' behind (appt ' + h(App.fmt.time(t.apptAt)) + ')</span>'; }
-      else if (eta) line = '<span class="small muted">ETA ' + h(SRC[t.eta.source] || '') + (t.eta.updatedAt ? ', ' + h(App.fmt.ago(t.eta.updatedAt)) : '') + (appt ? ' · appt ' + h(App.fmt.time(t.apptAt)) : '') + '</span>';
+      else if (eta && appt && eta - appt > 15 * 60000) { tone = 'soon'; line = '<span class="small warn-t bold">Running ' + h(dur(eta - appt)) + ' behind (appt ' + h(apptTxt) + ')</span>'; }
+      else if (eta) line = '<span class="small muted">ETA ' + h(SRC[t.eta.source] || '') + (t.eta.updatedAt ? ', ' + h(App.fmt.ago(t.eta.updatedAt)) : '') + (appt ? ' · appt ' + h(apptTxt) : '') + '</span>';
       else line = '<span class="small muted">Appointment. No ETA update yet.</span>';
       return tcard(t, tone,
         '<span class="row between nowrap"><b class="clock" style="font-size:1.5rem">' + h(at ? App.fmt.time(App.iso(at)) : 'No time') + '</b>' +
@@ -503,10 +502,11 @@
       help = t.status === 'done' ? 'This truck is done. Nothing left to do.' : 'This truck was cancelled.';
     }
     if (t.status === 'booked') more.push('<button type="button" class="btn secondary" data-act="office.openEta" data-id="' + h(id) + '">Set ETA</button>');
-    if (t.status !== 'cancelled' && t.status !== 'done') more.push('<button type="button" class="btn secondary" id="of-edit-driver" data-act="office.openDriver" data-mode="edit" data-id="' + h(id) + '">Driver and truck info</button>');
+    if (t.status !== 'cancelled' && t.status !== 'done') more.push('<button type="button" class="btn secondary" id="of-edit-driver" data-act="office.openDriver" data-mode="edit" data-id="' + h(id) + '">Edit driver info</button>');
     more.push('<button type="button" class="btn secondary" data-act="office.openNote" data-id="' + h(id) + '">' + (trim(t.notes) ? 'Edit note' : 'Add note') + '</button>');
     if (t.status !== 'cancelled') more.push('<button type="button" class="btn secondary" data-act="office.openScan" data-id="' + h(id) + '">Scan paperwork</button>');
     if (t.status === 'booked' || t.status === 'arrived') more.push(App.confirmBtn('of-cancel-' + id, 'Cancel truck', 'office.cancel', { 'data-id': id }, 'danger'));
+    more = more.map(function (b) { return b.replace('<button type="button" class="btn secondary"', '<button type="button" class="btn secondary" style="padding:0 10px"'); });
     return '<div class="card accent">' + cardHead('Office actions') + '<div class="stack">' +
       (main ? '<div>' + main + '</div>' : '') + '<p class="small muted">' + h(help) + '</p>' +
       '<div class="btn-row">' + more.join('') + '</div></div></div>';
@@ -694,7 +694,8 @@
       (f.tracking === 'samsara' || f.tracking === 'gps'
         ? field({ id: idPre + '-trackurl', label: (f.tracking === 'samsara' ? 'Samsara' : 'GPS') + ' share link', form: fn, field: 'trackUrl', type: 'url', placeholder: 'https://…', err: e.trackUrl,
           hint: 'The customer or driver can send it later too. We show it to the office and the crew.' })
-        : f.tracking === 'link' ? '<p class="small muted">The driver gets a link to their own page: they send their ETA and see their door number.</p>' : '');
+        : f.tracking === 'link' ? '<p class="small muted">The driver gets a link to their own page: they send their ETA and see their door number.</p>'
+          : f.tracking === 'self' ? '<p class="small muted">The customer changes the ETA in their portal.</p>' : '<p class="small muted">We go by the appointment time.</p>');
   }
   function driverSheet(p) {
     var t = App.get('trucks', p.id);
@@ -794,7 +795,7 @@
       (past ? '<p class="small warn-t" style="margin-top:8px" id="bk-past">That time has already passed. That’s fine if the truck is here now.</p>' : '') + '</div>';
     var right =
       '<div class="card">' + cardHead('4. Truck and driver', '<span class="small muted">fill in what you know</span>') + '<div class="stack">' +
-      '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))">' +
+      '<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr))">' +
       field({ id: 'bk-carrier', label: 'Carrier', form: fn, field: 'carrier' }) + field({ id: 'bk-truck', label: 'Truck #', form: fn, field: 'truckNo' }) +
       field({ id: 'bk-trailer', label: 'Trailer #', form: fn, field: 'trailerNo' }) +
       field({ id: 'bk-driver', label: 'Driver name', form: fn, field: 'driverName' }) + field({ id: 'bk-cell', label: 'Driver cell', form: fn, field: 'driverCell', type: 'tel', hint: 'We text the door number here.' }) +
@@ -1171,7 +1172,7 @@
         : '<button type="button" class="btn primary lg" id="fr-queue" data-act="office.fridayQueue">' + h('Queue ' + plural(on.length, 'Friday summary', 'Friday summaries')) + '</button>';
     var body = sectionHead('Friday summaries', qBtn,
       h('This week: ' + weekLabel() + '. One email per customer, built from their trucks this week.')) +
-      (queued.length ? '<div class="banner info" style="margin:8px 0"><div><b>' + h('Already queued this week: ' + plural(queued.length, 'summary', 'summaries')) + '</b><div class="small">' +
+      (queued.length ? '<div class="banner info" style="margin:8px 0"><div><b>' + h('Already queued this week for ' + plural(Object.keys(queued.reduce(function (m, x) { m[x.customerId] = 1; return m; }, {})).length, 'customer')) + '</b><div class="small">' +
         h('Last at ' + App.fmt.dayTime(queued[0].at) + '. Queuing again adds new copies to the Outbox.') + '</div></div></div>' : '') +
       '<div class="cols" style="margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))">' + (cards || '<div class="empty-state">No customers yet.</div>') + '</div>';
     return screen('office.friday', 'Friday summaries', officeSub(), body);

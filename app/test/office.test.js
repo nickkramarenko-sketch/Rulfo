@@ -600,6 +600,22 @@ const smallTargets = (page) => page.evaluate(() => [...document.querySelectorAll
   const h3 = await H.start({ seed });
   try {
     const p3 = await openOffice(h3, { viewport: WIDE });
+    /* just looking never writes: every view and every sheet */
+    const w0 = await p3.evaluate(() => window.__mockdb.writes.length);
+    for (const [v, prm] of [['office.board', {}], ['office.truck', { id: 't_ex3' }], ['office.truck', { id: 't_ex7' }], ['office.book', {}], ['office.damage', {}], ['office.gear', {}], ['office.customers', {}],
+      ['office.customer', { id: 'c_sierra' }], ['office.customer', { id: 'new' }], ['office.outbox', {}], ['office.friday', {}], ['office.settings', {}]]) {
+      await p3.evaluate(([v, prm]) => App.go(v, prm), [v, prm]); await settle(p3, 60);
+    }
+    for (const [v, prm] of [['office.door', { id: 't_ex3' }], ['office.eta', { id: 't_ex1' }], ['office.note', { id: 't_ex1' }], ['office.scan', { id: 't_ex1' }], ['office.driver', { id: 't_ex1', mode: 'checkin' }],
+      ['office.driver', { id: 't_ex1', mode: 'edit' }], ['office.damageItem', { id: 'd_ex1' }], ['office.gearBack', {}], ['office.fridayPreview', { id: 'c_bay' }], ['office.photo', { ref: 'p:ph_ex1', label: 'x' }]]) {
+      await p3.evaluate(([v, prm]) => App.sheet(v, prm), [v, prm]); await settle(p3, 60);
+    }
+    ok(await p3.evaluate(() => window.__mockdb.writes.length) === w0, 'opening every office screen and sheet writes nothing');
+    await p3.evaluate(() => { App.closeSheet(); App.go('office.board'); });
+    await settle(p3, 200);
+    await p3.evaluate(() => { window.__renders = 0; const r = App.render; App.render = function () { window.__renders++; return r.apply(this, arguments); }; });
+    await p3.waitForTimeout(3500);
+    ok(await p3.evaluate(() => window.__renders) === 0, 'live clocks tick without redrawing the whole board every second');
     const xss = async (where) => {
       const r = await p3.evaluate(() => ({ el: [...document.querySelectorAll('#app b')].filter(b => b.textContent === 'x').length + document.querySelectorAll('#app img[src="x"]').length, pwn: !!window.__pwn, txt: document.getElementById('app').innerText.indexOf('<b>x</b>') >= 0 }));
       ok(r.el === 0 && !r.pwn && r.txt, where + ': names with <b>, quotes and & show as plain text');
@@ -637,6 +653,7 @@ const smallTargets = (page) => page.evaluate(() => [...document.querySelectorAll
     await p3.click('#of-door');
     await p3.waitForSelector('.sheet #of-start');
     await p3.click('.sheet button[data-door="4"]');
+    await settle(p3);
     ok(!(await p3.$eval('#of-start', e => e.disabled)), 'door picker: door 4 picked');
     const other = await h3.open('crew', { crewName: 'Jordan' });
     await other.evaluate(() => App.logTruck('t_ex2', 'Unloading started at door 4', 'Jordan', { status: 'working', startedAt: App.iso(), door: '4', crewName: 'Jordan' }));
