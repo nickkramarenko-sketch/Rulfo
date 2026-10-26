@@ -132,6 +132,7 @@ en:{
   alreadyHere:"Already checked in",
   goOffice:"Please go to the office",
   saveFail:"We could not save your check-in. Please go to the office. They will check you in.",
+  paperFail:"Your paperwork photos did not save. Please give your papers to the office.",
   stepBooked:"Booked",
   startQ:"How do you want to check in?",
   byCompany:"Company name",
@@ -306,6 +307,7 @@ es:{
   alreadyHere:"Ya registrados",
   goOffice:"Por favor vaya a la oficina",
   saveFail:"No pudimos guardar su registro. Por favor vaya a la oficina. Ahí lo registran.",
+  paperFail:"Las fotos de sus papeles no se guardaron. Por favor entregue sus papeles en la oficina.",
   stepBooked:"Cita",
   startQ:"¿Cómo quiere registrarse?",
   byCompany:"Nombre de la compañía",
@@ -480,6 +482,7 @@ ru:{
   alreadyHere:"Уже зарегистрированы",
   goOffice:"Пожалуйста, подойдите в офис",
   saveFail:"Не удалось сохранить регистрацию. Пожалуйста, подойдите в офис — вас зарегистрируют там.",
+  paperFail:"Фото документов не сохранились. Пожалуйста, отдайте документы в офис.",
   stepBooked:"Запись",
   startQ:"Как вы хотите зарегистрироваться?",
   byCompany:"Название компании",
@@ -654,6 +657,7 @@ uk:{
   alreadyHere:"Уже зареєстровані",
   goOffice:"Будь ласка, підійдіть до офісу",
   saveFail:"Не вдалося зберегти реєстрацію. Будь ласка, підійдіть до офісу — вас зареєструють там.",
+  paperFail:"Фото документів не збереглися. Будь ласка, віддайте документи в офіс.",
   stepBooked:"Запис",
   startQ:"Як ви хочете зареєструватися?",
   byCompany:"Назва компанії",
@@ -828,6 +832,7 @@ pa:{
   alreadyHere:"ਚੈੱਕ-ਇਨ ਹੋ ਚੁੱਕਾ ਹੈ",
   goOffice:"ਕਿਰਪਾ ਕਰਕੇ ਦਫ਼ਤਰ ਜਾਓ",
   saveFail:"ਅਸੀਂ ਤੁਹਾਡਾ ਚੈੱਕ-ਇਨ ਸੇਵ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦਫ਼ਤਰ ਜਾਓ। ਉੱਥੇ ਤੁਹਾਡਾ ਚੈੱਕ-ਇਨ ਹੋ ਜਾਵੇਗਾ।",
+  paperFail:"ਤੁਹਾਡੇ ਕਾਗਜ਼ਾਂ ਦੀਆਂ ਫੋਟੋਆਂ ਸੇਵ ਨਹੀਂ ਹੋਈਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੇ ਕਾਗਜ਼ ਦਫ਼ਤਰ ਵਿੱਚ ਦਿਓ।",
   stepBooked:"ਬੁੱਕ",
   startQ:"ਤੁਸੀਂ ਚੈੱਕ-ਇਨ ਕਿਵੇਂ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?",
   byCompany:"ਕੰਪਨੀ ਦਾ ਨਾਮ",
@@ -1002,6 +1007,7 @@ hi:{
   alreadyHere:"चेक-इन हो चुका है",
   goOffice:"कृपया ऑफिस जाएँ",
   saveFail:"हम आपका चेक-इन सेव नहीं कर पाए। कृपया ऑफिस जाएँ। वहाँ आपका चेक-इन हो जाएगा।",
+  paperFail:"आपके कागज़ों की फ़ोटो सेव नहीं हुईं। कृपया अपने कागज़ ऑफिस में दें।",
   stepBooked:"बुक",
   startQ:"आप चेक-इन कैसे करना चाहते हैं?",
   byCompany:"कंपनी का नाम",
@@ -1091,6 +1097,8 @@ ZZk_h=(t,p,...c)=>H.createElement(t,p,...c),
 ZZk_LOC={en:"en-US",es:"es-US",ru:"ru-RU",uk:"uk-UA",pa:"pa-IN",hi:"hi-IN"},
 /* one dock for now (trailer.site is reserved for later) */
 ZZk_DOCK={name:"24 HR Crossdock",addr:"1095 Spice Islands Dr, Suites 105–106, Sparks, NV 89431",phone:"916-616-3481"},
+/* the dock phone: Nick's own constant (ZZPHONE, read when shown), so it never drifts from the rest of the portal */
+ZZk_phone=()=>typeof ZZPHONE==="string"&&ZZPHONE?ZZPHONE:ZZk_DOCK.phone,
 ZZk_okLang=l=>!!l&&Object.prototype.hasOwnProperty.call(ZZKT,l),
 /* text in a language, English when a word is missing; {name} is filled in from v */
 ZZk_t=(lg,k,v)=>{let d=ZZKT[lg]||ZZKT.en,s=d[k]!=null?d[k]:ZZKT.en[k]!=null?ZZKT.en[k]:k;if(v)Object.keys(v).forEach(n=>{s=s.split("{"+n+"}").join(String(v[n]??""))});return s},
@@ -1169,7 +1177,7 @@ ZZk_Step=({value,onChange,label,lg})=>{let v=Math.max(0,Math.round(+value||0)),b
       ZZk_h("button",{type:"button",className:"zzk-b",style:b,"aria-label":ZZk_t(lg,"more"),onClick:()=>onChange(v+1)},"+")))},
 /* everything the kiosk remembers about one driver; a reset puts all of it back */
 ZZk_blank=()=>({step:"lang",hist:[],lang:null,back:null,q:"",cid:null,tid:null,via:null,digits:"",codeErr:!1,
-  d:{driver:"",phone:"",truck:"",trailer:""},err:null,photos:[],photoErr:null,photoBusy:!1,busy:!1,res:null,saveErr:!1,statusTid:null,
+  d:{driver:"",phone:"",truck:"",trailer:""},err:null,photos:[],photoErr:null,photoBusy:!1,busy:!1,res:null,saveErr:!1,paperBad:!1,statusTid:null,
   w:{name:"",email:"",mc:"",phone:"",dir:"inbound",std:0,lg:0,crate:0,unsure:!1,more:!1},warn:!1,doneAt:0,wo:!1,staff:!1,sName:"",sPin:"",sErr:""}),
 
 /* ================= ZZKiosk: the check-in tablet by the door =================
@@ -1178,11 +1186,11 @@ ZZk_blank=()=>({step:"lang",hist:[],lang:null,back:null,q:"",cid:null,tid:null,v
    30 s after "done" it starts over too. Kiosk language lives here, never in the crew language (cd6:lang). */
 ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
   let [f,setF]=(0,H.useState)(ZZk_blank),[,setTk]=(0,H.useState)(0),
-    fr=(0,H.useRef)(f),act=(0,H.useRef)(Date.now()),pick=(0,H.useRef)(0),sess=(0,H.useRef)(0),fileRef=(0,H.useRef)(null);
+    fr=(0,H.useRef)(f),act=(0,H.useRef)(Date.now()),pick=(0,H.useRef)(0),sess=(0,H.useRef)(0),fileRef=(0,H.useRef)(null),lock=(0,H.useRef)(!1);
   fr.current=f;
   let up=p=>setF(o=>({...o,...(typeof p==="function"?p(o):p)})),
     lg=f.lang||"en",T=(k,v)=>ZZk_t(lg,k,v),
-    reset=()=>{sess.current++;act.current=Date.now();pick.current=0;try{fileRef.current&&(fileRef.current.value="")}catch{}setF(ZZk_blank())},
+    reset=()=>{sess.current++;lock.current=!1;act.current=Date.now();pick.current=0;try{fileRef.current&&(fileRef.current.value="")}catch{}setF(ZZk_blank())},
     go=(s,p)=>up(o=>({...(p||{}),step:s,hist:[...o.hist,o.step],err:null,codeErr:!1,saveErr:!1})),
     back=()=>up(o=>{let h=[...o.hist],s=h.pop()||"lang";return{step:s,hist:h,err:null,codeErr:!1,saveErr:!1,digits:""}}),
     touch=()=>{act.current=Date.now();fr.current.warn&&up({warn:!1})};
@@ -1215,7 +1223,10 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
       if(d.length<4){up({digits:d,codeErr:!1});return}
       /* truck check-in codes only: a customer's portal PIN is never looked up */
       let t=ZZbyCode(e,d);
-      if(!t){up({digits:"",codeErr:!0});return}
+      if(!t){let old=ZZk_etaTruck(e,d);
+        /* a booking cancelled in the last 3 days: say so (and send the driver to the office) instead of "wrong code" */
+        if(old&&old.stage==="cancelled"){up({digits:"",codeErr:!1,step:"status",hist:[],statusTid:old.id,res:null,doneAt:Date.now()});return}
+        up({digits:"",codeErr:!0});return}
       if(t.arrivedAt){up({digits:"",codeErr:!1,step:"status",hist:[],statusTid:t.id,res:null,doneAt:Date.now()});return}
       up(o2=>({digits:"",codeErr:!1,tid:t.id,cid:t.customerId||null,via:"code",d:{driver:t.driver||"",phone:t.phone||"",truck:t.truck||"",trailer:t.trailer||""},step:"details",hist:[...o2.hist,o2.step]}))},
     pickTruck=t=>go("details",{tid:t.id,via:"list",d:{driver:t.driver||"",phone:t.phone||"",truck:t.truck||"",trailer:t.trailer||""}}),
@@ -1236,7 +1247,10 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
       if(my!==sess.current)return;
       up(p=>({photos:[...p.photos,...out].slice(0,xA),photoBusy:!1,photoErr:bad?"photoBad":files.length>room?"maxPages":null}))},
     /* the check-in itself: one write (zzKioskIn or checkInWalkup), then the paperwork photos */
-    checkIn=async()=>{let o=fr.current;if(o.busy||o.photoBusy)return;let my=sess.current,d=o.d,r=null;up({busy:!0,saveErr:!1});
+    checkIn=async()=>{let o=fr.current;if(o.busy||o.photoBusy||lock.current)return;lock.current=!0;let my=sess.current,d=o.d,r=null,bad=!1,
+        /* a save that fails (storage full, shared data refused) raises cd6:sync; then the driver must not be told "checked in" */
+        onSync=ev=>{let dd=ev&&ev.detail;dd&&dd.text&&(dd.kind||"doc")==="doc"&&(bad=!0)};
+      up({busy:!0,saveErr:!1});try{window.addEventListener("cd6:sync",onSync)}catch{}
       try{if(o.via==="walk"){let w=o.w,cu=o.cid?cust(o.cid):null,inb=w.dir!=="outbound";
           r=await a.checkInWalkup({driver:d.driver.trim(),phone:d.phone.trim(),truck:d.truck.trim(),trailer:d.trailer.trim(),direction:inb?"inbound":"outbound",
             units:inb&&!w.unsure?{std:ie(w.std),lg:ie(w.lg),crate:ie(w.crate)}:{std:0,lg:0,crate:0},
@@ -1244,17 +1258,21 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
             newAccount:cu?null:{name:w.name.trim(),email:w.email.trim(),mc:w.mc.trim(),phone:w.phone.trim()},driverLang:o.lang||"en"})}
         else r=await a.zzKioskIn(o.tid,{driver:d.driver,phone:d.phone,truck:d.truck,trailer:d.trailer,lang:o.lang||"en"})}
       catch(err){console.error("kiosk check-in",err);r=null}
+      try{window.removeEventListener("cd6:sync",onSync)}catch{}
       if(my!==sess.current)return;
-      if(!r){up({busy:!1,saveErr:!0});return}
-      let tid=r.trailerId||o.tid;
+      if(!r||bad&&!r.already){lock.current=!1;up({busy:!1,saveErr:!0});return}
+      let tid=r.trailerId||o.tid,paperBad=!1;
+      /* paperwork: the photos go to paper:<tid> (crew and office already show it), then one patch for the count */
       if(o.photos.length&&tid){try{let old=await ls(dt.paper(tid));await ex(dt.paper(tid),[...(old||[]),...o.photos].slice(-xA));
-          let now2=await ls(dt.paper(tid));now2.length>(old||[]).length&&a.patchTrailer(tid,{paperCount:now2.length,paperBy:"Driver at kiosk"})}catch(err){console.error("kiosk paperwork",err)}}
+          let now2=await ls(dt.paper(tid));if(now2.length>(old||[]).length)a.patchTrailer(tid,{paperCount:now2.length,paperBy:"Driver at kiosk"});else paperBad=!0}catch(err){console.error("kiosk paperwork",err);paperBad=!0}}
       if(my!==sess.current)return;
-      act.current=Date.now();
-      up({busy:!1,res:r,statusTid:tid,step:r.already?"status":"done",hist:[],doneAt:Date.now(),photos:[]})},
+      lock.current=!1;act.current=Date.now();
+      up({busy:!1,res:r,statusTid:tid,step:r.already?"status":"done",hist:[],doneAt:Date.now(),photos:[],paperBad})},
     staffExit=()=>{let o=fr.current,low=s2=>String(s2||"").toLowerCase().trim(),ok=(e.settings?.admins||[]).some(ad=>low(ad.name)===low(o.sName)&&low(o.sName)&&String(ad.pin)===String(o.sPin).trim());
       if(!ok){up({sErr:R("That name and PIN don't match."),sPin:""});return}
-      reset();try{history.replaceState(null,"",location.pathname+location.search)}catch{}x&&x()};
+      /* forget the #kiosk link first, or the sign-in page opens the kiosk again; a #stations hash stays, so staff land
+         back on Dock stations exactly as the old kiosk's exit did */
+      reset();try{/^#?(kiosk|tv|eta\d{4})$/i.test(location.hash||"")&&history.replaceState(null,"",location.pathname+location.search)}catch{}x&&x()};
   /* ---------- screens ---------- */
   let h1=(txt,sub)=>ZZk_h("div",{style:{display:"flex",flexDirection:"column",gap:8}},ZZk_h("h1",{className:"zzk-h1"},txt),sub?ZZk_h("p",{className:"zzk-p"},sub):null),
     truckLine=(t,noCo)=>{let co=cust(t.customerId)?.name||t.carrier||null,cr=t.carrier&&t.carrier!==co?t.carrier:null;return[t.truck?T("truckN",{n:t.truck}):null,noCo?cr:co].filter(Boolean).join(" \xB7 ")},
@@ -1282,7 +1300,7 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
     let others=ZZLANGS.filter(l=>l.k!=="en").map(l=>ZZk_h("span",{key:l.k,lang:l.k,style:{whiteSpace:"nowrap"}},ZZk_t(l.k,"langTitle")));
     body=ZZk_h("div",{className:"zzk-col",style:{gap:26}},
       ZZk_h("div",{style:{textAlign:"center",display:"flex",flexDirection:"column",gap:10}},ZZk_h("h1",{className:"zzk-h1"},ZZk_t("en","langTitle")),
-        ZZk_h("p",{className:"zzk-p",style:{display:"flex",flexWrap:"wrap",justifyContent:"center",columnGap:18,rowGap:4}},...others.map((s2,k)=>[k?ZZk_h("span",{key:"s"+k,"aria-hidden":!0,style:{color:m.dim}},"\xB7"):null,s2]).flat())),
+        ZZk_h("p",{className:"zzk-p",style:{display:"flex",flexWrap:"wrap",justifyContent:"center",columnGap:26,rowGap:4}},...others)),
       ZZk_h("div",{className:"zzk-langs"},
         ...ZZLANGS.map(l=>ZZk_h("button",{key:l.k,type:"button",lang:l.k,className:"zzk-b","data-lang":l.k,"aria-pressed":f.lang===l.k,
           onClick:()=>{act.current=Date.now();f.back?up(o=>({lang:l.k,step:o.back,back:null,doneAt:Date.now()})):up({lang:l.k,step:"start",hist:["lang"]})},
@@ -1290,20 +1308,23 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
             background:f.lang===l.k?m.orange:m.panel,color:f.lang===l.k?ZZk_on(m.orange):m.text,border:`2px solid ${f.lang===l.k?m.orange:m.line}`}},
           ZZk_h("span",{style:{fontSize:"clamp(24px,3.2vw,32px)",fontWeight:800,lineHeight:1.15}},l.name),
           ZZk_h("span",{style:{fontSize:16,opacity:.8}},ZZk_t(l.k,"langTap"))))),
-      ZZk_h("p",{className:"zzk-p",style:{textAlign:"center",fontSize:16}},ZZk_t("en","help")," \xB7 ",ZZk_DOCK.phone))}
+      ZZk_h("p",{className:"zzk-p",style:{textAlign:"center",fontSize:16}},ZZk_t("en","help")," \xB7 ",ZZk_phone()))}
   else if(step==="start"){
     body=ZZk_h("div",{className:"zzk-col"},h1(T("startQ")),
       ZZk_Choice({primary:!0,icon:ZZk_h(vl,{size:30}),title:T("byCompany"),sub:T("byCompanySub"),onClick:()=>go("company",{via:"list",q:""})}),
       ZZk_Choice({icon:"#",title:T("haveCode"),sub:T("haveCodeSub"),onClick:()=>go("code",{digits:""})}),
       ZZk_Choice({icon:ZZk_h(Ca,{size:30}),title:T("walkIn"),sub:T("walkSub"),onClick:()=>startWalk(null,"")}))}
   else if(step==="company"||step==="wco"){
-    let walk=step==="wco",hits=f.q.trim()?Pj(e.customers||[],f.q,6):[];
+    let walk=step==="wco",hits=f.q.trim()?Pj(e.customers||[],f.q,6):[],
+      /* a walk-in for a company that has a truck booked today (or one already here) sees those trucks first, so a
+         driver who tapped "walk-in" by mistake does not make a second truck; "My truck isn't listed" goes on to the walk-in */
+      pickCo=cid=>!walk||trucksFor(cid).length||hereFor(cid).length?go("truck",{cid,via:"list"}):startWalk(cid,"");
     body=ZZk_h("div",{className:"zzk-col"},h1(walk?T("walkQ"):T("companyQ"),walk?T("walkSub"):null),
       ZZk_h("div",{style:{position:"relative"}},ZZk_in({value:f.q,autoFocus:!0,placeholder:T("companyPh"),"aria-label":T("companyPh"),autoComplete:"off",autoCapitalize:"words",spellCheck:!1,
-        onChange:ev=>up({q:ev.target.value}),onKeyDown:ev=>{ev.key==="Enter"&&hits[0]&&(walk?startWalk(hits[0].c.id,""):go("truck",{cid:hits[0].c.id}))}})),
+        onChange:ev=>up({q:ev.target.value}),onKeyDown:ev=>{ev.key==="Enter"&&hits[0]&&pickCo(hits[0].c.id)}})),
       !f.q.trim()?ZZk_h("p",{className:"zzk-p"},T("companyHint")):null,
       hits.length?ZZk_h("div",{className:"zzk-col",style:{gap:10}},ZZk_h("p",{className:"zzk-p"},T("companyTap")),
-        ...hits.map(({c})=>ZZk_h(de,{key:c.id,onClick:()=>walk?startWalk(c.id,""):go("truck",{cid:c.id}),style:{padding:"18px 20px",minHeight:76,display:"flex",alignItems:"center",gap:14,borderWidth:2}},
+        ...hits.map(({c})=>ZZk_h(de,{key:c.id,onClick:()=>pickCo(c.id),style:{padding:"18px 20px",minHeight:76,display:"flex",alignItems:"center",gap:14,borderWidth:2}},
           ZZk_h(vl,{size:26,style:{color:m.orange,flexShrink:0}}),
           ZZk_h("span",{style:{flex:1,minWidth:0,display:"flex",flexDirection:"column"}},ZZk_h("span",{style:{fontSize:"clamp(21px,2.6vw,26px)",fontWeight:800,overflowWrap:"anywhere"}},c.name),
             c.aliases&&c.aliases.length?ZZk_h("span",{style:{fontSize:16,color:m.mut,overflowWrap:"anywhere"}},c.aliases.join(", ")):null),
@@ -1346,7 +1367,7 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
         ZZk_h(de,{style:{padding:"14px 18px",display:"flex",gap:14,alignItems:"center"}},ZZk_h(Ca,{size:30,style:{color:m.orange,flexShrink:0}}),
           ZZk_h("div",{style:{minWidth:0,display:"flex",flexDirection:"column",gap:2}},ZZk_h("span",{style:{fontSize:15,color:m.mut}},T("yourTruck")),
             ZZk_h("b",{style:{fontSize:21,overflowWrap:"anywhere"}},c?c.name:f.w.name||"—"),
-            ZZk_h("span",{style:{fontSize:16,color:m.mut,overflowWrap:"anywhere"}},t?[t.scheduledAt?ZZk_when(t.scheduledAt,lg):null,T(t.direction==="outbound"?"kindPick":"kindDrop"),ZZk_pal(palOf(t),lg)].filter(Boolean).join(" \xB7 ")
+            ZZk_h("span",{style:{fontSize:16,color:m.mut,overflowWrap:"anywhere"}},t?[t.scheduledAt?ZZk_when(t.scheduledAt,lg):null,T(t.direction==="outbound"?"kindPick":"kindDrop"),palOf(t)>0?ZZk_pal(palOf(t),lg):null].filter(Boolean).join(" \xB7 ")
               :T(f.w.dir==="outbound"?"kindPick":"kindDrop"))))),
       ZZk_h("div",{className:"zzk-grid",style:{gap:"18px 22px"}},
         ZZk_h("label",{style:{display:"block"}},ZZk_label(T("yourName")),ZZk_in({value:d.driver,autoComplete:"off",autoCapitalize:"words",spellCheck:!1,onChange:ev=>set("driver",ev.target.value),"aria-invalid":f.err==="needName"})),
@@ -1357,7 +1378,7 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
       ZZk_err(f.err?T(f.err):null),
       ZZk_Btn({kind:"primary",big:!0,onClick:detailsNext,children:T("next")+" →"}))}
   else if(step==="scan"){
-    let ph=f.photos;
+    let ph=f.photos;foot=!f.saveErr;
     body=f.saveErr?ZZk_h("div",{className:"zzk-col"},h1(T("goOffice")),ZZk_err(T("saveFail")),ZZk_Btn({kind:"primary",big:!0,onClick:reset,children:T("startOver")}))
     :ZZk_h("div",{className:"zzk-col"},h1(T("scanQ")),
       ZZk_h("div",{style:{display:"grid",gap:12,gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,200px),1fr))"}},
@@ -1401,23 +1422,25 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
         ZZk_Btn({kind:"ghost",big:!0,onClick:()=>go("details",{w:{...w,unsure:!0}}),children:T("notSure")}),
         ZZk_Btn({kind:"primary",big:!0,disabled:tot<=0,onClick:()=>go("details",{w:{...w,unsure:!1}}),children:T("next")+" →"})))}
   else if(step==="done"||step==="status"){foot=!1;
-    let tid=f.statusTid,t=tid?L.find(q=>q.id===tid):null,r=f.res||{},done=step==="done",fin=t&&(t.workDoneAt||t.stage==="done"||t.stage==="departed"),
-      cell=(t&&t.phone)||r.phone||"",yard=t&&!(t.dock&&Gi.includes(t.dock))&&!fin,office=done&&(r.noFreight||r.walkup&&r.dock===Ee);
+    let tid=f.statusTid,t=tid?L.find(q=>q.id===tid):null,r=f.res||{},done=step==="done",fin=t&&(t.workDoneAt||t.stage==="done"||t.stage==="departed"),cx=!!t&&t.stage==="cancelled",
+      cell=(t&&t.phone)||r.phone||"",yard=t&&!(t.dock&&Gi.includes(t.dock))&&!fin&&!cx,office=done&&(r.noFreight||r.walkup&&r.dock===Ee);
     body=ZZk_h("div",{className:"zzk-col","data-zz":done?"kiosk-done":"kiosk-status"},
       ZZk_h("div",{style:{display:"grid",gap:24,gridTemplateColumns:"repeat(auto-fit,minmax(min(100%,340px),1fr))",alignItems:"center"}},
         ZZk_h("div",{className:"zzk-col",style:{gap:14}},
           done?ZZk_h(Ze,{size:76,style:{color:m.green}}):null,
           ZZk_h("h1",{className:"zzk-h1"},done?T("doneTitle"):!t?T("alreadyTitle"):t.stage==="cancelled"?T("stCancelled"):fin?T("truckDone"):T("alreadyTitle")),
           t?ZZk_h("p",{className:"zzk-p",style:{fontWeight:700,color:m.text}},truckLine(t)):null,
+          cx?ZZk_note(T("goOffice"),m.red):null,
           t&&yard&&office?ZZk_note(T(r.noFreight?"noFreight":"walkFull")):null,
           t&&yard&&!office?ZZk_h("p",{className:"zzk-p"},cell?T("textDoor",{cell}):T("noCell")):null,
           t&&yard&&!office?ZZk_h("p",{className:"zzk-p",style:{fontWeight:800,color:m.text}},T(cell?"stayTruck":"stayOnly")):null),
-        t?placeCard(t):null),
+        t&&!cx?placeCard(t):null),
       done&&r.newAccount?ZZk_note(ZZk_h(H.Fragment,null,ZZk_h("b",null,T("acctOpened",{name:r.newAccount.name})),ZZk_h("br"),T("acctInvoices",{email:r.newAccount.email})),m.green):null,
       office&&!yard?ZZk_note(T(r.noFreight?"noFreight":"walkFull")):null,
+      done&&f.paperBad?ZZk_note(T("paperFail")):null,
       done&&r.afterHours?ZZk_note(T("afterHours")):null,
       countdown(),
-      t&&!fin?ZZk_Btn({kind:"quiet",onClick:()=>up({wo:!0}),children:[ZZk_h(Ct,{key:"i",size:22}),ZZk_h("span",{key:"t"},T("printWo"))]}):null,
+      t&&!fin&&!cx?ZZk_Btn({kind:"quiet",onClick:()=>up({wo:!0}),children:[ZZk_h(Ct,{key:"i",size:22}),ZZk_h("span",{key:"t"},T("printWo"))]}):null,
       f.wo&&t?ZZk_h(sx,{t,doc:e,now:nw,autoPrint:!1,onClose:()=>{act.current=Date.now();up({wo:!1,doneAt:Date.now()})}}):null)}
   /* ---------- frame ---------- */
   let langName=(ZZLANGS.find(l=>l.k===lg)||ZZLANGS[0]).name,
@@ -1437,11 +1460,11 @@ ZZKiosk=({doc:e,now:nw,actions:a,onExit:x})=>{
       ZZk_h(Z,{size:"lg",kind:"quiet",disabled:f.busy,onClick:reset,children:"↺ "+T("startOver")}))):null,
     ZZk_h(Gt,{open:f.staff,onClose:()=>up({staff:!1,sName:"",sPin:"",sErr:""}),title:R("Staff only: leave the kiosk"),children:ZZk_h("div",{className:"space-y-3"},
       ZZk_h("div",{className:"text-sm",style:{color:m.mut}},R("Office name and PIN. Drivers never need this.")),
-      ZZk_h(xe,{label:R("Office name"),children:se({value:f.sName,autoComplete:"off",onChange:ev=>up({sName:ev.target.value,sErr:""}),placeholder:R("First name")})}),
-      ZZk_h(xe,{label:"PIN",children:se({type:"password",inputMode:"numeric",autoComplete:"off",value:f.sPin,maxLength:8,onChange:ev=>up({sPin:ev.target.value,sErr:""}),onKeyDown:ev=>{ev.key==="Enter"&&staffExit()},placeholder:R("4 digits")})}),
+      ZZk_h(xe,{label:R("Office name"),children:se({className:"py-3",value:f.sName,autoComplete:"off",onChange:ev=>up({sName:ev.target.value,sErr:""}),placeholder:R("First name")})}),
+      ZZk_h(xe,{label:"PIN",children:se({className:"py-3",type:"password",inputMode:"numeric",autoComplete:"off",value:f.sPin,maxLength:8,onChange:ev=>up({sPin:ev.target.value,sErr:""}),onKeyDown:ev=>{ev.key==="Enter"&&staffExit()},placeholder:R("4 digits")})}),
       f.sErr?ZZk_h("div",{role:"alert",className:"text-sm",style:{color:m.red}},f.sErr):null,
-      ZZk_h("div",{className:"flex gap-2"},ZZk_h(Z,{onClick:()=>up({staff:!1,sName:"",sPin:"",sErr:""}),children:R("Back to check-in")}),
-        ZZk_h(Z,{kind:"primary",className:"flex-1",disabled:!f.sName.trim()||!f.sPin.trim(),onClick:staffExit,children:R("Exit kiosk")})))}))},
+      ZZk_h("div",{className:"flex gap-2"},ZZk_h(Z,{size:"lg",onClick:()=>up({staff:!1,sName:"",sPin:"",sErr:""}),children:R("Back to check-in")}),
+        ZZk_h(Z,{kind:"primary",size:"lg",className:"flex-1",disabled:!f.sName.trim()||!f.sPin.trim(),onClick:staffExit,children:R("Exit kiosk")})))}))},
 
 /* ================= ZZEta: the driver's page, opened from a #eta1234 link =================
    Status in big words, ETA buttons, a live-location link, the driver's language. On a driver's own phone the truck is
@@ -1474,7 +1497,7 @@ ZZEta=({doc:e,now:nw,actions:a,code:c0,onExit:x})=>{
     st=t?ZZk_status(e,t,lg):null,canEta=!!t&&ZZactive(t)&&!t.arrivedAt,
     /* the text for the dock: English, because the office reads it */
     ready=(()=>{let head=t&&t.truck?`Truck ${t.truck} (check-in code ${code})`:`Check-in code ${code}`,bits=[];
-      s.etaMs&&bits.push(`ETA ${ZZk_time(s.etaMs,"en")} dock time`);s.why&&bits.push(`Running late: ${ZZKT.en[s.why]}`);s.linkTxt&&bits.push(`Live location: ${s.linkTxt}`);
+      s.etaMs&&bits.push(`ETA ${ZZk_when(s.etaMs,"en")} dock time`);s.why&&bits.push(`Running late: ${ZZKT.en[s.why]}`);s.linkTxt&&bits.push(`Live location: ${s.linkTxt}`);
       return bits.length?head+": "+bits.join(" \xB7 "):""})(),
     showText=!t||s.refused||s.saved&&ZZsync.mode!=="db",
     saveEta=async ms=>{if(s.busy)return;up({etaMs:ms,copied:"",msg:"",refused:!1,timeErr:!1,pick:!1});if(!canEta)return;
@@ -1508,17 +1531,17 @@ ZZEta=({doc:e,now:nw,actions:a,code:c0,onExit:x})=>{
   let card=(kids,st2)=>ZZk_h(de,{style:{padding:"18px 18px",display:"flex",flexDirection:"column",gap:14,...(st2||{})}},...kids),
     h2=txt=>ZZk_h("h2",{className:"zzk-h2"},txt),
     etaBtns=ZZk_h("div",{style:{display:"grid",gap:12,gridTemplateColumns:"repeat(2,minmax(0,1fr))"}},...[[15,"eta15"],[30,"eta30"],[60,"eta60"],[120,"eta120"]].map(([mn,k],i)=>
-      ZZk_Btn({key:k,kind:i===0?"primary":"ghost",big:!0,disabled:s.busy,onClick:()=>saveEta(Date.now()+mn*6e4),children:k==="eta15"?ZZk_t(lg,"durMin",{n:15}):T(k)}))),
+      ZZk_Btn({key:k,kind:"ghost",big:!0,disabled:s.busy,onClick:()=>saveEta(Date.now()+mn*6e4),children:k==="eta15"?ZZk_t(lg,"durMin",{n:15}):T(k)}))),
     pickBox=s.pick?ZZk_h("div",{style:{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}},
         ZZk_h("label",{style:{flex:"1 1 160px",minWidth:0}},ZZk_label(T("pickTime"),T("dockTime")),ZZk_in({type:"time",step:60,value:s.time,onChange:ev=>up({time:ev.target.value,timeErr:!1})})),
         ZZk_h("div",{style:{flex:"0 0 auto"}},ZZk_Btn({kind:"primary",disabled:s.busy,onClick:saveTime,children:T("saveTime"),style:{minHeight:64}})))
       :ZZk_Btn({kind:"ghost",onClick:()=>up({pick:!0}),children:[ZZk_h(Fd,{key:"i",size:22}),ZZk_h("span",{key:"t"},T("pickTime"))]}),
-    textBox=ready?card([ZZk_h("b",{key:"h",style:{fontSize:19}},s.refused?T("refused"):t?T("localNote",{phone:ZZk_DOCK.phone}):T("sendText")),
+    textBox=ready?card([ZZk_h("b",{key:"h",style:{fontSize:19}},s.refused?T("refused"):t?T("localNote",{phone:ZZk_phone()}):T("sendText")),
       ZZk_h("textarea",{key:"ta",ref:taRef,readOnly:!0,value:ready,rows:Math.min(7,Math.ceil(ready.length/30)+1),"data-zz":"eta-text",onFocus:ev=>{try{ev.target.select()}catch{}},
         style:{width:"100%",fontSize:18,padding:12,borderRadius:10,border:`2px solid ${m.line}`,background:m.raised,color:m.text,resize:"none",fontFamily:"inherit"}}),
       ZZk_Btn({key:"c",kind:"primary",onClick:copy,children:s.copied==="ok"?"✓ "+T("copied"):T("copy")}),
       s.copied==="fail"?ZZk_h("p",{key:"f",className:"zzk-p"},T("copyFail")):null,
-      ZZk_h("div",{key:"p",style:{fontSize:18}},T("dockPhone"),": ",ZZk_h("b",{style:{fontSize:22,whiteSpace:"nowrap"}},ZZk_DOCK.phone))],{borderColor:m.orange,borderWidth:2}):null,
+      ZZk_h("div",{key:"p",style:{fontSize:18}},T("dockPhone"),": ",ZZk_h("b",{style:{fontSize:22,whiteSpace:"nowrap"}},ZZk_phone()))],{borderColor:m.orange,borderWidth:2}):null,
     lateBox=card([h2(T("lateQ")),ZZk_h("p",{key:"s",className:"zzk-p"},T("lateSub")),
       ZZk_h("div",{key:"c",style:{display:"flex",flexWrap:"wrap",gap:10}},...ZZk_LATE.map(k=>ZZk_h("button",{key:k,type:"button",className:"zzk-b","aria-pressed":s.why===k,disabled:s.busy,onClick:()=>late(k),
         style:{minHeight:52,padding:"8px 16px",borderRadius:999,fontSize:18,fontWeight:700,cursor:"pointer",background:s.why===k?m.orange:m.panel,color:s.why===k?ZZk_on(m.orange):m.text,border:`2px solid ${s.why===k?m.orange:m.line}`}},(s.why===k?"✓ ":"")+T(k))))]),
@@ -1531,13 +1554,14 @@ ZZEta=({doc:e,now:nw,actions:a,code:c0,onExit:x})=>{
     dockBox=card([h2(T("whereLbl")),ZZk_h("div",{key:"a",style:{display:"grid",gap:6,fontSize:18}},
       ZZk_h("div",null,ZZk_h("span",{style:{color:m.mut}},T("address"),": "),ZZk_h("b",{style:{overflowWrap:"anywhere"}},ZZk_DOCK.addr)),
       ZZk_h("div",null,ZZk_h("span",{style:{color:m.mut}},T("hours"),": "),ZZk_h("b",null,T("hoursTxt"))),
-      ZZk_h("div",null,T("callDock",{phone:ZZk_DOCK.phone})))]),
+      ZZk_h("div",null,T("callDock",{phone:ZZk_phone()})))]),
     msgBox=s.msg?ZZk_note(s.msg,s.refused?m.amber:m.green):null,
     body;
   if(t)body=ZZk_h("div",{className:"zzk-col"},
     card([ZZk_h("div",{key:"w",style:{fontSize:17,color:m.mut,overflowWrap:"anywhere"}},[t.truck?T("truckN",{n:t.truck}):T("yourTruck"),cust?cust.name:t.carrier||null].filter(Boolean).join(" \xB7 ")),
       ZZk_h("div",{key:"b","data-zz":"eta-status",style:{fontSize:"clamp(34px,8vw,48px)",fontWeight:800,lineHeight:1.1,color:st.kind==="door"||st.kind==="work"?m.orange:st.kind==="cancelled"?m.red:m.text,overflowWrap:"anywhere"}},st.big),
       st.sub?ZZk_h("div",{key:"s",className:"zzk-p"},st.sub):null,
+      st.kind==="booked"?ZZk_h("div",{key:"z",style:{fontSize:15,color:m.mut,display:"flex",alignItems:"center",gap:6}},ZZk_h(Fd,{size:16,"aria-hidden":!0}),T("dockTime")):null,
       ZZactive(t)?ZZk_h("div",{key:"c",style:{fontSize:17,color:m.mut}},T("kioskCode"),": ",ZZk_h("b",{style:{fontSize:24,color:m.text,fontFamily:"ui-monospace,Menlo,monospace",letterSpacing:".08em"}},code)):null]),
     msgBox,
     s.refused?textBox:null,
@@ -1559,7 +1583,7 @@ ZZEta=({doc:e,now:nw,actions:a,code:c0,onExit:x})=>{
   return ZZk_h("div",{className:"zzk","data-zz":"eta",lang:lg,style:{minHeight:"100vh",background:m.bg,color:m.text}},
     ZZk_h("style",null,ZZk_css()),
     ZZk_top({sub:T("drvPage"),right:ZZk_topBtn({onClick:exit,children:T("exit")})}),
-    ZZk_h("main",{style:{maxWidth:620,margin:"0 auto",padding:"16px 16px 48px",display:"flex",flexDirection:"column",gap:16}},
+    ZZk_h("main",{style:{maxWidth:680,margin:"0 auto",padding:"16px 16px 48px",display:"flex",flexDirection:"column",gap:16}},
       ZZk_h("div",{role:"group","aria-label":T("language"),style:{display:"flex",flexWrap:"wrap",gap:8}},...ZZLANGS.map(l=>ZZk_h("button",{key:l.k,type:"button",lang:l.k,className:"zzk-b","aria-pressed":l.k===lg,onClick:()=>setLg(l.k),
         style:{minHeight:44,padding:"6px 14px",borderRadius:999,fontSize:17,fontWeight:700,cursor:"pointer",background:l.k===lg?m.orange:m.panel,color:l.k===lg?ZZk_on(m.orange):m.text,border:`2px solid ${l.k===lg?m.orange:m.line}`}},(l.k===lg?"✓ ":"")+l.name))),
       body))},
@@ -1568,5 +1592,8 @@ ZZEta=({doc:e,now:nw,actions:a,code:c0,onExit:x})=>{
    key: door | yard | released | reminder; vars {driver, truck, dock, time}. Returns a string, or null for an unknown
    language or key. ZZmsgs (engine) adds these as translated copies of the English texts pQ writes. */
 ZZdriverText=(lang,key,vars)=>{let d=ZZk_DT[lang],tpl=d&&d[key];if(!tpl)return null;vars=vars||{};
-  let v={brand:typeof Uo==="string"&&Uo?Uo:"24HR Crossdock",who:String(vars.driver||"").trim()?String(vars.driver).trim()+", ":"",truck:String(vars.truck||"").trim()||"—",dock:String(vars.dock||""),time:String(vars.time||"")};
+  /* Russian and Ukrainian texts read the time the 24-hour way (2:40 PM -> 14:40) */
+  let tm=String(vars.time||"").replace(/[\u202f\xa0]/g," ").trim(),x=/^(\d{1,2}):(\d{2}) ?([AP])\.?M\.?$/i.exec(tm);
+  if(x&&(lang==="ru"||lang==="uk"))tm=String(+x[1]%12+(/p/i.test(x[3])?12:0)).padStart(2,"0")+":"+x[2];
+  let v={brand:typeof Uo==="string"&&Uo?Uo:"24HR Crossdock",who:String(vars.driver||"").trim()?String(vars.driver).trim()+", ":"",truck:String(vars.truck||"").trim()||"—",dock:String(vars.dock||""),time:tm};
   return tpl.replace(/\{(\w+)\}/g,(m0,n)=>v[n]!=null?v[n]:m0)},

@@ -221,7 +221,10 @@ ZZCrew=({doc:e,now:t,actions:a,onExit:r,openShipment:n})=>{
   return ZZh("div",{style:{minHeight:"100vh",background:m.bg,color:m.text}},
     ZZh("style",null,`@keyframes cdpulse{0%,100%{box-shadow:0 0 0 2px ${m.orange}}50%{box-shadow:0 0 0 6px rgba(255,107,0,0.25)}}@media(prefers-reduced-motion:reduce){[style*="cdpulse"]{animation:none!important}}`+
       /* the bell list opens inside the white-text header (.zzhd forces white text): keep its text readable */
-      `.zzhd .fixed.inset-0 div,.zzhd .fixed.inset-0 button,.zzhd .fixed.inset-0 span:not([class*="rounded-full"]){color:${m.text}!important}.zzhd .fixed.inset-0 .tabular-nums,.zzhd .fixed.inset-0 .leading-relaxed{color:${m.mut}!important}`),
+      `.zzhd .fixed.inset-0 div,.zzhd .fixed.inset-0 button,.zzhd .fixed.inset-0 span:not([class*="rounded-full"]){color:${m.text}!important}.zzhd .fixed.inset-0 .tabular-nums,.zzhd .fixed.inset-0 .leading-relaxed{color:${m.mut}!important}`+
+      /* ...and its rows keep their card look and the red / amber / green edge that says how urgent each one is */
+      `.zzhd .fixed.inset-0 button[style*="background"]{background:${m.raised}!important;border-color:${m.line}!important}`+
+      [m.red,m.amber,m.green,m.blue,m.mut].map(c=>`.zzhd .fixed.inset-0 button[style*="${ZZd_rgb(c)}"]{border-left-color:${c}!important}`).join("")),
     h&&ZZh(oJ,{doc:e,actions:a,onDone:k=>{p(k),v(!1),S(_=>_+1)},onGuide:()=>{v(!1),w(!0)}}),
     g&&ZZh(sJ,{onDone:()=>A(!1)}),
     y&&ZZh(cJ,{onClose:()=>w(!1)}),
@@ -278,21 +281,23 @@ ZZCrewOffice=({doc:e,now:t,actions:a,openShipment:n})=>{
       ZZh("h2",{className:"zz-h2"},`Crew logins \xB7 ${crew.length}`),ZZh("p",{className:"zz-sub",style:{marginBottom:10}},"Drivers sign in at Staff, then Forklift crew, with their name and PIN. Every load they touch is stamped with their name. Phone, shift and rank tell customers who is on the dock and who to call first."),
       crew.length?ZZh("div",{className:"zz-tblw"},ZZh("table",{className:"zz-tbl"},
         ZZh("thead",null,ZZh("tr",null,ZZh("th",null,"Name"),ZZh("th",null,"PIN"),ZZh("th",null,"Language"),ZZh("th",null,"Phone"),ZZh("th",null,"Shift"),ZZh("th",{className:"num"},"Rank"),ZZh("th",null,"Added"),ZZh("th",null,""))),
-        ZZh("tbody",null,...crew.map(k=>ed&&ed.id===k.id?ZZh("tr",{key:k.id},ZZh("td",{colSpan:8},
-            ZZh(ZZd_CrewEdit,{ed,setEd,onCancel:()=>{setEd(null);setErr("")},onSave:()=>{let r2=ZZd_crewCheck(ed);if(r2.err)return setErr(r2.err);a.zzUpdateCrew(k.id,r2.patch);setEd(null);setErr("")}})))
-          :ZZh("tr",{key:k.id},ZZh("td",null,ZZh("b",null,k.name)),
+        ZZh("tbody",null,...crew.map(k=>ZZh("tr",{key:k.id,style:ed&&ed.id===k.id?{background:m.raised}:void 0},ZZh("td",null,ZZh("b",null,k.name)),
             ZZh("td",{style:{fontVariantNumeric:"tabular-nums"}},show[k.id]?k.pin:"••••"," ",ZZh("button",{className:"zz-link",style:{fontSize:13},onClick:()=>setShow({...show,[k.id]:!show[k.id]})},show[k.id]?"Hide":"Show")),
-            ZZh("td",null,lx[k.lang||"en"]),ZZh("td",{style:{whiteSpace:"nowrap"}},k.phone||"—"),ZZh("td",null,ZZd_shiftTxt(k.shift)),ZZh("td",{className:"num"},k.rank!=null&&k.rank!==""?k.rank:"—"),ZZh("td",null,k.createdAt?Dt(k.createdAt):"—"),
-            ZZh("td",{style:{whiteSpace:"nowrap",textAlign:"right"}},rm===k.id?ZZh("span",null,ZZh("b",{style:{color:m.red}},`Remove ${k.name}? `),btn("Yes, remove",()=>{a.removeCrewMember(k.id);setRm(null)},"danger sm")," ",btn("Keep",()=>setRm(null),"ghost sm"))
+            ZZh("td",null,lx[k.lang||"en"]),ZZh("td",{style:{whiteSpace:"nowrap"}},k.phone||"—"),ZZh("td",{style:{whiteSpace:"nowrap"}},ZZd_shiftTxt(k.shift)),ZZh("td",{className:"num"},k.rank!=null&&k.rank!==""?k.rank:"—"),ZZh("td",null,k.createdAt?Dt(k.createdAt):"—"),
+            ZZh("td",{style:{whiteSpace:"nowrap",textAlign:"right"}},ed&&ed.id===k.id?ZZh("b",{style:{color:m.orange}},"Editing below"):rm===k.id?ZZh("span",null,ZZh("b",{style:{color:m.red}},`Remove ${k.name}? `),btn("Yes, remove",()=>{a.removeCrewMember(k.id);setRm(null)},"danger sm")," ",btn("Keep",()=>setRm(null),"ghost sm"))
               :ZZh("span",null,btn("Edit",()=>{setErr("");setEd(ZZd_crewDraft(k))},"ghost sm")," ",btn("Remove",()=>setRm(k.id),"danger sm")))))))):ZZh("div",{className:"zz-empty",style:{padding:0}},"No crew logins yet. Until you add one, the crew phone accepts any name."),
+      ed&&crew.some(k=>k.id===ed.id)?ZZh("div",{style:{marginTop:12,padding:12,border:`2px solid ${m.orange}`,borderRadius:8,background:m.panel}},
+        ZZh("b",{style:{fontSize:16}},`Edit ${(crew.find(k=>k.id===ed.id)||{}).name||""}`),
+        ZZh(ZZd_CrewEdit,{ed,setEd,onCancel:()=>{setEd(null);setErr("")},onSave:()=>{let r2=ZZd_crewCheck(ed);if(r2.err)return setErr(r2.err);a.zzUpdateCrew(ed.id,r2.patch);setEd(null);setErr("")}}),
+        err?ZZh("div",{className:"zz-err",style:{marginTop:8},role:"alert"},err):null):null,
       ZZh("div",{style:{marginTop:14,paddingTop:14,borderTop:`1px solid ${m.line}`}},ZZh("b",null,"Add a driver"),
-        ZZh("div",{style:{display:"grid",gridTemplateColumns:"minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) auto",gap:8,alignItems:"end",marginTop:8}},
-          ZZh("label",{className:"zz-fl"},"First name",ZZh("input",{className:"zz-inp",value:nm,placeholder:"e.g. Marco",onChange:v2=>setNm(v2.target.value)})),
-          ZZh("label",{className:"zz-fl"},"PIN (4 to 6 digits)",ZZh("div",{style:{display:"flex",gap:6}},ZZh("input",{className:"zz-inp",value:pin,inputMode:"numeric",placeholder:"1234",onChange:v2=>setPin(v2.target.value.replace(/\D/g,"").slice(0,6))}),ZZh("button",{type:"button",className:"zz-btn ghost sm",onClick:()=>setPin(rnd())},"Make one"))),
-          ZZh("label",{className:"zz-fl"},"Language",ZZh("select",{className:"zz-inp",value:lang,onChange:v2=>setLang(v2.target.value)},...Object.entries(lx).map(([v3,l3])=>ZZh("option",{key:v3,value:v3},l3)))),
+        ZZh("div",{style:{display:"flex",flexWrap:"wrap",gap:8,alignItems:"flex-end",marginTop:8}},
+          ZZh("label",{className:"zz-fl",style:{flex:"1.5 1 200px",minWidth:0}},"First name",ZZh("input",{className:"zz-inp",value:nm,placeholder:"e.g. Marco",onChange:v2=>setNm(v2.target.value)})),
+          ZZh("label",{className:"zz-fl",style:{flex:"1 1 200px",minWidth:0}},"PIN (4 to 6 digits)",ZZh("div",{style:{display:"flex",gap:6}},ZZh("input",{className:"zz-inp",value:pin,inputMode:"numeric",placeholder:"1234",onChange:v2=>setPin(v2.target.value.replace(/\D/g,"").slice(0,6))}),ZZh("button",{type:"button",className:"zz-btn ghost sm",onClick:()=>setPin(rnd())},"Make one"))),
+          ZZh("label",{className:"zz-fl",style:{flex:"1 1 150px",minWidth:0}},"Language",ZZh("select",{className:"zz-inp",value:lang,onChange:v2=>setLang(v2.target.value)},...Object.entries(lx).map(([v3,l3])=>ZZh("option",{key:v3,value:v3},l3)))),
           btn("Add login",add)),
         ZZh("p",{className:"zz-sub",style:{marginTop:8}},"After adding, tap Edit to set the phone, shift and rank."),
-        err?ZZh("div",{className:"zz-err",style:{marginTop:8},role:"alert"},err):null)));
+        err&&!ed?ZZh("div",{className:"zz-err",style:{marginTop:8},role:"alert"},err):null)));
 },
 /* new crew strings in Spanish and Russian (stream D). Lazy like ZZtr: Sj is defined later in the bundle.
    Only fills keys that are not translated yet, so existing wording never changes. */
@@ -351,6 +356,10 @@ ZZtr3=()=>{if(ZZtr3Done||typeof Sj!=="object"||!Sj.es||!Sj.ru)return;ZZtr3Done=!
     "whose gear it is":"de quién es el equipo","what came back":"qué regresó","Ready: {q} {g} back from {c}.":"Listo: regresan {q} {g} de {c}.","Logged: {q} {g} back from {c}.":"Registrado: regresaron {q} {g} de {c}.",
     "Last 10 moves":"Últimos 10 movimientos","Back":"Regresó","Out":"Salió","No gear moves yet.":"Todavía no hay movimientos de equipo.",
     "load secured":"carga asegurada","loads secured":"cargas aseguradas","not yet":"todavía no",
+    "Rewrap is already priced in the damage report. Don't count it again below.":"Volver a emplayar ya tiene precio en el reporte de daño. No lo cuentes otra vez abajo.",
+    "lane":"carril","1. Count":"1. Contar","2. Photo":"2. Foto","Count is correct":"El conteo está bien","Count confirmed ✓":"Conteo confirmado ✓","Confirm {n} (not {w})":"Confirmar {n} (no {w})",
+    "3. Load it":"3. Cargarla","3. Load it (no photo)":"3. Cargarla (sin foto)","Confirm the count first":"Primero confirma el conteo",
+    "Count doesn't match the paperwork — dispatch will see it.":"El conteo no coincide con los papeles — despacho lo verá.",
     "How points work: 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo, 5 per damage report, 5 per load secured.":"Cómo se ganan puntos: 1 por tarima movida, 10 por camión terminado, 2 por carga contada, 1 por foto, 5 por reporte de daño, 5 por carga asegurada."});
   add(Sj.ru,{
     "Waiting {t} · goal {g}":"Ждёт {t} · цель {g}","#{n} in line":"№{n} в очереди","Working {t}":"В работе {t}",
@@ -404,6 +413,10 @@ ZZtr3=()=>{if(ZZtr3Done||typeof Sj!=="object"||!Sj.es||!Sj.ru)return;ZZtr3Done=!
     "whose gear it is":"чей крепёж","what came back":"что вернулось","Ready: {q} {g} back from {c}.":"Готово: {g}, {q} шт. от {c}.","Logged: {q} {g} back from {c}.":"Записано: {g}, {q} шт. вернули от {c}.",
     "Last 10 moves":"Последние 10 движений","Back":"Возврат","Out":"Выдано","No gear moves yet.":"Движений крепежа пока нет.",
     "load secured":"груз закреплён","loads secured":"грузов закреплено","not yet":"ещё нет",
+    "Rewrap is already priced in the damage report. Don't count it again below.":"Перемотка уже есть в акте повреждения. Не считайте её ещё раз ниже.",
+    "lane":"ряд","1. Count":"1. Пересчёт","2. Photo":"2. Фото","Count is correct":"Счёт верный","Count confirmed ✓":"Счёт подтверждён ✓","Confirm {n} (not {w})":"Подтвердить {n} (не {w})",
+    "3. Load it":"3. Загрузить","3. Load it (no photo)":"3. Загрузить (без фото)","Confirm the count first":"Сначала подтвердите счёт",
+    "Count doesn't match the paperwork — dispatch will see it.":"Счёт не совпадает с документами — диспетчер это увидит.",
     "How points work: 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo, 5 per damage report, 5 per load secured.":"Очки: 1 за паллету, 10 за готовую фуру, 2 за пересчёт груза, 1 за фото, 5 за акт повреждения, 5 за закреплённый груз."})},
 /* ================= Stream D: new crew features (PLAN.md 3.D) =================
    Wait clocks against the goal, door labels, the damage report with photos (ZZDmg), Secure the load (ZZSecure),
@@ -415,6 +428,8 @@ ZZtr3=()=>{if(ZZtr3Done||typeof Sj!=="object"||!Sj.es||!Sj.ru)return;ZZtr3Done=!
 /* R() a text with {placeholders}: ZZd_f("Waiting {t}",{t:"5m"}) */
 ZZd_f=(k,v)=>String(R(k)).replace(/\{(\w+)\}/g,(_,x)=>v&&v[x]!=null?String(v[x]):""),
 ZZd_ms=v=>v==null||v===""?NaN:typeof v==="number"?v:Date.parse(v),
+/* "#C0392B" -> "rgb(192, 57, 43)" (how the browser writes a colour into a style attribute) */
+ZZd_rgb=h=>{let x=/^#([0-9a-f]{6})$/i.exec(String(h||""));if(!x)return String(h||"");let n=parseInt(x[1],16);return`rgb(${n>>16&255}, ${n>>8&255}, ${n&255})`},
 ZZd_short=n=>{let w=String(n||"—").trim().split(/\s+/),s=w[0].length>=4||w.length<2?w[0]:w[0]+" "+w[1];return s.length>12?s.slice(0,11)+"…":s},
 ZZd_cname=(doc,t)=>(((doc&&doc.customers)||[]).find(c=>c.id===t.customerId)||{}).name||t.carrier||"—",
 /* ms since check-in while the truck is checked in but not started (yard or at a door); else null */
@@ -425,17 +440,21 @@ ZZd_promLine=pr=>{if(!pr||pr.leftMin==null)return"";let lim=pr.limitMin,hr=lim%6
 ZZd_clock=(t,doc,now)=>{if(!t||!t.arrivedAt||t.stage==="departed"||t.stage==="cancelled")return null;
   let w0=ZZd_waitOnly(t,now);
   if(w0!=null){let tone=ZZtone(w0,doc),pl=ZZplace(doc,t.id),tx=ZZd_f("Waiting {t} · goal {g}",{t:ot(w0),g:ZZS(doc).waitGoalMin});
-    return{k:"wait",ms:w0,tone,color:ZZtoneColor(tone),place:pl,full:pl?`${ZZd_f("#{n} in line",{n:pl})} · ${tx}`:tx}}
+    return{k:"wait",ms:w0,tone,color:ZZtoneColor(tone),place:pl,wait:tx,full:pl?`${ZZd_f("#{n} in line",{n:pl})} · ${tx}`:tx}}
   if(t.stage==="working"&&t.workStartedAt){let pr=ZZpromise(doc,t,now),wk=Math.max(0,+now-ZZd_ms(t.workStartedAt)),tone=pr.leftMin==null?"neutral":pr.leftMin<0?"bad":pr.leftMin<=pr.limitMin*.25?"warn":"good",ln=ZZd_promLine(pr);
     return{k:"work",ms:wk,tone,color:ZZtoneColor(tone),full:ZZd_f("Working {t}",{t:ot(wk)})+(ln?" · "+ln:"")}}
   return null},
-ZZd_Clock=({t,doc,now,size})=>{ZZtr3();let c=ZZd_clock(t,doc,now);if(!c)return null;let z=size||16;
-  return ZZh("div",{"data-zz":"clock",style:{display:"flex",alignItems:"flex-start",gap:6,fontSize:z,fontWeight:800,lineHeight:1.3,color:c.color,margin:"2px 0"}},
+ZZd_Clock=({t,doc,now,size,line})=>{ZZtr3();let c=ZZd_clock(t,doc,now);if(!c)return null;let z=size||16;
+  return ZZh("div",{"data-zz":"clock",style:{display:"flex",alignItems:"flex-start",gap:6,fontSize:z,fontWeight:800,lineHeight:1.3,color:c.color,margin:"2px 0",
+    ...(line?{marginTop:12,paddingTop:10,borderTop:`1px solid ${m.line}`}:{})}},
     ZZh(cu,{size:z+1,style:{flexShrink:0,marginTop:Math.round(z*.12)}}),ZZh("span",{style:{minWidth:0}},c.full))},
 /* the pill on the truck card (xj) while a truck waits */
 ZZd_Pill=({t,doc,now})=>{ZZtr3();let c=ZZd_clock(t,doc,now);if(!c||c.k!=="wait")return null;
-  return ZZh("span",{"data-zz":"waitpill",style:{display:"inline-flex",alignItems:"center",gap:5,padding:"2px 8px",borderRadius:6,fontSize:13,fontWeight:800,lineHeight:1.35,color:c.color,background:m.panel,border:`2px solid ${c.color}`,maxWidth:"100%"}},
-    ZZh(cu,{size:14,style:{flexShrink:0}}),ZZh("span",{style:{minWidth:0}},c.full))},
+  let st={display:"inline-flex",alignItems:"center",gap:5,padding:"2px 8px",borderRadius:6,fontSize:13,fontWeight:800,lineHeight:1.35,background:m.panel,maxWidth:"100%"};
+  return ZZh(i.Fragment,null,
+    c.place?ZZh("span",{"data-zz":"placepill",style:{...st,color:m.text,border:`2px solid ${m.amber}`}},ZZd_f("#{n} in line",{n:c.place})):null,
+    ZZh("span",{"data-zz":"waitpill",style:{...st,color:c.color,border:`2px solid ${c.color}`}},
+      ZZh(cu,{size:14,style:{flexShrink:0}}),ZZh("span",{style:{minWidth:0}},c.wait)))},
 /* crew bell: one red alert per truck that waited past the goal without being started */
 ZZd_waitOver=(doc,now)=>{let out=[];try{ZZtr3();let g=ZZS(doc).waitGoalMin;((doc&&doc.trailers)||[]).forEach(t=>{let w0=ZZd_waitOnly(t,now);if(w0==null||w0<g*6e4)return;let yd=!t.dock||t.dock===Ee;
     out.push({id:`waitover:${t.id}`,ts:ZZd_ms(t.arrivedAt)+g*6e4,tid:t.id,text:ZZd_f(yd?"Truck {k} has waited {t} in the yard. The goal is {g} min. It needs a door.":"Truck {k} has waited {t} at {d}. The goal is {g} min. Start it.",{k:t.truck||"—",d:t.dock,t:ot(w0),g})})})}catch(x){console.error("ZZd_waitOver",x)}return out},
@@ -458,14 +477,17 @@ ZZd_Step=({value,onChange,min,max,step,label})=>{let st=step||1,v=ie(value),lo=m
     style:{width:56,height:56,borderRadius:12,fontSize:28,fontWeight:900,lineHeight:1,background:m.raised,border:`1px solid ${m.line}`,color:m.text,cursor:"pointer",flexShrink:0,opacity:(dv<0?v<=lo:v>=hi)?.4:1}},t2);
   return ZZh("div",{"data-zz":"step",style:{display:"inline-flex",alignItems:"center",gap:6,flexShrink:0}},b("−",-st,`${R("One less")} ${label||""}`.trim()),
     ZZh("output",{"aria-live":"polite",style:{minWidth:44,textAlign:"center",fontSize:26,fontWeight:900,fontVariantNumeric:"tabular-nums"}},v),b("+",st,`${R("One more")} ${label||""}`.trim()))},
-ZZd_chip=on=>({minHeight:52,padding:"8px 12px",borderRadius:12,fontSize:16,fontWeight:800,textAlign:"left",cursor:"pointer",border:`2px solid ${on?m.orange:m.line}`,background:on?m.orange:m.panel,color:on?"#fff":m.text}),
+/* text on a filled accent colour: white on the light 24 HR theme, near-black on the dark Clean / Hi-vis themes
+   (their bright orange, green, amber and red are too light for white text) */
+ZZd_onAcc=ym==="brand"?"#fff":"#0A0A0A",
+ZZd_chip=on=>({minHeight:52,padding:"8px 12px",borderRadius:12,fontSize:16,fontWeight:800,textAlign:"left",cursor:"pointer",border:`2px solid ${on?m.orange:m.line}`,background:on?m.orange:m.panel,color:on?ZZd_onAcc:m.text}),
 ZZd_Missing=({miss,ok})=>miss.length?ZZh("div",{"data-zz":"missing",role:"status",style:{fontSize:15,fontWeight:800,color:m.red,lineHeight:1.35}},`${R("Still missing")}: ${miss.join(", ")}`)
   :ZZh("div",{"data-zz":"missing",role:"status",style:{fontSize:15,fontWeight:800,color:m.green}},ok||R("Ready to save.")),
 /* load row pills: pieces, weight, Hazmat (red), Do not stack (amber) */
 ZZd_LoadPills=({s})=>{if(!s)return null;ZZtr3();let pc=ie(s.pieces),wt=ie(s.weight),P=[];
   pc>0&&P.push([`${pc} ${R(pc===1?"piece":"pieces")}`,m.text,m.raised,m.line]);
   wt>0&&P.push([`${Math.round(wt).toLocaleString("en-US")} lb`,m.text,m.raised,m.line]);
-  s.hazmat&&P.push([R("Hazmat"),"#fff",m.red,m.red]);
+  s.hazmat&&P.push([R("Hazmat"),ZZd_onAcc,m.red,m.red]);
   s.stackable===!1&&P.push([R("Do not stack"),"#1A1200",m.amber,m.amber]);
   return P.length?ZZh("span",{"data-zz":"loadpills",style:{display:"inline-flex",flexWrap:"wrap",gap:4,marginLeft:6,verticalAlign:"middle",maxWidth:"100%"}},
     ...P.map(([t2,c,b,l2])=>ZZh("span",{key:t2,style:{fontSize:12,fontWeight:800,lineHeight:1.4,padding:"1px 7px",borderRadius:5,color:c,background:b,border:`1px solid ${l2}`,whiteSpace:"nowrap"}},t2))):null},
@@ -477,7 +499,7 @@ ZZd_Note=({value,onChange,short,n,out})=>{ZZtr3();let bad=!String(value||"").tri
       className:"focus:outline-none focus:ring-2 focus:ring-[var(--accent)]",style:{...ZZd_inp,border:`2px solid ${bad?m.red:m.line}`}}))},
 /* door picker label: door, short company, clock (busy) / Free / This truck / yard count */
 ZZDoorLbl=({door,doc,now,self})=>{ZZtr3();let sid=self&&self.id,L=(doc&&doc.trailers)||[],
-  sm={display:"block",fontSize:11,fontWeight:700,lineHeight:1.25,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"},
+  sm={display:"block",fontSize:12,fontWeight:800,lineHeight:1.25,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:"100%"},
   wrap=(...c)=>ZZh("span",{style:{display:"block",minWidth:0}},ZZh("span",{style:{display:"block",fontSize:18,fontWeight:900,lineHeight:1.1}},door),...c);
   if(door===Ee){let n=ZZyardQ(doc).filter(k=>k.id!==sid).length;return wrap(ZZh("span",{style:sm},n?ZZd_f("{n} waiting",{n}):R("Yard")))}
   if(self&&self.dock===door)return wrap(ZZh("span",{style:sm},R("This truck")));
@@ -499,10 +521,10 @@ ZZd_Doors=({doc,now,onOpen})=>{ZZtr3();let L=((doc&&doc.trailers)||[]).filter(k=
       ...Gi.map(d=>{let k=L.find(x=>x.dock===d);
         if(!k)return tile(d,[big(d,m.green),line(R("Free"),{color:m.green,marginTop:6,fontSize:15,fontWeight:800})],{border:`2px solid ${m.green}`},void 0,`${d} ${R("Free")}`);
         let c=ZZd_clock(k,doc,now),col=k.stage==="done"?m.mut:c?c.color:m.orange,
-          st=k.stage==="done"?R("Done"):c?ZZd_f(c.k==="wait"?"Waiting {t}":"Working {t}",{t:ot(c.ms)}):R(ds[k.stage]||"");
-        return tile(d,[big(d,m.orange),line(`${R("Truck")} ${k.truck||"—"}`,{marginTop:4}),line(ZZd_short(ZZd_cname(doc,k)),{color:m.mut,fontWeight:600}),line(st,{color:col,fontWeight:800})],{border:`2px solid ${col}`},()=>onOpen(k.id),`${d} ${R("Truck")} ${k.truck||""}`)}),
+          st=k.stage==="done"?R("Done"):c?ZZd_f(c.k==="wait"?"Waiting {t}":"Working {t}",{t:ot(c.ms).replace(/ /g,"\u00A0")}):R(ds[k.stage]||"");
+        return tile(d,[big(d,m.orange),line(`${R("Truck")} ${k.truck||"—"}`,{marginTop:4}),line(ZZd_short(ZZd_cname(doc,k)),{color:m.mut,fontWeight:600}),line(st,{color:col,fontWeight:800,whiteSpace:"normal"})],{border:`2px solid ${col}`},()=>onOpen(k.id),`${d} ${R("Truck")} ${k.truck||""}`)}),
       tile("YD",[big("YD",m.amber),line(yq.length?ZZd_f("{n} waiting",{n:yq.length}):R("Yard empty"),{marginTop:4}),
-        yw!=null?line(ZZd_f("Longest {t}",{t:ot(yw)}),{color:ZZtoneColor(ZZtone(yw,doc)),fontWeight:800}):null],{border:`2px solid ${m.amber}`},yq[0]?()=>onOpen(yq[0].id):void 0,R("Yard"))))},
+        yw!=null?line(ZZd_f("Longest {t}",{t:ot(yw).replace(/ /g,"\u00A0")}),{color:ZZtoneColor(ZZtone(yw,doc)),fontWeight:800,whiteSpace:"normal"}):null],{border:`2px solid ${m.amber}`},yq[0]?()=>onOpen(yq[0].id):void 0,R("Yard"))))},
 
 /* ---------- photos for one owner key, split into slots (wide shot, close-up, more) ----------
    All slots write the same owner list through one queue, so two boxes never overwrite each other. */
@@ -536,7 +558,7 @@ ZZd_Shots=({owner,slots,onCount})=>{ZZtr3();
     view?ZZh("div",{role:"dialog","aria-label":R("Photo"),onClick:()=>setView(null),style:{position:"fixed",inset:0,zIndex:80,background:"rgba(0,0,0,.86)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}},
       ZZh("img",{src:view.src,alt:"",onClick:e=>e.stopPropagation(),style:{maxWidth:"100%",maxHeight:"70vh",borderRadius:10}}),
       ZZh("div",{onClick:e=>e.stopPropagation(),style:{display:"flex",gap:10,marginTop:14,width:"100%",maxWidth:420}},
-        ZZh("button",{type:"button",onClick:()=>del(view.id),style:{flex:1,minHeight:52,borderRadius:12,border:0,background:m.red,color:"#fff",fontSize:17,fontWeight:800,cursor:"pointer"}},R("Delete photo")),
+        ZZh("button",{type:"button",onClick:()=>del(view.id),style:{flex:1,minHeight:52,borderRadius:12,border:0,background:m.red,color:ZZd_onAcc,fontSize:17,fontWeight:800,cursor:"pointer"}},R("Delete photo")),
         ZZh("button",{type:"button",onClick:()=>setView(null),style:{flex:1,minHeight:52,borderRadius:12,border:0,background:"#fff",color:"#111",fontSize:17,fontWeight:800,cursor:"pointer"}},R("Close")))):null)},
 
 /* ---------- ZZDmg: damage report with photos and a fix price ----------
@@ -574,7 +596,7 @@ ZZDmg=({s,doc,actions:a,onClose,onSaved,pallets:p0})=>{ZZtr3();
         ZZh("div",{style:{display:"grid",gap:8,marginTop:8}},...f.lines.map(l=>{let on=l.on!==!1,st=l.k==="labor"?.5:1;
           return ZZh("div",{key:l.k,"data-line":l.k,style:{border:`2px solid ${on?m.orange:m.line}`,borderRadius:12,padding:10,background:on?m.panel:m.raised,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
             ZZh("button",{type:"button","aria-pressed":on,onClick:()=>setLine(l.k,{on:!on}),style:{flex:"1 1 170px",minWidth:0,minHeight:52,display:"flex",alignItems:"center",gap:10,textAlign:"left",background:"none",border:0,padding:0,cursor:"pointer",color:m.text}},
-              ZZh("span",{style:{width:32,height:32,borderRadius:8,flexShrink:0,display:"grid",placeItems:"center",fontWeight:900,fontSize:18,border:`2px solid ${on?m.orange:m.dim}`,background:on?m.orange:m.panel,color:"#fff"}},on?"✓":""),
+              ZZh("span",{style:{width:32,height:32,borderRadius:8,flexShrink:0,display:"grid",placeItems:"center",fontWeight:900,fontSize:18,border:`2px solid ${on?m.orange:m.dim}`,background:on?m.orange:m.panel,color:ZZd_onAcc}},on?"✓":""),
               ZZh("span",{style:{minWidth:0}},ZZh("b",{style:{display:"block",fontSize:16}},R(l.label)),ZZh("span",{style:{fontSize:13,color:m.mut}},`${je(l.unit)} ${R(l.k==="labor"?"per hour":"each")}`))),
             on?ZZh(ZZd_Step,{value:l.qty,step:st,min:st,max:99,onChange:v=>setLine(l.k,{qty:v}),label:R(l.label)}):null,
             ZZh("b",{style:{minWidth:72,textAlign:"right",fontSize:17,marginLeft:"auto",color:on?m.text:m.dim}},je(on?ie(l.qty)*ie(l.unit):0)))})),
@@ -585,7 +607,8 @@ ZZDmg=({s,doc,actions:a,onClose,onSaved,pallets:p0})=>{ZZtr3();
         ZZh(ZZd_Missing,{miss}),
         ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:wr,disabled:!!miss.length||busy,onClick:save},busy?R("Saving…"):R("Save damage report")))))},
 /* a load's photo damage reports (count card, pull card) */
-ZZd_DmgList=({s,onAdd,addLabel})=>{ZZtr3();let L=((s&&s.exceptions)||[]).filter(x=>x&&x.kind==="Damage"&&x.photoOwner);
+ZZd_DmgList=({s,onAdd,addLabel,rw})=>{ZZtr3();let L=((s&&s.exceptions)||[]).filter(x=>x&&x.kind==="Damage"&&x.photoOwner),
+    rwIn=rw&&L.some(x=>!x.resolved&&((x.est&&x.est.lines)||[]).some(l=>/rewrap/i.test((l&&l.label)||"")));
   return ZZh("div",{"data-zz":"dmglist",style:{display:"grid",gap:8,paddingTop:4}},
     ...L.map(x=>{let an=x.answer,st=an&&an.status==="accepted"?(an.auto?R("Auto-approved"):R("Customer approved")):an&&an.status==="declined"?R("Customer declined"):an&&an.status==="call"?R("Customer wants a call"):x.resolved?R("Resolved"):R("Waiting for the customer"),
       tot=ZZestTotal((x.est&&x.est.lines)||[]),pl=ie(x.pallets);
@@ -596,7 +619,8 @@ ZZd_DmgList=({s,onAdd,addLabel})=>{ZZtr3();let L=((s&&s.exceptions)||[]).filter(
         ZZh("div",{style:{fontSize:13,color:m.mut}},[ZZd_f("{n} photos",{n:ie(x.photoCount)}),tot?`${R("Fix price")} ${je(tot)}`:"",st].filter(Boolean).join(" · ")),
         ZZh(lr,{ownerId:x.photoOwner,size:56}))}),
     onAdd?ZZh("button",{type:"button",onClick:onAdd,"data-zz":"dmgadd",style:{minHeight:52,borderRadius:12,border:`2px solid ${m.red}`,background:m.panel,color:m.red,fontSize:16,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:"8px 12px"}},
-      ZZh(wr,{size:18}),addLabel||(L.length?R("Report more damage"):R("Report damage with photos"))):null)},
+      ZZh(wr,{size:18}),addLabel||(L.length?R("Report more damage"):R("Report damage with photos"))):null,
+    rwIn?ZZh("div",{"data-zz":"rwhint",style:{fontSize:14,fontWeight:700,color:m.mut,lineHeight:1.35}},R("Rewrap is already priced in the damage report. Don't count it again below.")):null)},
 ZZd_PullDmg=({s,doc,actions:a,open,setOpen})=>ZZh("div",null,
   ZZh(ZZd_DmgList,{s,onAdd:()=>setOpen(!0),addLabel:((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner)?R("Report more damage"):R("Damage? Report it")}),
   open?ZZh(ZZDmg,{s,doc,actions:a,pallets:1,onClose:()=>setOpen(!1),onSaved:()=>setOpen(!1)}):null),
@@ -605,12 +629,19 @@ ZZd_PullDmg=({s,doc,actions:a,open,setOpen})=>ZZh("div",null,
 ZZd_CONF=["","Not safe","Needs work","OK","Solid","Rock solid"],
 ZZd_CONFSUB=["","Do not let it leave like this","Something could still move","It holds, but could be better","Tight. Nothing moves","Could not be better"],
 ZZd_confColor=c=>c<=1?m.red:c<=3?m.amber:m.green,
+/* the half-filled form per truck stays in memory (gear, tags, seal, rating, note), so leaving the truck and coming back keeps it;
+   the check box and the signature are never kept */
+ZZd_secDraft={},
 ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
   let s0=t.secure&&t.secure.signedAt?t.secure:null,
     init=()=>{let g={};ZZGEAR.forEach(x=>{let v=((s0&&s0.gear)||{})[x.k]||{};g[x.k]={qty:Math.max(0,Math.round(ie(v.qty))),owner:v.owner==="driver"?"driver":"ours"}});
       return{gear:g,tags:[...((s0&&s0.tags)||[])],seal:(s0&&s0.seal)||t.sealOut||"",conf:s0?ie(s0.confidence):0,note:(s0&&s0.note)||"",checked:!1,sign:""}},
-    [f,setF]=(0,H.useState)(init),[tg,setTg]=(0,H.useState)(""),[edit,setEdit]=(0,H.useState)(!s0),[busy,setBusy]=(0,H.useState)(!1),
-    up=p=>setF(o=>({...o,...p})),setGear=(k,p)=>setF(o=>({...o,gear:{...o.gear,[k]:{...o.gear[k],...p}}})),
+    [f,setF]=(0,H.useState)(()=>ZZd_secDraft[t.id]?{...ZZd_secDraft[t.id],checked:!1,sign:""}:init()),[tg,setTg]=(0,H.useState)(""),[edit,setEdit]=(0,H.useState)(()=>!s0||!!ZZd_secDraft[t.id]),[busy,setBusy]=(0,H.useState)(!1);
+  /* only a form someone actually changed is kept */
+  (0,H.useEffect)(()=>{if(!edit)return;let d={...f,checked:!1,sign:""};ZZd_secDraft[t.id]=JSON.stringify(d)!==JSON.stringify(init())?d:null},[f,edit,t.id]);
+  /* secured on another phone (shared data) while this one shows an untouched form: show the saved report */
+  (0,H.useEffect)(()=>{s0&&!ZZd_secDraft[t.id]&&(setEdit(!1),setF(init()))},[s0&&s0.signedAt]);
+  let up=p=>setF(o=>({...o,...p})),setGear=(k,p)=>setF(o=>({...o,gear:{...o.gear,[k]:{...o.gear[k],...p}}})),
     ph={...((s0&&s0.photos)||{}),...(t.secPhotos||{})},cnt=k=>ie(ph[k]),
     mp=ZZSECSLOTS.filter(sl=>!(cnt(sl.k)>0)).map(sl=>R(sl.label).toLowerCase()),
     miss=[mp.length?(mp.length===5?R("all 5 photos"):ZZd_f(mp.length===1?"the {x} photo":"{n} photos ({x})",{n:mp.length,x:mp.join(", ")})):"",
@@ -618,11 +649,11 @@ ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
     addTag=()=>{let v=tg.trim().toUpperCase();if(!v)return;f.tags.includes(v)||up({tags:[...f.tags,v]});setTg("")},
     save=async()=>{if(miss.length||busy)return;setBusy(!0);let photos={};ZZSECSLOTS.forEach(sl=>{photos[sl.k]=cnt(sl.k)});let r=null;
       try{r=await a.zzSecure(t.id,{gear:f.gear,tags:f.tags,seal:f.seal.trim(),photos,confidence:f.conf,note:f.note.trim(),checkedRows:f.checked,signature:f.sign.trim()})}catch(x){console.error("zzSecure",x)}
-      setBusy(!1);if(r==null)return;up({checked:!1,sign:""});setEdit(!1);f.conf>1&&onNext&&onNext()},
+      setBusy(!1);if(r==null)return;ZZd_secDraft[t.id]=null;up({checked:!1,sign:""});setEdit(!1);f.conf>1&&onNext&&onNext()},
     sc=s0?ie(s0.confidence):0,
     hint=s0?(sc<=1?R("Rated not safe. Fix it and secure it again."):`${R("Secured")} ${sc}/5 · ${R(ZZd_CONF[sc]||"")}${s0.seal?` · ${R("seal")} ${s0.seal}`:""} · ${s0.signedBy||""}`):R("Gear, tags, seal, 5 photos, how solid, then sign"),
     num=(k,txt)=>ZZh("div",{style:{display:"flex",alignItems:"center",gap:8,...ZZd_H,fontSize:18}},ZZh("span",{style:{width:28,height:28,borderRadius:14,display:"grid",placeItems:"center",fontSize:14,fontWeight:900,background:m.raised,color:m.orange,flexShrink:0}},k),txt),
-    seg=on=>({minHeight:52,borderRadius:10,fontSize:16,fontWeight:800,cursor:"pointer",border:`2px solid ${on?m.orange:m.line}`,background:on?m.orange:m.panel,color:on?"#fff":m.text,padding:"6px 8px"}),
+    seg=on=>({minHeight:52,borderRadius:10,fontSize:16,fontWeight:800,cursor:"pointer",border:`2px solid ${on?m.orange:m.line}`,background:on?m.orange:m.panel,color:on?ZZd_onAcc:m.text,padding:"6px 8px"}),
     redBox={borderRadius:10,padding:"10px 12px",border:`2px solid ${m.red}`,background:"rgba(192,57,43,.08)",color:m.text,display:"grid",gap:4};
   let summary=()=>ZZh("div",{"data-zz":"securedone",style:{display:"grid",gap:10}},
     sc<=1?ZZh("div",{role:"alert",style:redBox},ZZh("b",{style:{color:m.red,fontSize:17}},R("Do not let it leave like this — tell the office.")),ZZh("div",{style:{fontSize:15}},R("Fix the load, then secure it again. This truck can't be sent until then.")))
@@ -662,7 +693,7 @@ ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
     ZZh("div",{style:{display:"grid",gap:8}},num(5,R("How solid is it?")),
       ...[1,2,3,4,5].map(c=>{let on=f.conf===c,col=ZZd_confColor(c);return ZZh("button",{key:c,type:"button","aria-pressed":on,"data-conf":c,onClick:()=>up({conf:c}),
         style:{display:"flex",alignItems:"center",gap:12,width:"100%",minHeight:58,textAlign:"left",padding:"8px 12px",borderRadius:12,cursor:"pointer",border:`2px solid ${on?col:m.line}`,background:on?col+"1F":m.panel,color:m.text}},
-        ZZh("span",{style:{width:40,height:40,borderRadius:20,display:"grid",placeItems:"center",fontSize:20,fontWeight:900,flexShrink:0,background:on?col:m.raised,color:on?"#fff":m.text}},c),
+        ZZh("span",{style:{width:40,height:40,borderRadius:20,display:"grid",placeItems:"center",fontSize:20,fontWeight:900,flexShrink:0,background:on?col:m.raised,color:on?ZZd_onAcc:m.text}},c),
         ZZh("span",{style:{minWidth:0,flex:1}},ZZh("b",{style:{display:"block",fontSize:17}},R(ZZd_CONF[c])),ZZh("span",{style:{fontSize:13,color:m.mut}},R(ZZd_CONFSUB[c]))),on?ZZh("b",{style:{fontSize:20,color:col}},"✓"):null)}),
       f.conf===1?ZZh("div",{role:"alert","data-zz":"notsafe",style:redBox},ZZh("b",{style:{color:m.red,fontSize:17}},R("Do not let it leave like this — tell the office."))):null,
       f.conf&&f.conf<=3?ZZh("label",{style:{display:"grid",gap:6}},ZZh("span",{style:{fontSize:15,fontWeight:800,color:f.note.trim()?m.text:m.red}},R("What would make it safer? (required)")),
@@ -677,14 +708,14 @@ ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
           className:"focus:outline-none focus:ring-2 focus:ring-[var(--accent)]",style:ZZd_inp}))),
     ZZh("div",{style:{display:"grid",gap:8}},ZZh(ZZd_Missing,{miss,ok:R("Ready. Saving puts the report and photos in the customer's portal.")}),
       ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:bi,disabled:!!miss.length||busy,onClick:save},busy?R("Saving…"):R("Save and sign")),
-      s0?ZZh(Z,{kind:"ghost",size:"md",className:"w-full",onClick:()=>{setF(init());setEdit(!1)}},R("Keep the saved report")):null));
-  return ZZh(hm,{n,title:R("Secure the load"),done,open,onOpen,hint},ZZh("div",{style:{paddingTop:10}},s0&&!edit?summary():form()))},
+      s0?ZZh(Z,{kind:"ghost",size:"md",className:"w-full",onClick:()=>{ZZd_secDraft[t.id]=null;setF(init());setEdit(!1)}},R("Keep the saved report")):null));
+  return ZZh("div",{"data-zz":"securestep",style:{scrollMarginTop:150}},ZZh(hm,{n,title:R("Secure the load"),done,open,onOpen,hint},ZZh("div",{style:{paddingTop:10}},s0&&!edit?summary():form())))},
 /* wrap-up: the line that blocks "Send to dispatch" until the load is secured */
 ZZd_SecureFirst=({t,onGo})=>{ZZtr3();let bad=!!(t&&t.secure&&t.secure.signedAt);
   return ZZh("div",{role:"alert","data-zz":"securefirst",style:{borderRadius:10,padding:"10px 12px",border:`2px solid ${m.red}`,background:"rgba(192,57,43,.08)",display:"grid",gap:8}},
     ZZh("div",{style:{fontSize:17,fontWeight:900,color:m.red}},R("Secure the load first")),
     ZZh("div",{style:{fontSize:15,color:m.text}},bad?R("It was rated not safe. Fix the load and secure it again before it leaves."):R("Gear, seal, 5 photos, how solid, and your signature. Then you can send it.")),
-    ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:bi,onClick:onGo},R("Go to Secure the load")))},
+    ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:bi,onClick:()=>{onGo&&onGo();setTimeout(()=>{try{let el=document.querySelector("[data-zz=securestep]");el&&el.scrollIntoView({behavior:"smooth",block:"start"})}catch{}},150)}},R("Go to Secure the load")))},
 
 /* ---------- Gear tab (5th crew tab) ---------- */
 ZZd_Gear=({doc:e,actions:a})=>{ZZtr3();
@@ -702,7 +733,7 @@ ZZd_Gear=({doc:e,actions:a})=>{ZZtr3();
     h1=txt=>ZZh("div",{className:"zzc",style:{fontSize:24,fontWeight:800,margin:"4px 2px 2px"}},txt),
     sub=txt=>ZZh("div",{style:{fontSize:15,color:m.mut,margin:"0 2px 10px"}},txt),
     num=(k,txt)=>ZZh("div",{style:{...ZZd_H,display:"flex",gap:8,alignItems:"center",marginTop:6}},ZZh("span",{style:{width:26,height:26,borderRadius:13,display:"grid",placeItems:"center",fontSize:13,fontWeight:900,background:m.raised,color:m.orange,flexShrink:0}},k),txt),
-    tagChip=(x,on,click)=>ZZh("button",{key:x,type:"button","aria-pressed":on,onClick:click,style:{minHeight:48,padding:"4px 14px",borderRadius:10,fontSize:16,fontWeight:800,cursor:"pointer",border:`2px solid ${on?m.green:m.line}`,background:on?m.green:m.panel,color:on?"#fff":m.text}},`${on?"✓ ":""}${x}`);
+    tagChip=(x,on,click)=>ZZh("button",{key:x,type:"button","aria-pressed":on,onClick:click,style:{minHeight:48,padding:"4px 14px",borderRadius:10,fontSize:16,fontWeight:800,cursor:"pointer",border:`2px solid ${on?m.green:m.line}`,background:on?m.green:m.panel,color:on?ZZd_onAcc:m.text}},`${on?"✓ ":""}${x}`);
   return ZZh("div",{"data-zz":"gear"},
     ZZh("section",{style:{marginBottom:20}},h1(R("Out with customers now")),sub(R("Our gear that went out on loads and has not come back yet.")),
       out.length?ZZh("div",{style:{display:"grid",gap:8}},...out.map(({c,o})=>ZZh("div",{key:c.id,"data-zz":"gearout",style:{...ZZd_card,display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}},
@@ -745,10 +776,11 @@ ZZd_Gear=({doc:e,actions:a})=>{ZZtr3();
 ZZd_DAYS=[[1,"Mon"],[2,"Tue"],[3,"Wed"],[4,"Thu"],[5,"Fri"],[6,"Sat"],[0,"Sun"]],
 ZZd_hm12=s=>{let x=/^(\d{1,2}):(\d{2})/.exec(String(s||""));if(!x)return"";let h=+x[1]%24;return`${h%12||12}:${x[2]} ${h<12?"AM":"PM"}`},
 ZZd_shiftTxt=sh=>{if(!sh||!sh.start||!sh.end)return"—";let d=Array.isArray(sh.days)&&sh.days.length?sh.days.map(Number):[0,1,2,3,4,5,6],
-  nm=ZZd_DAYS.filter(([k])=>d.includes(k)).map(([,l])=>l),days=d.length===7?"every day":d.length===5&&[1,2,3,4,5].every(k=>d.includes(k))?"Mon–Fri":nm.join(" ");
+  on=ZZd_DAYS.map(([k])=>d.includes(k)),nm=ZZd_DAYS.filter(([k])=>d.includes(k)).map(([,l])=>l),fi=on.indexOf(!0),la=on.lastIndexOf(!0),
+    run=fi>=0&&on.slice(fi,la+1).every(Boolean)&&la-fi>=2,days=d.length===7?"every day":run?`${ZZd_DAYS[fi][1]}–${ZZd_DAYS[la][1]}`:nm.join(" ");
   return`${ZZd_hm12(sh.start)}–${ZZd_hm12(sh.end)} · ${days}`},
 ZZd_crewDraft=k=>({id:k.id,name:k.name||"",pin:k.pin||"",lang:k.lang||"en",phone:k.phone||"",start:(k.shift&&k.shift.start)||"",end:(k.shift&&k.shift.end)||"",
-  days:k.shift&&Array.isArray(k.shift.days)&&k.shift.days.length?k.shift.days.map(Number):[1,2,3,4,5],rank:k.rank!=null&&k.rank!==""?String(k.rank):""}),
+  days:k.shift&&Array.isArray(k.shift.days)&&k.shift.days.length?k.shift.days.map(Number):[1,2,3,4,5],rank:k.rank!=null&&k.rank!==""?String(k.rank):"",hadRank:k.rank!=null&&k.rank!==""}),
 /* {err} or {patch} for zzUpdateCrew; cleared fields are saved as null (never deleted) */
 ZZd_crewCheck=ed=>{let nm=String(ed.name||"").trim(),st=String(ed.start||""),en=String(ed.end||""),rk=String(ed.rank||"").trim(),ph=String(ed.phone||"").trim();
   if(nm.length<2||!/^\d{4,6}$/.test(ed.pin||""))return{err:"Name needs 2+ letters and PIN 4 to 6 digits."};
@@ -756,7 +788,8 @@ ZZd_crewCheck=ed=>{let nm=String(ed.name||"").trim(),st=String(ed.start||""),en=
   if(st&&!(ed.days||[]).length)return{err:"Pick at least one day for the shift."};
   if(rk&&!/^\d{1,2}$/.test(rk))return{err:"Rank is a number: 1 is called first."};
   if(ph&&ph.replace(/\D/g,"").length<7)return{err:"That phone number looks too short."};
-  return{patch:{name:nm,pin:ed.pin,lang:ed.lang||"en",phone:ph||null,shift:st&&en?{start:st,end:en,days:[...ed.days].map(Number).sort((x,y)=>x-y)}:null,rank:rk?+rk:null}}},
+  let patch={name:nm,pin:ed.pin,lang:ed.lang||"en",phone:ph||null,shift:st&&en?{start:st,end:en,days:[...ed.days].map(Number).sort((x,y)=>x-y)}:null};
+  if(rk)patch.rank=+rk;else if(ed.hadRank)patch.rank=null;return{patch}},
 ZZd_CrewEdit=({ed,setEd,onSave,onCancel})=>{let set=p=>setEd({...ed,...p}),
   fl=(label,el,hint)=>ZZh("label",{className:"zz-fl",style:{minWidth:0}},label,el,hint?ZZh("span",{style:{fontSize:12,color:m.dim,fontWeight:400}},hint):null);
   return ZZh("div",{"data-zz":"crewedit",style:{display:"grid",gap:10,padding:"6px 0"}},
@@ -765,8 +798,8 @@ ZZd_CrewEdit=({ed,setEd,onSave,onCancel})=>{let set=p=>setEd({...ed,...p}),
       fl("PIN (4 to 6 digits)",ZZh("input",{className:"zz-inp",value:ed.pin,inputMode:"numeric",onChange:v=>set({pin:v.target.value.replace(/\D/g,"").slice(0,6)})})),
       fl("Language",ZZh("select",{className:"zz-inp",value:ed.lang||"en",onChange:v=>set({lang:v.target.value})},...Object.entries(lx).map(([v3,l3])=>ZZh("option",{key:v3,value:v3},l3)))),
       fl("Cell phone",ZZh("input",{className:"zz-inp",type:"tel",value:ed.phone,placeholder:"775-555-0100",onChange:v=>set({phone:v.target.value})}),"Shown to customers as the dock lead when this person is on shift."),
-      fl("Shift starts",ZZh("input",{className:"zz-inp",type:"time",step:300,value:ed.start,onChange:v=>set({start:v.target.value})})),
-      fl("Shift ends",ZZh("input",{className:"zz-inp",type:"time",step:300,value:ed.end,onChange:v=>set({end:v.target.value})})),
+      fl("Shift starts (dock time)",ZZh("input",{className:"zz-inp",type:"time",step:300,value:ed.start,onChange:v=>set({start:v.target.value})})),
+      fl("Shift ends (dock time)",ZZh("input",{className:"zz-inp",type:"time",step:300,value:ed.end,onChange:v=>set({end:v.target.value})})),
       fl("Rank",ZZh("input",{className:"zz-inp",inputMode:"numeric",value:ed.rank,placeholder:"1",onChange:v=>set({rank:v.target.value.replace(/\D/g,"").slice(0,2)})}),"1 = dock lead, called first.")),
     ZZh("div",null,ZZh("div",{className:"zz-fl",style:{marginBottom:4}},"Shift days"),
       ZZh("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},...ZZd_DAYS.map(([k,l])=>{let on=(ed.days||[]).includes(k);

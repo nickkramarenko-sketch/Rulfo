@@ -8,7 +8,9 @@
      done   F1 (Altex, 60 min), F2 (Great Basin, 70), F3 (Silver State, 90), F4 (Tahoe, 150: over the 2 h promise)
      booked C1 (Comstock, customer booking not confirmed, code 4821, Samsara link, ETA), C2 (Altex dispatch, code 5932),
             C3 (Pyramid Lake, old-style "Requested by customer" note)
-   Average wait today = (5+15+30+10+20+10+36)/7 = 18 min. Data is always read back from localStorage. */
+   Average wait today = (5+15+30+10+20+10+36)/7 = 18 min. Data is always read back from localStorage.
+   Contacts: Altex (Pat: friday email, Lee), Truckee River (Dana: friday by text); Pine Ridge has an account email; the other
+   demo accounts have no email, so their Friday summary waits until the office adds one. */
 const H = require('./harness');
 const { PHONE, DESK } = H;
 const MIN = 6e4, HOUR = 36e5, DAY = 864e5;
@@ -59,6 +61,7 @@ async function fixture(h, NOW, o = {}) {
       alerts: { arrived: { text: true, email: false }, done: { text: false, email: true }, friday: { text: false, email: true } } },
     { id: 'ct2', name: 'Lee', role: 'Billing', phone: '775-555-0102', email: 'lee@altex.example',
       alerts: { arrived: { text: false, email: true }, done: { text: false, email: false } } }];
+  cu('zzc1').contacts = [{ id: 'ct3', name: 'Dana', role: 'Dispatch', phone: '775-555-0210', email: '', alerts: { friday: { text: true, email: false } } }];
   cu('zzc6').fridaySummary = false;
   cu('zzc7').securementInterest = ago(24 * 60);
   cu('zzc7').securementInterestBy = 'Sam Comstock';
@@ -152,10 +155,15 @@ H.main('e-office', async (h, t) => {
   {
     const s2 = clone(seed);
     s2.trailers.push({ ...clone(s2.trailers.find(x => x.id === 'zzeW1')), id: 'zzeW1b', truck: 'W1B', trailer: 'TW1B', customerId: 'zzc9', stage: 'at-dock', workStartedAt: null, workStartedBy: null });
+    // a truck that just checked in (NEW for 5 minutes) and a booking 30 min past its appointment that never came
+    s2.trailers.push({ ...clone(s2.trailers.find(x => x.id === 'zzeY10')), id: 'zzeY02', truck: 'Y02', trailer: 'TY02', customerId: 'zzc8', arrivedAt: new Date(NOW - 2 * MIN).toISOString(), paperCount: 0 });
+    s2.trailers.push({ ...clone(s2.trailers.find(x => x.id === 'zzeC3')), id: 'zzeC0', truck: 'C0', trailer: 'TC0', customerId: 'zzc9', scheduledAt: new Date(NOW - 30 * MIN).toISOString(), notes: '' });
     const p = await office(h, s2, NOW);
     await tab(p, 'Yard');
     const s = await h.text(p);
     t.ok(/Two trucks are marked at door D1: truck W1 and truck W1B\./.test(s) && (s.match(/Same door twice/g) || []).length === 2, 'double door: red banner and both cards flagged');
+    t.ok(/NEW/.test(await p.locator('[data-truck="zzeY02"]').innerText()) && !/NEW/.test(await p.locator('[data-truck="zzeY10"]').innerText()), 'NEW pill on a truck checked in 2 min ago, not on the one from 10 min ago');
+    t.ok(/Late: 30m past the appointment/.test(await p.locator('[data-truck="zzeC0"]').innerText()), 'coming today: a no-show 30 min past its appointment is flagged late');
     await p.context().close();
   }
 
@@ -181,6 +189,15 @@ H.main('e-office', async (h, t) => {
     await tab(p, 'Yard');
     t.eq(await color(statV(p, 'avg')), RGB.amber, 'average wait 18m turns amber against the 20 min goal');
     t.ok(/over the 20 min goal/.test(await p.locator('[data-stat-value="longest"]').locator('xpath=..').innerText()) && /goal 20 min/.test(await h.text(p)), 'yard texts follow the new goal');
+    {
+      // the crew clocks (stream D) read the same setting: check them when this build has D's crew screen
+      // a crew phone with the saved doc (a fresh browser: this one remembers Nick's sign-in)
+      const cp = await h.openAs('crew', { viewport: PHONE, seed: await h.readDocRaw(p), now: NOW, timezoneId: TZ });
+      const ct = await h.text(cp);
+      if (/· goal \d+/.test(ct)) t.ok(/· goal 20/.test(ct) && !/· goal 30/.test(ct), 'crew wait clocks follow the new 20 min goal (stream D screen)');
+      else console.log('  note - this build has no crew wait clocks (they come from stream D); skipped the crew-clock check');
+      await cp.context().close();
+    }
     await tab(p, 'Setup');
     await card.locator('input[aria-label^="Wait goal"]').fill('12');
     await card.getByRole('button', { name: 'Save dock settings' }).click();
@@ -195,6 +212,12 @@ H.main('e-office', async (h, t) => {
     await card.getByRole('button', { name: 'Save dock settings' }).click();
     await p.waitForTimeout(300);
     t.ok(await p.getByText('The promise must be between 15 and 1440 minutes.').count() > 0 && (await h.readDoc(p)).settings.promiseMin === 120, 'a bad promise is refused with a plain message and nothing is saved');
+    await card.locator('input[aria-label^="Our promise"]').fill('90');
+    t.ok(/1h 30m from check-in to done/.test(await card.innerText()), 'the promise hint spells out 90 minutes as 1h 30m');
+    await card.locator('input[aria-label^="Replacement pallet"]').fill('');
+    await card.getByRole('button', { name: 'Save dock settings' }).click();
+    await p.waitForTimeout(300);
+    t.ok(await p.getByText('Type the replacement pallet price (a number, 0 or more).').count() > 0 && (await h.readDoc(p)).rates.newPallet === 25 && (await h.readDoc(p)).settings.promiseMin === 120, 'a blank price is refused (it is not saved as $0)');
     await p.setViewportSize(PHONE);
     await card.scrollIntoViewIfNeeded();
     await h.check(p, 'setup-390');
@@ -214,6 +237,9 @@ H.main('e-office', async (h, t) => {
     await p.waitForTimeout(300);
     const bar = await p.evaluate(() => { const el = document.querySelector('div.fixed.bottom-0 > div'); return { sw: el.scrollWidth, cw: el.clientWidth, page: document.scrollingElement.scrollWidth, n: el.querySelectorAll('button').length }; });
     t.ok(bar.n === 11 && bar.sw > bar.cw && bar.cw <= 390 && bar.page <= 390, `tab bar at 390: 11 tabs scroll inside the bar (${bar.sw} > ${bar.cw}), the page does not (${bar.page})`);
+    const peek = await p.evaluate(() => { const el = document.querySelector('div.fixed.bottom-0 > div'), b = [...el.querySelectorAll('button')], r = b.map(x => x.getBoundingClientRect());
+      const cut = r.find(x => x.left < innerWidth && x.right > innerWidth); return { cut: cut ? Math.round(innerWidth - cut.left) : 0, minH: Math.min(...r.map(x => x.height)), shade: /radial-gradient/.test(getComputedStyle(el).backgroundImage) }; });
+    t.ok(peek.cut >= 15 && peek.shade && peek.minH >= 44, `a part of the next tab peeks in (${peek.cut}px) with an edge shadow, so Nick can see the bar scrolls; tabs ${peek.minH}px tall`);
     await tab(p, 'Gear');
     t.ok(await p.locator('[data-zz="gear"]').count() === 1, 'a tab past the edge (Gear) is reachable at 390');
     await h.check(p, 'tabbar-390');
@@ -273,7 +299,7 @@ H.main('e-office', async (h, t) => {
   }
 
   /* ================= Friday ================= */
-  t.section('Friday summaries: one per eligible customer, second click adds 0');
+  t.section('Friday summaries: one per reachable customer, a second click adds 0, unreachable ones wait for a contact');
   {
     const p = await office(h, seed, NOW);
     await tab(p, 'Outbox');
@@ -283,27 +309,38 @@ H.main('e-office', async (h, t) => {
     const want = ['cu_altex', 'cu_pine', 'zzc1', 'zzc2', 'zzc3', 'zzc4', 'zzc5'].sort();
     t.eq(cards, want, 'previews for the 7 customers with trucks this week and Friday summaries on');
     t.ok(/Turned off by the customer: Tahoe Freightways\./.test(await h.text(p)), 'a customer who switched it off is listed as off');
+    t.ok(/Left out until they have an email or cell on file: Carson Line Trucking, Great Basin Transport, Silver State Express, Washoe Valley Freight\./.test(await h.text(p)),
+      'customers with nobody to send to are named (not silently queued to nobody)');
     const alt = p.locator('[data-friday="cu_altex"]').locator('xpath=../..');
     await alt.getByRole('button', { name: 'Preview email' }).click();
     const pv = await alt.locator('pre').innerText();
     t.ok(/Hi Pat,/.test(pv) && /Trucks: 2 \(1 done\)/.test(pv) && /Done within our 2-hour promise: 100%/.test(pv) && /plywood sheets/.test(pv) && /Goes to: Pat \(pat@altex\.example\)/.test(await alt.innerText()), 'Altex preview built from ZZweek, addressed to the contact who chose it');
+    t.ok(/No address/.test(await p.locator('[data-friday="zzc3"]').locator('xpath=..').innerText()), 'a customer without an address is marked "No address"');
     await h.check(p, 'friday-1400');
     await p.getByRole('button', { name: 'Queue Friday summaries' }).click();
     await p.waitForTimeout(700);
     let doc = await h.readDoc(p);
     let fr = (doc.zzOutbox || []).filter(o => o.event === 'friday');
-    t.ok(fr.length === 7 && new Set(fr.map(o => o.customerId)).size === 7 && fr.every(o => want.includes(o.customerId)), 'queued one entry per eligible customer (7)');
-    t.ok(fr.find(o => o.customerId === 'cu_altex').to === 'pat@altex.example', 'the Altex entry goes to Pat');
-    t.ok(await p.getByText('Queued 7 Friday summaries. They\'re in the Outbox, not sent.').count() > 0, 'toast shows the count (and says not sent)');
+    t.ok(fr.length === 3 && new Set(fr.map(o => o.customerId)).size === 3 && fr.every(o => ['cu_altex', 'cu_pine', 'zzc1'].includes(o.customerId) && o.to), 'queued one entry per reachable customer (3), each with an address');
+    t.ok(fr.find(o => o.customerId === 'cu_altex').to === 'pat@altex.example' && fr.find(o => o.customerId === 'cu_pine').to === 'ops@pineridge.example', 'Altex goes to Pat, Pine Ridge to the account email');
+    const dana = fr.find(o => o.customerId === 'zzc1');
+    t.ok(dana.channel === 'sms' && dana.to === '775-555-0210' && /your week so far/.test(dana.body) && !dana.subject, 'Truckee River gets the short text version (Dana chose text)');
+    t.ok(await p.getByText("Queued 3 Friday summaries. They're in the Outbox, not sent. 4 customers still have no email or cell on file.").count() > 0, 'toast shows the count, says not sent, and says who is left out');
     await p.getByRole('button', { name: 'Queue Friday summaries' }).click();
     await p.waitForTimeout(700);
     doc = await h.readDoc(p);
-    t.eq((doc.zzOutbox || []).filter(o => o.event === 'friday').length, 7, 'second click queues 0');
-    t.ok(await p.getByText("Nothing new to queue. This week's summaries are already in the Outbox.").count() > 0, 'toast: nothing new to queue');
+    t.eq((doc.zzOutbox || []).filter(o => o.event === 'friday').length, 3, 'second click queues 0');
+    t.ok(await p.getByText('Nothing new queued. 4 customers still have no email or cell on file.').count() > 0, 'toast: nothing new queued');
+    await act(p, 'zzCustomer', 'zzc2', { contact: 'ops@washoe.example' });
+    await p.getByRole('button', { name: 'Queue Friday summaries' }).click();
+    await p.waitForTimeout(700);
+    doc = await h.readDoc(p);
+    fr = (doc.zzOutbox || []).filter(o => o.event === 'friday');
+    t.ok(fr.length === 4 && fr.filter(o => o.customerId === 'zzc2').length === 1 && fr.find(o => o.customerId === 'zzc2').to === 'ops@washoe.example', 'after the office adds an email, queuing again adds only that customer');
     await p.getByRole('button', { name: 'Messages' }).click();
     await p.locator('select[aria-label="Kind of message"]').selectOption('friday');
     await p.waitForTimeout(200);
-    t.eq(await p.locator('[data-msg^="obx:"]').count(), 7, 'the queued summaries show in the Outbox list (ZZobx)');
+    t.eq(await p.locator('[data-msg^="obx:"]').count(), 4, 'the queued summaries show in the Outbox list (ZZobx)');
     await tab(p, 'Setup');
     t.ok(/Your week at 24HR Crossdock/.test(await h.text(p)), 'the old Setup outbox lists them too (E10)');
     await tab(p, 'Outbox');
@@ -330,11 +367,12 @@ H.main('e-office', async (h, t) => {
     await h.check(p, 'gear-log-1400');
     await p.locator('input[aria-label="How many"]').fill('2');
     await p.getByRole('button', { name: 'B-18' }).click();
-    await p.getByRole('button', { name: 'Save return' }).click();
-    await p.waitForTimeout(600);
+    // two quick taps on Save (a double tap) must log the return once
+    await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim() === 'Save return'); b.click(); b.click(); });
+    await p.waitForTimeout(700);
     const doc = await h.readDoc(p);
     const back = doc.zzGear.filter(g => g.dir === 'back');
-    t.ok(back.length === 1 && back[0].customerId === 'cu_altex' && back[0].type === 'plywood' && back[0].qty === 2 && back[0].src === 'return' && back[0].by === 'Nick', 'zzGear row: 2 plywood back from Altex, by Nick');
+    t.ok(back.length === 1 && back[0].customerId === 'cu_altex' && back[0].type === 'plywood' && back[0].qty === 2 && back[0].src === 'return' && back[0].by === 'Nick', 'zzGear row: 2 plywood back from Altex, by Nick (a double tap saves once)');
     t.eq(await val('plywood'), '4', 'Altex plywood total drops to 4');
     t.eq(await statV(p, 'gear-plywood').innerText(), '4', 'plywood out tile drops to 4');
     t.ok(await p.getByText('Logged: 2 plywood sheets back from Altex Transportation.').count() > 0, 'toast confirms the return');
@@ -370,6 +408,11 @@ H.main('e-office', async (h, t) => {
     const st = await sheet.innerText();
     t.ok(/ETA updates\s*Samsara/.test(st) && /Español/.test(st) && /Booked by the customer \(Sam Comstock\)/.test(st), 'tracking choice, driver language and who booked');
     t.ok(await sheet.locator('input[aria-label="Samsara live map link"]').inputValue() === 'https://cloud.samsara.com/o/123/fleet/viz/share/abc', 'tracking URL as text');
+    const openA = await sheet.locator('a', { hasText: 'Open' }).evaluateAll(els => els.map(a => [a.getAttribute('href'), a.getAttribute('target'), a.getAttribute('rel')]));
+    t.eq(openA, [['https://cloud.samsara.com/o/123/fleet/viz/share/abc', '_blank', 'noopener noreferrer']], 'the live map link also opens (https only, new tab, noopener noreferrer)');
+    const ord = s0 => ['Check-in code and driver link', 'Loads on this trailer', 'Chat about this truck', 'Messages for this truck'].map(k => s0.indexOf(k));
+    const o1 = ord(st);
+    t.ok(o1.every(x => x >= 0) && o1[0] < o1[1] && o1[1] < o1[2] && o1[2] < o1[3], 'sheet order: the new code / ETA / booking boxes, then Nick\'s loads and truck chat, then this truck\'s messages at the end (' + o1 + ')');
     t.ok(/ETA \d{1,2}:\d{2} PM/.test(st) && /from the customer \(Sam Comstock\), 12m ago/.test(st), 'ETA with its source');
     await sheet.getByRole('button', { name: 'Copy' }).first().click();
     await p.waitForTimeout(200);
@@ -409,7 +452,10 @@ H.main('e-office', async (h, t) => {
     await p.locator('[data-truck="zzeY10"]').click();
     await p.waitForTimeout(500);
     t.ok(await sheet.locator('img[src^="data:image/png"]').count() >= 1 && /Paperwork · 1 photo/.test(await sheet.innerText()), 'paperwork photos from paper:<tid>');
-    t.ok(/Waiting 10m · goal 30 min/.test(await sheet.innerText()), 'clock section: waiting against the goal');
+    const y10 = await sheet.innerText();
+    t.ok(/Waiting 10m · goal 30 min/.test(y10) && /Check-in code and driver link[\s\S]*No check-in code yet/.test(y10), 'clock section: waiting against the goal; the code box stays until the crew starts (this older truck can get a code)');
+    t.ok(y10.indexOf('Check-in and promise') < y10.indexOf('Loads on this trailer') && y10.indexOf('Chat about this truck') < y10.indexOf('Paperwork'), 'checked-in truck: one clock box on top, paperwork after the chat');
+    t.ok(!/Set ETA|Confirm time|Check in now/.test(y10), 'after check-in: no Set ETA / Confirm time / Check in now buttons');
     await closeSheet(p);
     await p.locator('[data-truck="zzeW2"]').click();
     await p.waitForTimeout(400);
@@ -467,6 +513,8 @@ H.main('e-office', async (h, t) => {
     t.ok(yard.length === 2 && /^#1 Y40/.test(yard[0]) && /^#2 Y10/.test(yard[1]), `TV yard list in check-in order with # @${vp.width} (${yard.join(' | ')})`);
     const doors = await p.evaluate(() => [...document.querySelectorAll('div.rounded-xl.p-4')].map(e => [e.innerText.trim().slice(0, 2), getComputedStyle(e).borderTopColor]));
     t.ok(doors.find(d => d[0] === 'D3')[1] === RGB.red && doors.find(d => d[0] === 'D1')[1] === RGB.orange, `TV doors: D3 red past the promise, D1 orange @${vp.width}`);
+    const cut = await p.evaluate(() => [...document.querySelectorAll('div.rounded-xl.p-4 .text-2xl.font-bold')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.innerText));
+    t.eq(cut, [], `TV doors: no truck number is cut off @${vp.width}`);
     await h.check(p, 'tv-' + vp.width);   // no knownScroll: the board fits a phone now
     if (vp === DESK) {
       await p.evaluate(() => history.replaceState(null, '', location.pathname + '#tv'));

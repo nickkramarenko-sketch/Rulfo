@@ -1,9 +1,11 @@
 /* Stream D acceptance (PLAN.md 3.D): the forklift crew. Sign in as Roman 1111.
      node website/portal/test/run.js d [--dist DIR]
-   Covers: wait clocks against the goal (Next job, Then rows, cards, door map, bell), door picker labels,
-   count notes, unload order, load pills, the damage report with photos (count card and outbound pull card),
-   auto-approve, Secure the load (refusals, gear rows, seal, wrap-up block), the Gear tab, the office crew
-   phone / shift / rank fields, and Spanish. Data is always read back from localStorage (the truth). */
+   Covers: wait clocks against the goal (Next job, Then rows, cards, door map, bell with its red edge), door picker
+   labels and columns, count notes, unload order, load pills, the damage report with photos (count card and outbound
+   pull card, one Short report per count), auto-approve, Secure the load (refusals, gear rows, seal, wrap-up block,
+   scroll to the step, half-filled form kept, inbound reload order, "not safe" blocks wrap-up, ZZFLAGS.secureStep off),
+   the Gear tab, the office crew phone / shift / rank fields (edit form on screen at 390, no rank:null), Spanish,
+   Russian (5 tabs fit), and the hi-vis theme. Data is always read back from localStorage (the truth). */
 const H = require('./harness');
 const { PHONE, DESK } = H;
 
@@ -39,7 +41,7 @@ async function calc(page, fn, a) {
 }
 async function crew(h, o) {
   const p = await h.openAs('crew', o);
-  const got = p.getByRole('button', { name: /^(Got it|Entendido)$/ });
+  const got = p.getByRole('button', { name: /^(Got it|Entendido|Понятно)$/ });
   if (await got.count()) await got.first().click();
   await ready(p);
   return p;
@@ -49,6 +51,9 @@ const color = (loc) => loc.evaluate(el => getComputedStyle(el).color);
 const wait = (p, ms) => p.waitForTimeout(ms || 350);
 /* the card (xj) for a truck on All trucks */
 const card = (p, truck, trailer) => p.locator(`:text("Truck ${truck} · Trailer ${trailer}")`).locator('xpath=ancestor::*[.//button[contains(@class,"rounded-lg")]][1]');
+
+/* how many door buttons sit on the first row of the door picker */
+const doorCols = p => p.$$eval('button[data-door]', bs => { const y = Math.round(bs[0].getBoundingClientRect().top); return bs.filter(b => Math.abs(Math.round(b.getBoundingClientRect().top) - y) < 4).length; });
 
 /* long screens: viewport-sized screenshots down the page (or down a modal), name-1, name-2, ... */
 async function segs(h, p, name, o = {}) {
@@ -84,8 +89,8 @@ H.main('d-crew', async (h, t) => {
   const pill = card(p, '9040', 'TW40').locator('[data-zz=waitpill]');
   t.ok(/Waiting 4[01]m · goal 30/.test(await pill.innerText()), 'its truck card shows the same red pill: ' + (await pill.innerText()));
   t.eq(await color(pill), RED, 'the card pill is red');
-  const yardPill = card(p, '63', 'T420').locator('[data-zz=waitpill]');
-  t.ok(/^#\d in line · Waiting \d+m · goal 30$/.test((await yardPill.innerText()).trim()), 'a yard truck card shows its place in line: ' + (await yardPill.innerText()));
+  const yardPill = card(p, '63', 'T420').locator('[data-zz=waitpill]'), yardPlace = card(p, '63', 'T420').locator('[data-zz=placepill]');
+  t.ok(/^#\d in line$/.test((await yardPlace.innerText()).trim()) && /^Waiting \d+m · goal 30$/.test((await yardPill.innerText()).trim()), 'a yard truck card shows its place in line and its wait: ' + (await yardPlace.innerText()) + ' / ' + (await yardPill.innerText()));
   const doors = p.locator('[data-zz=doors]');
   t.ok(await doors.count() === 1, 'All trucks has a Doors map');
   const d8 = doors.locator('button[aria-label^="D8 "]');
@@ -97,6 +102,9 @@ H.main('d-crew', async (h, t) => {
   await wait(p);
   s = await h.text(p);
   t.ok(/Truck 9040 has waited 4[01]m at D8\. The goal is 30 min\. Start it\./.test(s), 'crew bell lists a waitover alert for truck 9040');
+  const wo = p.getByRole('button', { name: /Truck 9040 has waited/ }).first();
+  t.eq(await wo.evaluate(el => getComputedStyle(el).borderLeftColor), RED, 'the waitover alert has the red edge (urgent)');
+  t.ok(await wo.evaluate(el => getComputedStyle(el).color) !== 'rgb(255, 255, 255)', 'and its text is readable (not white on white)');
   await h.check(p, 'bell-390', { settle: 900 });
   await p.keyboard.press('Escape');
 
@@ -119,6 +127,8 @@ H.main('d-crew', async (h, t) => {
   t.ok(await p.locator('button[data-door="D8"]').isDisabled() && /waiting 4[01]m/.test(await p.locator('button[data-door="D8"]').innerText()), 'busy D8 shows its clock');
   t.ok(!(await dD6.isDisabled()) && /Free/.test(await dD6.innerText()), 'free D6 can be picked');
   t.ok(+(await dD1.evaluate(el => getComputedStyle(el).opacity)) === 0.5, 'dimmed doors use opacity 50');
+  t.eq(await doorCols(p), 3, 'door picker: 3 doors per row on a phone, so the labels fit');
+  t.ok(await p.$$eval('button[data-door]', bs => bs.every(b => b.getBoundingClientRect().height >= 48)), 'door buttons are at least 48 px tall (gloves)');
   await h.check(p, 'doorpicker-390');
   await dD6.click();
   await wait(p, 500);
@@ -143,6 +153,10 @@ H.main('d-crew', async (h, t) => {
   doc = await h.readDoc(p);
   let pl1 = doc.shipments.find(x => x.ref === 'PL-3301');
   t.ok(pl1.pullCount === 7 && (pl1.exceptions || []).filter(x => x.kind === 'Short' && !x.resolved && /Only 7 in lane R20/.test(x.note)).length === 1, 'confirming opens one Short report with the note');
+  await pull.getByRole('button', { name: /^Count confirmed/ }).click();
+  await wait(p, 500);
+  doc = await h.readDoc(p);
+  t.eq((doc.shipments.find(x => x.ref === 'PL-3301').exceptions || []).filter(x => x.kind === 'Short').length, 1, 'a second tap on "Count confirmed" does not open a second Short report');
 
   await pull.locator('[data-zz=dmgadd]').click();
   await wait(p);
@@ -178,8 +192,11 @@ H.main('d-crew', async (h, t) => {
   t.ok(/Secured\s*not yet/.test(await h.text(p)), 'the Wrap up summary has a Secured row (not yet)');
   await p.getByRole('button', { name: /Wrap up & send/ }).click();
   await wait(p);
+  await p.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight));
   await p.getByRole('button', { name: 'Go to Secure the load' }).click();
-  await wait(p);
+  await wait(p, 900);
+  const stTop = await p.locator('[data-zz=securestep]').evaluate(el => el.getBoundingClientRect().top);
+  t.ok(stTop >= 0 && stTop < 844 * 0.6, '"Go to Secure the load" scrolls the step into view (top at ' + Math.round(stTop) + ' px)');
   const sf = p.locator('[data-zz=secureform]');
   t.ok(await sf.count() === 1, '"Go to Secure the load" opens the secure form');
   const saveSec = sf.getByRole('button', { name: 'Save and sign' });
@@ -326,6 +343,7 @@ H.main('d-crew', async (h, t) => {
   await cardB.locator('button').first().click();
   await wait(p);
   t.ok(await cardB.locator('[data-zz=dmgreport]').count() === 1 && /Crushed/.test(await cardB.locator('[data-zz=dmgreport]').innerText()), 'opened again, the count card lists the photo report');
+  t.ok(await cardB.locator('[data-zz=rwhint]').count() === 1, 'and says rewrap is already priced in the report (the old rewrap stepper is not charged again)');
   t.ok(await p.evaluate(async id => { const r = await window.__zz.h.photos.ls(id); return r.length; }, dx[0].photoOwner) >= 2, 'the photos are stored under dmg:<id>');
   await into(cardB.locator('[data-zz=dmgreport]'));
   await h.check(p, 'count-reported-390');
@@ -392,6 +410,81 @@ H.main('d-crew', async (h, t) => {
   await h.check(p, 'es-gear-390');
   await p.context().close();
 
+  /* ================= inbound with a reload: reload, secure; a "not safe" rating blocks wrap-up ================= */
+  t.section('inbound truck with a reload; not safe; switch off');
+  p = await crew(h, { viewport: PHONE, seed });
+  await p.getByRole('button', { name: /All trucks/ }).first().click();
+  await wait(p);
+  await card(p, '151', '050').getByRole('button', { name: 'Start unloading' }).click();
+  await wait(p, 500);
+  const stepNames = async () => p.$$eval('div[style*="sticky"] button[title]', bs => bs.map(b => b.title));
+  let sn = await stepNames();
+  t.ok(sn.join('|').includes('Reload|Secure the load|Photo log|Wrap up'), 'inbound truck with a reload: steps go Reload, Secure the load, Photo log (' + sn.join(' / ') + ')');
+  const tid151 = (await h.readDoc(p)).trailers.find(x => x.truck === '151').id;
+  await act(p, 'zzSecure', tid151, { gear: { bars: { qty: 2, owner: 'ours' } }, tags: [], seal: '', photos: { nose: 1, middle: 1, tail: 1, closeup: 1, seal: 1 }, confidence: 1, note: 'Load is leaning at the tail', checkedRows: true, signature: 'Roman' });
+  await wait(p, 400);
+  await p.getByRole('button', { name: 'Secure the load', exact: true }).click();
+  await wait(p);
+  const nsTxt = await p.locator('[data-zz=securedone]').innerText();
+  t.ok(/Do not let it leave like this/.test(nsTxt) && await p.getByRole('button', { name: 'Secure it again', exact: true }).count() === 1, 'rated 1 (not safe): the step shows the red warning and "Secure it again" (' + nsTxt.slice(0, 120).replace(/\n/g, ' / ') + ')');
+  await into(p.locator('[data-zz=securedone]'));
+  await h.check(p, 'notsafe-390');
+  await p.getByRole('button', { name: /Wrap up & send/ }).click();
+  await wait(p);
+  t.ok(/rated not safe/.test(await p.locator('[data-zz=securefirst]').innerText()) && await p.getByRole('button', { name: 'Send to dispatch', exact: true }).isDisabled(), 'a "not safe" truck cannot be sent to dispatch');
+  await p.keyboard.press('Escape');
+  await p.context().close();
+  // the switch: with ZZFLAGS.secureStep off the old steps and wrap-up come back
+  p = await crew(h, { viewport: PHONE, seed, flags: { secureStep: false } });
+  await p.getByRole('button', { name: /All trucks/ }).first().click();
+  await wait(p);
+  await card(p, '118', 'T970').getByRole('button', { name: 'Give it a door' }).click();
+  await wait(p, 500);
+  sn = await stepNames();
+  t.ok(!sn.includes('Secure the load') && await p.locator('[data-zz=securestep]').count() === 0, 'with ZZFLAGS.secureStep off there is no Secure step (' + sn.join(' / ') + ')');
+  await p.context().close();
+
+  /* ================= Russian: 5 tabs fit, pull card words ================= */
+  t.section('crew language ru');
+  const ru = clone(seed);
+  ru.settings.crewMembers.find(c => c.name === 'Roman').lang = 'ru';
+  p = await crew(h, { viewport: PHONE, seed: ru });
+  const tabFit = await p.$$eval('nav[aria-label=Crew] button span', ss => ss.filter(x => /clamp/.test(x.style.fontSize)).map(x => [x.innerText, x.scrollWidth <= x.clientWidth + 1, x.getBoundingClientRect().height]));
+  t.ok(tabFit.length === 5 && tabFit.every(([, fit, hgt]) => fit && hgt < 24), 'Russian: the 5 crew tabs fit on one line at 390 px (' + tabFit.map(x => x[0]).join(' / ') + ')');
+  s = await h.text(p);
+  t.ok(/Ждёт 4[01]m · цель 30/.test(s) && s.includes('Крепёж'), 'Russian: wait clock and Gear tab in Russian');
+  await h.check(p, 'ru-nextjob-390');
+  await p.getByRole('button', { name: /Фуры/ }).first().click();
+  await wait(p);
+  await card(p, '118', 'T970').locator('button').last().click();
+  await wait(p, 500);
+  s = await h.text(p);
+  t.ok(s.includes('Закрепить груз') && s.includes('1. Пересчёт') && s.includes('2. Фото') && /Счёт верный/.test(s), 'Russian: Secure the load step and the pull card words are in Russian');
+  await h.check(p, 'ru-truck-390');
+  await p.context().close();
+
+  /* ================= hi-vis theme (dark): text on filled colours stays readable ================= */
+  t.section('hi-vis theme');
+  p = await crew(h, { viewport: PHONE, seed });
+  await p.evaluate(() => localStorage.setItem('cd6:theme', 'hivis'));
+  await p.reload(); await h.waitLoaded(p); await ready(p);
+  await p.getByRole('button', { name: /All trucks/ }).first().click();
+  await wait(p);
+  await h.check(p, 'hivis-doors-390');
+  await card(p, '118', 'T970').locator('button').last().click();
+  await wait(p, 500);
+  await p.getByRole('button', { name: 'Secure the load', exact: true }).click();
+  await wait(p);
+  await p.locator('[data-zz=secureform] [data-gear=bars] button[aria-label^="One more"]').click();
+  await p.locator('[data-zz=secureform] [data-conf="4"]').click();
+  const oursCol = await p.locator('[data-zz=secureform] [data-gear=bars] [data-owner=ours]').evaluate(el => getComputedStyle(el).color);
+  t.eq(oursCol, 'rgb(10, 10, 10)', 'hi-vis: a picked toggle has dark text on the bright orange (white would be too faint)');
+  await into(p.locator('[data-zz=secureform] [data-gear=bars]'));
+  await h.check(p, 'hivis-secure-390');
+  await into(p.locator('[data-zz=secureform] [data-conf="4"]'));
+  await h.check(p, 'hivis-confidence-390');
+  await p.context().close();
+
   /* ================= office crew tab: phone, shift, rank ================= */
   t.section('office crew logins: phone, shift, rank');
   for (const [vw, viewport] of [['1400', DESK], ['390', PHONE]]) {
@@ -402,6 +495,8 @@ H.main('d-crew', async (h, t) => {
     await row.getByRole('button', { name: 'Edit' }).click();
     await wait(q);
     const ed = q.locator('[data-zz=crewedit]');
+    const eb = await ed.boundingBox();
+    t.ok(eb && eb.x >= 0 && eb.x + eb.width <= viewport.width + 1, `@${vw}: the edit form is fully on screen (x ${Math.round(eb.x)}, width ${Math.round(eb.width)})`);
     await ed.locator('input[type=tel]').fill('775-555-0142');
     await ed.locator('input[type=time]').nth(0).fill('06:00');
     await ed.locator('input[type=time]').nth(1).fill('14:30');
@@ -413,7 +508,17 @@ H.main('d-crew', async (h, t) => {
     doc = await h.readDoc(q);
     const rm = doc.settings.crewMembers.find(c => c.name === 'Roman');
     t.ok(rm.phone === '775-555-0142' && rm.rank === 1 && rm.pin === '1111' && rm.shift && rm.shift.start === '06:00' && rm.shift.end === '14:30' && JSON.stringify(rm.shift.days) === '[1,2,3,4,5,6]', `@${vw}: zzUpdateCrew saved phone, shift (Mon-Sat) and rank; PIN kept`);
-    t.ok(/6:00 AM–2:30 PM/.test(await h.text(q)) && /Loads secured/i.test(await h.text(q)), `@${vw}: the logins table shows the shift; stats have a Loads secured column`);
+    t.ok(/6:00 AM–2:30 PM · Mon–Sat/.test(await h.text(q)) && /Loads secured/i.test(await h.text(q)), `@${vw}: the logins table shows the shift (Mon–Sat); stats have a Loads secured column`);
+    if (vw === '390') {
+      const rowS = q.locator('tr').filter({ hasText: 'Sergio' }).filter({ has: q.getByRole('button', { name: 'Edit' }) }).first();
+      await rowS.getByRole('button', { name: 'Edit' }).click();
+      await wait(q);
+      await q.locator('[data-zz=crewedit] input[type=tel]').fill('775-555-0177');
+      await q.locator('[data-zz=crewedit]').getByRole('button', { name: 'Save', exact: true }).click();
+      await wait(q, 500);
+      const sg = (await h.readDoc(q)).settings.crewMembers.find(c => c.name === 'Sergio');
+      t.ok(sg.phone === '775-555-0177' && !('rank' in sg), 'saving someone who has no rank does not write rank:null (ZZlead would read it as rank 0)');
+    }
     await segs(h, q, `office-crew-${vw}`, { max: 3 });
     if (vw === '1400') {
       const on = await calc(q, (hh, d) => hh.ZZcrewOnShift(d, Date.parse(hh.ZZzonedIso(hh.ZZdockParts(Date.now()).ymd, '10:00'))).map(c => c.name));
@@ -432,6 +537,7 @@ H.main('d-crew', async (h, t) => {
   await card(p, '118', 'T970').getByRole('button', { name: 'Give it a door' }).click();
   await wait(p);
   await p.getByRole('button', { name: 'Pick a door for this truck' }).click();
+  t.eq(await doorCols(p), 5, 'door picker: 5 doors per row on a wide screen, as before');
   await h.check(p, 'doorpicker-1400');
   await p.locator('button[data-door="D6"]').click();
   await wait(p);
@@ -439,6 +545,19 @@ H.main('d-crew', async (h, t) => {
   await wait(p, 500);
   await p.getByRole('button', { name: 'Secure the load', exact: true }).click();
   await wait(p);
+  await p.locator('[data-zz=secureform] [data-gear=plywood] button[aria-label^="One more"]').click();
+  await p.locator('[data-zz=secureform] [data-gear=plywood] button[aria-label^="One more"]').click();
+  await p.locator('[data-zz=secureform] input[aria-label="Tag number"]').fill('P-7');
+  await p.locator('[data-zz=secureform] [data-zz=tagadd]').click();
+  await p.getByRole('button', { name: 'Back' }).first().click();
+  await wait(p);
+  await p.getByRole('button', { name: /All trucks/ }).first().click();
+  await wait(p);
+  await card(p, '118', 'T970').locator('button').last().click();
+  await wait(p, 500);
+  await p.getByRole('button', { name: 'Secure the load', exact: true }).click();
+  await wait(p);
+  t.ok((await p.locator('[data-zz=secureform] [data-gear=plywood] output').innerText()).trim() === '2' && /P-7/.test(await p.locator('[data-zz=secureform]').innerText()), 'leaving the truck and coming back keeps the half-filled secure form (gear and tags)');
   await segs(h, p, 'secure-form-1400', { max: 5 });
   const pull2 = p.locator('div.rounded-lg.p-3.space-y-3').filter({ hasText: 'PL-3302' }).first();
   await p.getByRole('button', { name: 'Load', exact: true }).click().catch(() => {});

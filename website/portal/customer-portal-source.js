@@ -28,16 +28,19 @@ ZZtable=(est)=>ZZh("div",{style:{border:`1px solid ${m.line}`,borderRadius:8,ove
   ...est.lines.map((l,k)=>ZZh("div",{key:k,style:{display:"flex",gap:10,padding:"10px 12px",borderBottom:`1px solid ${m.line}`,fontSize:15}},
     ZZh("span",{style:{flex:1}},l.label,ZZh("span",{style:{color:m.dim,fontSize:13}},` \xB7 ${l.qty} \xD7 ${je(l.unit)}`)),
     ZZh("b",{style:{fontVariantNumeric:"tabular-nums"}},je(l.amount)))),
-  ZZh("div",{style:{display:"flex",padding:"12px",background:"#FBF1E8",fontSize:17,fontWeight:800}},ZZh("span",{style:{flex:1}},"Estimated total"),ZZh("span",{style:{fontVariantNumeric:"tabular-nums"}},je(est.total)))),
+  /* the cream total row is for the light theme; on the dark themes the text is light, so use the raised panel colour */
+  ZZh("div",{style:{display:"flex",padding:"12px",background:ZZb_light()?"#FBF1E8":m.raised,fontSize:17,fontWeight:800}},ZZh("span",{style:{flex:1}},"Estimated total"),ZZh("span",{style:{fontVariantNumeric:"tabular-nums"}},je(est.total)))),
 ZZpill=(txt,col)=>ZZh("span",{style:{display:"inline-block",fontSize:13,fontWeight:800,padding:"3px 10px",borderRadius:20,color:col,border:`1px solid ${col}`,background:m.panel,whiteSpace:"nowrap"}},txt),
 ZZstatus=(x)=>{let a=x.answer;return !a?null:a.status==="accepted"?ZZpill((a.auto?"Auto-approved \xB7 ":"You approved \xB7 ")+ge(a.at),m.green):a.status==="declined"?ZZpill("You declined \xB7 we'll call you",m.red):ZZpill("We'll call you about this",m.blue)},
 
 /* Office / crew: build the estimate the customer approves. Shown inside the load's Exceptions box. */
 ZZEst=({s,x,rates:y,actions:a})=>{
-  let [lab,setLab]=(0,H.useState)(""),[amt,setAmt]=(0,H.useState)(""),
+  let [lab,setLab]=(0,H.useState)(""),[amt,setAmt]=(0,H.useState)(""),last=(0,H.useRef)(null),
     est=ZZestOf(s,x,y),ans=x.answer,locked=!!x.est?.applied,
-    /* zzEstLines saves the lines in one write and applies the customer's auto-approve limit (if they set one) */
-    save=fn=>a.zzEstLines?a.zzEstLines(s.id,x.id,fn(x.est?.lines||[])):a.patchShipment(s.id,sh=>({exceptions:(sh.exceptions||[]).map(q=>q.id!==x.id?q:{...q,est:{...(q.est||{}),lines:fn(q.est?.lines||[]),sentAt:ye(Date.now())},answer:q.answer&&q.answer.status==="call"?q.answer:null})})),
+    /* zzEstLines saves the whole list in one write and applies the customer's auto-approve limit (if they set one).
+       It takes a list, not an updater, so a second tap before the first save lands builds on the list just sent. */
+    save=fn=>{if(!a.zzEstLines)return a.patchShipment(s.id,sh=>({exceptions:(sh.exceptions||[]).map(q=>q.id!==x.id?q:{...q,est:{...(q.est||{}),lines:fn(q.est?.lines||[]),sentAt:ye(Date.now())},answer:q.answer&&q.answer.status==="call"?q.answer:null})}));
+      let src=x.est&&x.est.lines,r=last.current,next=fn(r&&r.src===src?r.lines:src||[]);last.current={src,lines:next};return a.zzEstLines(s.id,x.id,next)},
     add=(label,unit)=>save(L=>{let f=L.find(l=>l.label===label&&ie(l.unit)===ie(unit));return f?L.map(l=>l===f?{...l,qty:ie(l.qty,1)+1}:l):[...L,{id:Ce(),label,qty:1,unit:ie(unit)}]}),
     quick=[["Rewrap pallet",y.rewrap],["Labor, 1 hour",y.laborHour],["Replacement pallet",ie(y.newPallet,20)||20],["Dispose of 1 pallet",200]];
   return ZZh("div",{className:"mt-2 rounded p-2.5",style:{background:m.panel,border:`1px dashed ${m.orange}`}},
@@ -99,6 +102,8 @@ ZZb_wkOff=(ymd,today)=>Math.round((Date.parse(ZZb_mon(ymd)+"T12:00:00Z")-Date.pa
 ZZb_pl=(n,w)=>`${n} ${w}${n===1?"":"s"}`,
 ZZb_pn=min=>min%60===0?`${min/60}-hour`:`${min}-minute`,
 ZZb_hasCode=k=>/^\d{4}$/.test(String(k&&k.code!=null?k.code:"")),
+/* the light ("24 HR light") theme has a white panel; the clean and hi-vis themes are dark */
+ZZb_light=()=>{try{return /^#[e-f]/i.test(String(m.panel))}catch{return!0}},
 /* one booking-form load row; every place a row is made uses this (new form, + Add another load, Book this again) */
 ZZb_row=p=>({id:Ce(),ref:"",pallets:"",lane:"reno",more:!1,bol:"",po:"",deliverBy:"",notes:"",weight:"",pieces:"",dest:"",stackable:null,hazmat:!1,...(p||{})}),
 ZZb_TRACK=[{k:"link",t:"Send my driver a link",d:"Your driver taps one button to tell us when they're close. No app needed."},
@@ -120,7 +125,8 @@ ZZb_done=(e,k,now)=>{let out=k.direction==="outbound",L=(e.shipments||[]).filter
     ph=ie(k.afterPhotoCount)+ie(k.beforePhotoCount)+L.reduce((a,s)=>a+ie(s.photoCount)+ie(s.rowPhotoCount)+ie(s.loadPhotoCount),0),
     dm=L.reduce((a,s)=>a+(s.exceptions||[]).filter(x=>x&&x.kind==="Damage").length,0),pr=ZZpromise(e,k,now),
     tm=pr.doneMin!=null?`${ot(pr.doneMin*6e4)}, ${pr.kept?"within":"over"} our ${ZZb_pn(pr.limitMin)} promise`:"";
-  return{L,bol,cnt,ph,dm,pr,tm,txt:`${k.truck?"Truck "+k.truck:"Your truck"} is done: ${cnt} of ${ZZb_pl(bol,"pallet")}, ${ZZb_pl(ph,"photo")}, ${ZZb_pl(dm,"damage report")}.${tm?" "+tm[0].toUpperCase()+tm.slice(1)+".":""}`}},
+  /* no loads listed on the truck: leave out "0 of 0 pallets" */
+  return{L,bol,cnt,ph,dm,pr,tm,txt:`${k.truck?"Truck "+k.truck:"Your truck"} is done: ${[bol?`${cnt} of ${ZZb_pl(bol,"pallet")}`:"",ZZb_pl(ph,"photo"),ZZb_pl(dm,"damage report")].filter(Boolean).join(", ")}.${tm?" "+tm[0].toUpperCase()+tm.slice(1)+".":""}`}},
 /* 53' dry van: 26 floor spots, ~44,000 lb legal load */
 ZZTRL={spots:26,lb:44e3},
 ZZphoneI=({size:z})=>ZZh("svg",{width:z,height:z,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2.2,strokeLinecap:"round",strokeLinejoin:"round","aria-hidden":"true"},ZZh("path",{d:"M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"})),
@@ -302,7 +308,7 @@ button.zzb-card{cursor:pointer}button.zzb-card:hover{background:var(--raised)}
 .zzb-bk.me{background:var(--panel);box-shadow:inset 0 0 0 2px var(--acc);font-weight:700}
 .zzb-bk em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums;color:var(--mut)}
 .zzb-bk .zz-mb{height:8px}
-.zzb-lx{grid-column:1/-1;display:grid;grid-template-columns:120px 100px auto auto;gap:8px;align-items:end}
+.zzb-lx{grid-column:1/-1;display:grid;grid-template-columns:130px 110px max-content max-content;justify-content:start;gap:8px 16px;align-items:end}
 .zzb-lx>*{min-width:0}
 .zzb-seg{display:inline-flex;justify-self:start;border:1px solid var(--line);border-radius:6px;overflow:hidden;height:44px}
 .zzb-seg button{background:var(--panel);border:0;border-left:1px solid var(--line);padding:0 14px;font:inherit;font-weight:700;font-size:14px;color:var(--mut);cursor:pointer}
@@ -337,6 +343,13 @@ button.zzb-card{cursor:pointer}button.zzb-card:hover{background:var(--raised)}
 .zzb-mr .m{flex:1;min-width:0}.zzb-mr .m b{display:block;font-size:14.5px}.zzb-mr .m span{display:block;font-size:13px;color:var(--mut)}
 .zzb-ph{display:grid;gap:8px}
 .zzb-tag{display:inline-block;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;font-weight:700;padding:3px 9px;border-radius:14px;border:1px solid var(--line);background:var(--raised);overflow-wrap:anywhere}
+.zzb-chips .zz-btn{min-height:44px;min-width:68px}
+.zz-icon.zzb-arw{width:44px;height:44px}
+.zzb-hit{display:inline-flex;align-items:center;min-height:44px}
+.zzb-alt label{min-height:44px}
+.zz input[type=checkbox]{accent-color:var(--acc)}
+${ZZb_light()?".zz input[type=checkbox],.zz input[type=radio]{color-scheme:light}":""}
+@media(max-width:480px){.zzb-so span{display:none}}
 @media(max-width:820px){.zzb-g4{grid-template-columns:1fr 1fr}.zzb-stats{grid-template-columns:1fr 1fr}.zzb-lx{grid-template-columns:1fr 1fr}.zz-load .zzb-lx{order:4}.zz-load .zzb-mt{order:5}.zz-load .zz-more{order:6}}
 @media(max-width:480px){.zz-top .zz-in{gap:8px}}
 @media(max-width:560px){.zzb-st span{display:none}.zzb-tl div{grid-template-columns:1fr;gap:2px}.zzb-bk{grid-template-columns:84px minmax(0,1fr) 58px}}`,
@@ -350,7 +363,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
     [note,setNote]=(0,H.useState)(""),[why,setWhy]=(0,H.useState)(""),[ok,setOk]=(0,H.useState)(!1),
     [tx,setTx]=(0,H.useState)({}),[wo,setWo]=(0,H.useState)(null),[rq,setRq]=(0,H.useState)(null),[rqx,setRqx]=(0,H.useState)(null),[call,setCall]=(0,H.useState)(!1),
     /* stream B: booked sheet (truck id), alerts & settings draft, load trail sheet, copy state, open damage row */
-    [bk,setBk]=(0,H.useState)(null),[al,setAl]=(0,H.useState)(null),[trl,setTrl]=(0,H.useState)(null),[cp,setCp]=(0,H.useState)(""),[hx,setHx]=(0,H.useState)(null),
+    [bk,setBk]=(0,H.useState)(null),[al,setAl]=(0,H.useState)(null),[trl,setTrl]=(0,H.useState)(null),[cp,setCp]=(0,H.useState)(""),[hx,setHx]=(0,H.useState)(null),[planAsk,setPlanAsk]=(0,H.useState)(!1),planRef=(0,H.useRef)(!1),
     doneKey="cd6:zzdone:"+o,[seenDone,setSeenDone]=(0,H.useState)(()=>{try{let v=JSON.parse(localStorage.getItem(doneKey)||"[]");return Array.isArray(v)?v:[]}catch{return[]}}),
     todayYmd=ZZb_today(t),
     REQ=(e.zzRequests||[]).filter(k=>k.customerId===o).sort((k,_)=>new Date(_.createdAt)-new Date(k.createdAt)),
@@ -450,7 +463,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
     return ZZh("div",{style:{display:"grid",gap:8}},
       ZZh("div",{id:lid,className:"zzb-link"},link),
       ZZh("div",{style:{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}},
-        btn(st==="ok"?"Copied":"Copy link",()=>{ZZb_copy(link,lid).then(r=>setCp(k.id+":"+r))},"ghost sm",Ct),
+        btn(st==="ok"?"Copied":"Copy link",()=>{ZZb_copy(link,lid).then(r=>setCp(k.id+":"+r))},"ghost",Ct),
         st==="ok"?ZZh("span",{className:"zz-sub",style:{margin:0,color:m.green,fontWeight:700}},"Copied. Paste it in a text to your driver."):
         st==="sel"?ZZh("span",{className:"zz-sub",style:{margin:0}},"Your browser blocked copying. The link is selected: copy it by hand."):null))};
 
@@ -479,8 +492,8 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
       flash?ZZh("div",{key:"fl",className:"zz-flash"},ZZh(Ze,{size:18}),flash):null,
       (waiting.length||clock.length||doneNew.length)?ZZh("div",{key:"nt",className:"zz-notes"},
         ...doneNew.map(k=>ZZh("div",{key:"dn"+k.id,className:"zz-note","data-zzb":"done-note"},ZZh(Ze,{size:17}),ZZh("span",{style:{flex:1,minWidth:0}},ZZh("b",null,ZZb_done(e,k,t).txt)),
-          ZZh("span",{style:{display:"inline-flex",gap:12,flex:"none"}},ZZh("button",{className:"zz-link",style:{marginLeft:0},onClick:()=>{markDone(k.id);setSel(k.id)}},"Open"),
-            ZZh("button",{className:"zz-link",style:{marginLeft:0,color:m.mut},"aria-label":"Dismiss",onClick:()=>markDone(k.id)},"Dismiss")))),
+          ZZh("span",{style:{display:"inline-flex",gap:12,flex:"none"}},ZZh("button",{className:"zz-link zzb-hit",style:{marginLeft:0},onClick:()=>{markDone(k.id);setSel(k.id)}},"Open"),
+            ZZh("button",{className:"zz-link zzb-hit",style:{marginLeft:0,color:m.mut},"aria-label":"Dismiss",onClick:()=>markDone(k.id)},"Dismiss")))),
         waiting.length?ZZh("div",{className:"zz-note"},ZZh(wr,{size:17}),ZZh("span",null,ZZh("b",null,`${waiting.length} damage report${waiting.length>1?"s need":" needs"} your answer.`)," See photos and the cost to fix."),ZZh("button",{className:"zz-link",onClick:()=>go("damage")},"Review")):null,
         clock.length?ZZh("div",{className:"zz-note"},ZZh(Fd,{size:17}),ZZh("span",null,ZZh("b",null,`${clock.length} load${clock.length>1?"s are":" is"} past or near free time.`)," Book a pickup to stop storage."),ZZh("button",{className:"zz-link",onClick:()=>newForm(null,"pick")},"Book pickup")):null):null,
       liveNow.length?ZZh("section",{key:"lv",style:{marginBottom:16},"data-zzb":"live-now"},
@@ -566,8 +579,8 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
       planCard=ZZh("section",{key:"plan",className:"zz-panel",style:{borderColor:m.orange},"data-zzb":"plan"},
         ZZh("div",{className:"zz-bar",style:{marginBottom:6}},ZZh("h2",{className:"zz-h2"},"Securement plan"),ZZpill("New",m.orange)),
         ZZh("p",{style:{margin:"0 0 10px",fontSize:15}},"Our gear on every load for ",ZZh("b",null,`${Fe(gp.price)} per ${gp.months} months`),". Plywood, load bars, straps and airbags, put in by our crew, photographed and signed off on every truck."),
-        A?.securementInterest?ZZh("div",{className:"zz-flash",style:{margin:0}},ZZh(Ze,{size:18}),`Thanks! You told us you're interested (${Dt(A.securementInterest)}). We'll call you.`)
-          :btn("I'm interested",()=>{let nm=who.trim()||A?.name||"Customer";a.zzCustomer(o,{securementInterest:ye(Date.now()),securementInterestBy:nm});
+        A?.securementInterest||planAsk?ZZh("div",{className:"zz-flash",style:{margin:0}},ZZh(Ze,{size:18}),`Thanks! You told us you're interested (${Dt(A?.securementInterest||Date.now())}). We'll call you.`)
+          :btn("I'm interested",()=>{if(planRef.current)return;planRef.current=!0;setPlanAsk(!0);let nm=who.trim()||A?.name||"Customer";a.zzCustomer(o,{securementInterest:ye(Date.now()),securementInterestBy:nm});
             a.sendAccountChat(o,"dispatcher",`Interested in the securement plan (${Fe(gp.price)} per ${gp.months} months). Please call me. (${nm})`)},"",Ze)),
       group=(key,title,sub,L)=>ZZh("section",{key,className:"zz-panel",style:{marginBottom:16}},
         ZZh("div",{className:"zz-bar",style:{marginBottom:6}},ZZh("div",null,ZZh("h2",{className:"zz-h2"},title),ZZh("p",{className:"zz-sub"},sub))),
@@ -627,7 +640,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
       x.photoOwner||ie(x.pallets)||(x.kinds||[]).length?ZZh("div",{style:{display:"grid",gap:6,margin:"0 0 10px"}},
         ZZh("div",{style:{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}},ie(x.pallets)?ZZh("b",{style:{fontSize:15,marginRight:4}},ZZb_pl(ie(x.pallets),"pallet")+" hurt"):null,...(x.kinds||[]).map(kd=>ZZh("span",{key:kd},ZZpill(kd,m.amber)))),
         ZZh("p",{style:{margin:0,fontSize:15}},x.what||(x.photoOwner?"":x.note)||"No notes.")):ZZh("p",{style:{margin:"0 0 10px",fontSize:15}},x.note||"No notes."),
-      x.photoOwner?ZZh(lr,{ownerId:x.photoOwner,size:84,label:"Damage photos",empty:ie(x.photoCount)?`${ZZb_pl(ie(x.photoCount),"photo")} taken. They show here on the device that took them, or ask us in Messages.`:"No photos yet. Ask us in Messages."})
+      x.photoOwner?ZZh(lr,{ownerId:x.photoOwner,size:84,label:"Damage photos",empty:ie(x.photoCount)?`${ZZb_pl(ie(x.photoCount),"photo")} taken by our crew. Don't see them here? Ask us in Messages and we'll send them.`:"No photos yet. Ask us in Messages."})
         :ZZh("div",{className:"zzb-ph"},ZZh(lr,{ownerId:dt.off(s.id),size:84,label:"Photos",empty:"No photos yet. Ask us in Messages."}),ZZh(lr,{ownerId:`pull:${s.id}`,size:84,label:"Loading photos"})),
       hasCost?ZZh("div",{style:{marginTop:12}},ZZh("b",null,"What it costs to fix"),ZZtable(est),ZZh("p",{className:"zz-sub",style:{marginTop:6}},"Approved charges go on your next bill for this load.")):ZZh("p",{className:"zz-sub",style:{marginTop:10}},"No extra charges on this one."),
       !x.resolved&&(!ans||ans.status==="call")&&hasCost&&ZZh("div",{style:{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}},
@@ -751,8 +764,8 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
               ZZh("label",{className:"zz-chk zzb-hz"},ZZh("input",{type:"checkbox",checked:!!l.hazmat,"aria-label":`Load ${ix+1} hazmat`,onChange:()=>setL(l.id,{hazmat:!l.hazmat})}),"Hazmat")),
             ZZh("div",{className:"zzb-mt",style:{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},ZZh("button",{type:"button",className:"zz-link",style:{fontSize:13},onClick:()=>setL(l.id,{more:!l.more})},l.more?"Hide BOL, PO and notes":"Add BOL, PO, destination, deliver-by date or notes"),
               f.order&&f.loads.length>1?ZZh("span",{className:"zzb-ord"},ZZh("span",{className:"zzb-num"},`#${ix+1}`),
-                ZZh("button",{type:"button",className:"zz-icon","aria-label":`Move load ${ix+1} up`,disabled:ix===0,onClick:()=>move(ix,-1)},ZZh(Bd,{size:16})),
-                ZZh("button",{type:"button",className:"zz-icon","aria-label":`Move load ${ix+1} down`,disabled:ix===f.loads.length-1,onClick:()=>move(ix,1)},ZZh(_d,{size:16}))):null),
+                ZZh("button",{type:"button",className:"zz-icon zzb-arw","aria-label":`Move load ${ix+1} up`,disabled:ix===0,onClick:()=>move(ix,-1)},ZZh(Bd,{size:16})),
+                ZZh("button",{type:"button",className:"zz-icon zzb-arw","aria-label":`Move load ${ix+1} down`,disabled:ix===f.loads.length-1,onClick:()=>move(ix,1)},ZZh(_d,{size:16}))):null),
             l.more?ZZh("div",{className:"zz-more"},fl("BOL",ZZh("input",{className:"zz-inp",value:l.bol,onChange:v=>setL(l.id,{bol:v.target.value})})),fl("PO",ZZh("input",{className:"zz-inp",value:l.po,onChange:v=>setL(l.id,{po:v.target.value})})),fl("Deliver by",ZZh("input",{type:"date",className:"zz-inp",value:l.deliverBy,onChange:v=>setL(l.id,{deliverBy:v.target.value})})),
               ZZh("label",{className:"zz-fl",style:{gridColumn:"1/-1"}},"Destination",ZZh("input",{className:"zz-inp",value:l.dest||"",placeholder:"City or company, if you know it",onChange:v=>setL(l.id,{dest:v.target.value})})),
               ZZh("label",{className:"zz-fl",style:{gridColumn:"1/-1"}},"How it's loaded / notes",ZZh("input",{className:"zz-inp",value:l.notes,placeholder:"Double stacked, strapped, fragile…",onChange:v=>setL(l.id,{notes:v.target.value})}))):null)),
@@ -784,7 +797,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
     if(!bk)return null;let k=e.trailers.find(z2=>z2.id===bk),close=()=>{setBk(null);setCp("")};
     if(!k)return ZZh(Gt,{open:!0,onClose:close,title:"Booking"},ZZh("div",{className:"zz zz-f",style:{minHeight:0,background:"transparent"}},ZZh("p",{className:"zz-sub"},"Saving your booking…")));
     let inb=k.direction==="inbound",ok=b||!!k.confirmedAt,code=ZZcode(k);
-    return ZZh(Gt,{open:!0,onClose:close,title:`Booked: ${truckName(k)}`},
+    return ZZh(Gt,{open:!0,onClose:close,title:`${ok?"Booked":"Request sent"}${k.truck?": Truck "+k.truck:""}`},
       ZZh("div",{className:"zz zz-f",style:{minHeight:0,background:"transparent"},"data-zzb":"booked"},
         ZZh("div",{style:{textAlign:"center",display:"grid",gap:6}},ZZh("div",{className:"zzb-check","aria-hidden":"true"},ZZh(Ze,{size:36})),
           ZZh("h2",{className:"zz-h1",style:{fontSize:26}},ok?"You're booked":"Request sent"),
@@ -794,7 +807,8 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
           ZZh("div",{className:"zzb-code","data-zzb":"code"},code),
           ZZh("div",{className:"zz-sub",style:{margin:0}},"Your driver types this code at our check-in kiosk. It is not your portal PIN.")),
         ZZh("div",{className:"zzb-box"},ZZh("b",{style:{fontSize:16}},"Driver ETA link"),
-          ZZh("div",{className:"zz-sub",style:{margin:0}},"Send this to your driver. One tap tells us when they're close, and it shows their door number after check-in. No app needed."),
+          /* on the driver's own phone the page gives a ready text to send the dock (plan risk 6), so promise only that */
+          ZZh("div",{className:"zz-sub",style:{margin:0}},"Text this link to your driver. They tap how far away they are and send us the update. The page also shows their check-in code and our phone number. No app needed."),
           linkBlock(k)),
         ZZh("div",{className:"zzb-box"},ZZh("b",{style:{fontSize:16}},"What happens next"),
           ZZh("ol",{className:"zzb-ol"},ZZh("li",null,"Your driver checks in at our kiosk with code ",ZZh("b",null,code),"."),
@@ -866,10 +880,12 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
 
   /* ---------- truck sheet ---------- */
   let truckSheet=()=>{
-    let k=sel&&e.trailers.find(z2=>z2.id===sel);if(!k)return null;
+    /* only this customer's trucks (the bell or a chat link could name another one) */
+    let k=sel&&e.trailers.find(z2=>z2.id===sel);if(!k||k.customerId&&k.customerId!==o)return null;
     let inb=k.direction==="inbound",st=stOf(k),sched=k.stage==="scheduled",
       /* loads in their unload / load order (seq), the truck customer's own loads only */
-      L=loadsOf(k).filter(s2=>!s2.customerId||s2.customerId===o).map((s2,j)=>({s2,j})).sort((u,v)=>ie(u.s2.seq,u.j)-ie(v.s2.seq,v.j)||u.j-v.j).map(z2=>z2.s2),
+      /* same order rule as the bundle's ir() (seq ?? position), which reorderLoad / zzReorder swap against */
+      L=loadsOf(k).filter(s2=>!s2.customerId||s2.customerId===o).map((s2,j)=>({s2,j})).sort((u,v)=>(u.s2.seq??u.j)-(v.s2.seq??v.j)||u.j-v.j).map(z2=>z2.s2),
       tot=L.reduce((s2,z2)=>s2+fe(z2),0),lbs=L.reduce((s2,z2)=>s2+ZZwt(z2),0),
       T=tx[k.id]||{},setT=p=>setTx({...tx,[k.id]:{...T,...p}}),
       w2=ZZwhen(k),dp=ZZdockParts(k.scheduledAt||w2),
@@ -880,20 +896,21 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
       loadSt=s2=>inb?(s2.receivedAt?(s2.qc?.counted!=null?`Off, counted ${s2.qc.counted}`:"Off the truck"):"On the truck"):(s2.shippedAt?"Shipped":s2.loadedAt?"Loaded":"Planned"),
       pills=s2=>[s2.hazmat?ZZh("span",{key:"hz"},ZZpill("Hazmat",m.red)):null,s2.stackable===!1?ZZh("span",{key:"ns"},ZZpill("No stack",m.amber)):null].filter(Boolean),
       extra=s2=>[ie(s2.pieces)?ZZb_pl(ie(s2.pieces),"piece"):"",s2.dest&&!["Reno, NV","Sacramento, CA"].includes(s2.dest)?s2.dest:""].filter(Boolean).join(" \xB7 "),
-      rm=s2=>sched&&(inb?!s2.receivedAt:!s2.loadedAt)?ZZh("button",{className:"zz-link",style:{color:m.red,fontSize:13},onClick:()=>inb?a.zzRemoveLoad(s2.id):a.planOnto(s2.id,null)},"Remove"):null,
-      trailBtn=s2=>ZZh("button",{className:"zz-link",style:{fontSize:13},onClick:()=>setTrl({tid:k.id,sid:s2.id})},"Trail"),
+      rm=s2=>sched&&(inb?!s2.receivedAt:!s2.loadedAt)?ZZh("button",{className:"zz-link zzb-hit",style:{color:m.red,fontSize:13},onClick:()=>inb?a.zzRemoveLoad(s2.id):a.planOnto(s2.id,null)},"Remove"):null,
+      trailBtn=s2=>ZZh("button",{className:"zz-link zzb-hit",style:{fontSize:13},onClick:()=>setTrl({tid:k.id,sid:s2.id})},"Trail"),
       arrows=(s2,ix)=>ord&&sched?ZZh("span",{style:{display:"inline-flex",gap:4}},
-        ZZh("button",{type:"button",className:"zz-icon","aria-label":`Move load ${s2.ref} up`,disabled:ix===0,onClick:()=>mv(s2,-1)},ZZh(Bd,{size:15})),
-        ZZh("button",{type:"button",className:"zz-icon","aria-label":`Move load ${s2.ref} down`,disabled:ix===L.length-1,onClick:()=>mv(s2,1)},ZZh(_d,{size:15}))):null,
+        ZZh("button",{type:"button",className:"zz-icon zzb-arw","aria-label":`Move load ${s2.ref} up`,disabled:ix===0,onClick:()=>mv(s2,-1)},ZZh(Bd,{size:15})),
+        ZZh("button",{type:"button",className:"zz-icon zzb-arw","aria-label":`Move load ${s2.ref} down`,disabled:ix===L.length-1,onClick:()=>mv(s2,1)},ZZh(_d,{size:15}))):null,
       trail=ZZtrail(e,k.id),trailShow=T.allTrail?trail:trail.slice(-8),
       dd=fin&&k.stage!=="cancelled"?ZZb_done(e,k,t):null,sec=k.secure,
       /* ETA box: chips, a time, a note */
       setEta=ms=>{a.zzEta(k.id,{at:ye(ms),source:"client",note:(T.etaNote||"").trim(),by:who.trim()||A?.name||"Customer"});setT({eta:"",etaNote:""})},
       etaAt=()=>{let iso=/^\d{1,2}:\d{2}$/.test(T.eta||"")?ZZzonedIso(todayYmd,T.eta):null,ms=ZZb_ms(iso);if(!isFinite(ms))return NaN;if(ms<Date.now()-10*6e4)ms=ZZb_ms(ZZzonedIso(ZZb_add(todayYmd,1),T.eta));return ms},
       trkSel=T.trkSel||k.tracking||"link",trkUrlNeed=trkSel==="samsara"||trkSel==="gps",
-      saveTrk=()=>{let u=(T.trkUrl!=null?T.trkUrl:k.trackUrl||"").trim();if(trkUrlNeed&&u&&!ZZsafeUrl(u))return setT({trkErr:"That link must start with https://"});
-        let p={tracking:trkSel};if(trkUrlNeed)p.trackUrl=u;else if(k.trackUrl)p.trackUrl="";
-        a.zzTrack(k.id,p);setT({trk:!1,trkSel:"",trkUrl:null,trkErr:""})},
+      /* send only what changed: no write (and no "link removed" history line) when nothing did */
+      saveTrk=()=>{let u=(T.trkUrl!=null?T.trkUrl:k.trackUrl||"").trim(),old=k.trackUrl||"";if(trkUrlNeed&&u&&!ZZsafeUrl(u))return setT({trkErr:"That link must start with https://"});
+        let p={};if(trkSel!==k.tracking)p.tracking=trkSel;if(trkUrlNeed){if(u!==old)p.trackUrl=u}else if(old)p.trackUrl="";
+        Object.keys(p).length&&a.zzTrack(k.id,p);setT({trk:!1,trkSel:"",trkUrl:null,trkErr:""})},
       /* time change: keeps the time when only the day changes; any minute */
       newDay=T.date||dp.ymd||todayYmd,newTime=T.time||dp.hhmm||"08:00",changed=(T.date&&T.date!==dp.ymd)||(T.time&&T.time!==dp.hhmm),
       saveTime=()=>{let iso=ZZzonedIso(newDay,newTime),ms=ZZb_ms(iso);if(!iso||!isFinite(ms))return setT({tErr:"Pick a real day and time."});
@@ -917,7 +934,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
           T.eta?ZZh("div",null,btn(`Set ETA ${isFinite(etaAt())?ZZb_when(etaAt()):""}`,()=>{let ms=etaAt();isFinite(ms)&&setEta(ms)},"sm",Fd,!isFinite(etaAt()))):null,
           ZZh("div",{style:{borderTop:`1px solid ${m.line}`,paddingTop:10,display:"grid",gap:8}},
             ZZh("div",{style:{display:"flex",gap:8,alignItems:"baseline",flexWrap:"wrap"}},ZZh("b",null,"Live location"),ZZh("span",{className:"zz-sub",style:{margin:0}},`How we'll know it's close: ${ZZb_trName[k.tracking]||"not set"}`),
-              T.trk?null:ZZh("button",{className:"zz-link",style:{fontSize:13},onClick:()=>setT({trk:!0,trkSel:k.tracking||"link",trkUrl:k.trackUrl||"",trkErr:""})},"Change")),
+              T.trk?null:ZZh("button",{className:"zz-link zzb-hit",style:{fontSize:13},onClick:()=>setT({trk:!0,trkSel:k.tracking||"link",trkUrl:k.trackUrl||"",trkErr:""})},"Change")),
             k.trackUrl&&ZZsafeUrl(k.trackUrl)?ZZh("div",{style:{display:"grid",gap:6}},ZZh("div",null,ZZh("a",{href:ZZsafeUrl(k.trackUrl),target:"_blank",rel:"noopener noreferrer",className:"zz-btn ghost sm",style:{textDecoration:"none"}},"Open live map")),
               ZZh("div",{className:"zzb-link",style:{fontSize:13}},k.trackUrl)):null,
             T.trk?ZZh("div",{style:{display:"grid",gap:8}},
@@ -929,7 +946,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
         active&&!fin?ZZh("div",{className:"zzb-box","data-zzb":"driver-link"},
           ZZh("div",{style:{display:"flex",gap:10,alignItems:"baseline",flexWrap:"wrap"}},ZZh("b",{style:{fontSize:16}},"Driver link and check-in code"),
             ZZb_hasCode(k)?ZZh("span",{className:"zz-sub",style:{margin:0}},"Code ",ZZh("b",{style:{fontSize:18,color:m.text,letterSpacing:".08em"}},k.code)):null),
-          ZZb_hasCode(k)?[ZZh("div",{key:"t",className:"zz-sub",style:{margin:0}},"Send the link to your driver. It shows their ETA buttons now and their door number after check-in. At our kiosk they type the code."),ZZh("div",{key:"l"},linkBlock(k))]
+          ZZb_hasCode(k)?[ZZh("div",{key:"t",className:"zz-sub",style:{margin:0}},"Text this link to your driver. They tap how far away they are and send us the update. At our check-in kiosk they type the code."),ZZh("div",{key:"l"},linkBlock(k))]
             :[ZZh("div",{key:"t",className:"zz-sub",style:{margin:0}},"This truck was booked before driver links. Make one to send your driver a link and a check-in code."),
               ZZh("div",{key:"b"},btn("Make a driver link",()=>a.zzEnsureCode(k.id),"",Ca))]):null,
         /* done: counts against the BOL, photos, damage */
@@ -939,18 +956,18 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
             return ZZh("div",{key:s2.id,style:{display:"flex",justifyContent:"space-between",gap:8,fontSize:14.5,borderTop:`1px solid ${m.line}`,paddingTop:6}},ZZh("span",null,`Load ${s2.ref}`),
               ZZh("b",{style:{color:c2==null?m.mut:okc?m.green:m.amber}},c2==null?"not counted yet":`${okc?"✓ ":""}${c2} of ${ZZb_pl(fe(s2),"pallet")} on the BOL`))}),
           ZZh("div",{className:"zzb-ph"},ZZh(lr,{ownerId:`before:${k.id}`,size:72,label:"Before"}),ZZh(lr,{ownerId:`after:${k.id}`,size:72,label:"After"}),
-            !ie(k.afterPhotoCount)&&!ie(k.beforePhotoCount)?ZZh("div",{className:"zz-sub",style:{margin:0}},"No truck photos yet."):ZZh("div",{className:"zz-sub",style:{margin:0}},`${ZZb_pl(ie(k.beforePhotoCount)+ie(k.afterPhotoCount),"photo")} taken by our crew.`)),
+            !ie(k.afterPhotoCount)&&!ie(k.beforePhotoCount)?ZZh("div",{className:"zz-sub",style:{margin:0}},"No truck photos yet."):ZZh("div",{className:"zz-sub",style:{margin:0}},`${ZZb_pl(ie(k.beforePhotoCount)+ie(k.afterPhotoCount),"photo")} taken by our crew. Don't see them here? Ask us in Messages and we'll send them.`)),
           ...dd.L.filter(s2=>(s2.exceptions||[]).some(x=>x&&x.kind==="Damage")).map(s2=>ZZh("div",{key:"d"+s2.id,className:"zz-note",style:{margin:0}},ZZh(wr,{size:17}),
             ZZh("span",null,ZZh("b",null,`Damage on load ${s2.ref}.`)," Photos and the fix price are on the Damage tab."),ZZh("button",{className:"zz-link",onClick:()=>{setSel(null);go("damage")}},"See it")))):null,
         /* loaded and secured */
         sec?ZZh("div",{className:"zz-fs","data-zzb":"secured"},
-          ZZh("div",{style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},ZZh("div",{className:"lbl",style:{marginRight:"auto"}},"Loaded and secured"),sec.seal?ZZh("span",{className:"zzb-tag"},`Seal ${sec.seal}`):null),
+          ZZh("div",{style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},ZZh("div",{style:{marginRight:"auto",fontWeight:800,fontSize:16}},"Loaded and secured"),sec.seal?ZZh("span",{className:"zzb-tag"},`Seal ${sec.seal}`):null),
           (()=>{let cf=Math.max(0,Math.min(5,ie(sec.confidence))),col=cf>=4?m.green:cf===3?m.amber:m.red;return ZZh("div",{style:{display:"grid",gap:4}},
             ZZh("div",{style:{display:"flex",justifyContent:"space-between",fontSize:14.5}},ZZh("span",null,"How safe is it?"),ZZh("b",{style:{color:col}},`${cf} of 5 \xB7 ${ZZb_CONF[cf]||""}`)),
             ZZh("div",{className:"zzb-bars",role:"img","aria-label":`Confidence ${cf} of 5`},...[1,2,3,4,5].map(n2=>ZZh("i",{key:n2,style:n2<=cf?{background:col}:void 0}))))})(),
           ZZGEAR.some(g2=>ie(sec.gear?.[g2.k]?.qty)>0)?ZZh("div",{className:"zz-tblw"},ZZh("table",{className:"zz-tbl"},ZZh("thead",null,ZZh("tr",null,ZZh("th",null,"Gear"),ZZh("th",{className:"num"},"Qty"),ZZh("th",null,"Whose"))),
             ZZh("tbody",null,...ZZGEAR.filter(g2=>ie(sec.gear?.[g2.k]?.qty)>0).map(g2=>ZZh("tr",{key:g2.k},ZZh("td",null,g2.label),ZZh("td",{className:"num"},ie(sec.gear[g2.k].qty)),ZZh("td",null,sec.gear[g2.k].owner==="driver"?"Driver's":"Ours (24 HR)")))))):ZZh("div",{className:"zz-sub",style:{margin:0}},"No gear listed."),
-          (sec.tags||[]).length?ZZh("div",null,ZZh("div",{className:"zz-sub",style:{margin:"0 0 6px",fontWeight:700}},"Tag numbers on our gear"),ZZh("div",{className:"zzb-chips"},...sec.tags.map(tg=>ZZh("span",{key:tg,className:"zzb-tag"},tg)))):null,
+          (sec.tags||[]).length?ZZh("div",null,ZZh("div",{className:"zz-sub",style:{margin:"0 0 6px",fontWeight:700}},"Tag numbers on our gear"),ZZh("div",{className:"zzb-chips"},...sec.tags.map((tg,ix)=>ZZh("span",{key:ix+":"+tg,className:"zzb-tag"},tg)))):null,
           ZZh("div",{className:"zzb-ph"},...ZZSECSLOTS.map(sl=>ZZh(lr,{key:sl.k,ownerId:`sec:${k.id}:${sl.k}`,size:64,label:`${sl.label} (${sl.hint.toLowerCase()})`,empty:ie(sec.photos?.[sl.k])?`${ZZb_pl(ie(sec.photos[sl.k]),"photo")} taken`:"No photo"}))),
           sec.note?ZZh("p",{className:"zz-sub",style:{margin:0}},ZZh("b",null,"Crew note: "),sec.note):null,
           ZZh("p",{className:"zz-sub",style:{margin:0}},`Signed by ${sec.signedBy||"our crew"}${sec.signature&&sec.signature!==sec.signedBy?` ("${sec.signature}")`:""}${sec.signedAt?" \xB7 "+ZZb_when(sec.signedAt):""}${sec.checkedRows?" \xB7 checked every row is tight":""}`)):null,
@@ -981,7 +998,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
           sched&&!inb&&free.length?ZZh("div",{style:{display:"grid",gap:6,marginTop:4}},ZZh("div",{className:"zz-sub"},"Add from the floor:"),
             ...free.map(s2=>ZZh("div",{key:s2.id,className:"zz-pick",style:{cursor:"default"}},ZZh("div",{style:{flex:1}},ZZh("b",null,`Load ${s2.ref}`),ZZh("span",{className:"zz-sub"},` \xB7 ${fe(s2)} plt \xB7 ${freeNote(s2)}`)),btn("Add",()=>a.planOnto(s2.id,k.id),"ghost sm",wa)))):null),
         ZZh("div",{className:"zz-fs"},ZZh("div",{className:"lbl"},"Truck and driver"),
-          ZZh("div",{className:"zz-kv"},...[["Carrier",k.carrier],["Truck",k.truck],["Trailer",k.trailer],["Driver",k.driver],["Driver phone",k.phone],["Door",k.dock&&k.dock!==Ee?k.dock:"Not yet"],["Driver's language",ZZb_lang(k.driverLang||"en")],["Check-in code",ZZb_hasCode(k)?k.code:"—"]].map(([l2,v2])=>ZZh("div",{key:l2},ZZh("span",null,l2),v2||"—"))),
+          ZZh("div",{className:"zz-kv"},...[["Carrier",k.carrier],["Truck",k.truck],["Trailer",k.trailer],["Driver",k.driver],["Driver phone",k.phone],["Door",k.dock&&k.dock!==Ee?k.dock:fin||!active?"—":k.arrivedAt?"Waiting in the yard":"Not yet"],["Driver's language",ZZb_lang(k.driverLang||"en")],["Check-in code",ZZb_hasCode(k)?k.code:"—"]].map(([l2,v2])=>ZZh("div",{key:l2},ZZh("span",null,l2),v2||"—"))),
           k.notes?ZZh("p",{className:"zz-sub"},`Notes: ${k.notes}`):null),
         sched?ZZh("div",{className:"zz-fs","data-zzb":"time"},ZZh("div",{className:"lbl"},"Change the time"),ZZh("div",{className:"hint"},"Any minute. Dock time (Pacific). Change only the day and the time stays the same."),
           ZZh("div",{className:"zz-g2"},fl("Day",ZZh("input",{type:"date",className:"zz-inp",value:newDay,min:todayYmd,onChange:v=>setT({date:v.target.value,tErr:""})})),
@@ -1093,7 +1110,8 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
         ZZh("button",{type:"button",className:"zz-callb",onClick:()=>setCall(!0),"aria-label":"Call the dock"},ZZh(ZZphoneI,{size:15}),ZZh("span",null,"Call dock")),
         ZZh("button",{type:"button",className:"zzb-hic",onClick:openAlerts,"aria-label":"Alerts and settings",title:"Alerts and settings"},ZZh(uu,{size:18})),
         ZZh(MA,{role:"client",doc:e,now:t,customerId:o,onShipment:n,onTrailer:k=>setSel(k.id)}),
-        ZZh("button",{onClick:r,style:{display:"inline-flex",alignItems:"center",gap:6,background:"transparent",border:"1px solid rgba(255,255,255,.35)",borderRadius:6,padding:"7px 10px",fontWeight:700,fontSize:14,cursor:"pointer"}},ZZh(yl,{size:15}),"Sign out"))),
+        /* on a phone the label hides (like "Call dock"), so the company name has room next to the settings icon */
+        ZZh("button",{onClick:r,className:"zzb-so","aria-label":"Sign out",title:"Sign out",style:{display:"inline-flex",alignItems:"center",gap:6,background:"transparent",border:"1px solid rgba(255,255,255,.35)",borderRadius:6,padding:"7px 10px",fontWeight:700,fontSize:14,cursor:"pointer"}},ZZh(yl,{size:15}),ZZh("span",null,"Sign out")))),
       ZZh("nav",{className:"zz-tabs","aria-label":"Portal"},ZZh("div",{className:"zz-in"},...tabs.map(k=>ZZh("button",{key:k.k,type:"button",className:"zz-tab",onClick:()=>go(k.k),"aria-current":tab===k.k?"page":void 0},
         ZZh(k.icon,{size:21}),ZZh("span",null,k.label),k.n?ZZh("i",{style:k.soft?{background:m.green}:void 0},k.n):null))))),
     ZZh("main",{className:"zz-main"},...[].concat(tab==="schedule"?schedule():tab==="trucks"?trucks():tab==="floor"?floorTab():tab==="requests"?requests():tab==="damage"?damage():tab==="bills"?bills():chat())),

@@ -3,6 +3,11 @@
 # escapes such as — and \xB7 as literal text. Plan: PLAN.md section 3.E. The components live in office-source.js.
 # Not done on purpose: E14 (Yard as the default office tab; Board stays first, as today) and E11 (the Outbox inside
 # Setup stays as it is; it now also lists the queued Friday summaries through E10).
+# Beyond the plan's list (all inside screens stream E owns): E16/E17 hand the doc to the door map, E19 + E31 split the truck
+# sheet extras (top: what to act on now; end: paperwork, securement, messages after Nick's truck chat), E20 marks office
+# bookings as office-made and confirmed, E21-E30 + E32 are TV board fixes (PIN hint, yard # and colors, phone layout without
+# sideways scroll, truck number never cut off). Icons: Outbox uses Ct (file-text) and Gear qd (refresh) because the plan's
+# un (send) and Sa (package) are already the Chat and History tab icons.
 
 PATCHES = [
     # ---------------- tabs and content ----------------
@@ -21,8 +26,8 @@ PATCHES = [
 
     ('E03',
      r'className:"max-w-7xl mx-auto flex",children:e.map(r=>(0,i.jsxs)("button",{onClick:()=>a(r.k),className:"flex-1 py-2.5 flex flex-col items-center gap-1 transition",style:{color:t===r.k?m.orange:m.mut}',
-     r'className:"max-w-7xl mx-auto flex overflow-x-auto",children:e.map(r=>(0,i.jsxs)("button",{onClick:()=>a(r.k),className:"flex-1 py-2.5 px-1 flex flex-col items-center gap-1 transition",style:{color:t===r.k?m.orange:m.mut,...(e.length>8?{minWidth:64,flexShrink:0}:{})}',
-     'Bottom tab bar PA: with more than 8 tabs (office has 11) each tab keeps 64 px and the bar scrolls inside itself; shorter bars are unchanged.'),
+     r'className:"max-w-7xl mx-auto flex"+(e.length>8?" overflow-x-auto":""),style:e.length>8?ZZo_tabShade():void 0,children:e.map(r=>(0,i.jsxs)("button",{onClick:()=>a(r.k),className:"flex-1 py-2.5 flex flex-col items-center gap-1 transition"+(e.length>8?" px-1":""),style:{color:t===r.k?m.orange:m.mut,...(e.length>8?{minWidth:58,flexShrink:0}:{})}',
+     'Bottom tab bar PA: with more than 8 tabs (office has 11) each tab keeps 58 px, the bar scrolls inside itself and a soft shadow shows at the edge that has more tabs (a part of the next tab peeks in). Bars with 8 tabs or fewer are byte-for-byte as before.'),
 
     # ---------------- board ----------------
     ('E05',
@@ -75,8 +80,13 @@ PATCHES = [
 
     ('E19',
      r'children:"Edit booking"})]}),h&&(0,i.jsx)(Gt,{open:!0,onClose:()=>v(!1),title:',
-     r'children:"Edit booking"})]}),(0,i.jsx)(ZZTruckExtra,{t:y,doc:t,now:a,actions:r,role:n}),h&&(0,i.jsx)(Gt,{open:!0,onClose:()=>v(!1),title:',
-     'Truck sheet _Q: ZZTruckExtra under the action buttons (code + driver link, ETA + Set ETA, Confirm time, Check in now, tracking, language, paperwork, securement, this truck\'s messages).'),
+     r'children:"Edit booking"})]}),(0,i.jsx)(ZZTruckExtra,{t:y,doc:t,now:a,actions:r,role:n,part:"top"}),h&&(0,i.jsx)(Gt,{open:!0,onClose:()=>v(!1),title:',
+     'Truck sheet _Q: ZZTruckExtra (top part) under the action buttons. Before check-in: code + driver link, ETA + Set ETA, Confirm time, Check in now, tracking, language. After: one clock box.'),
+
+    ('E31',
+     r'onSend:O=>r.sendTrailerChat(y.id,n,O)})]})]})})}',
+     r'onSend:O=>r.sendTrailerChat(y.id,n,O)})]}),(0,i.jsx)(ZZTruckExtra,{t:y,doc:t,now:a,actions:r,role:n,part:"end"})]})})}',
+     'Truck sheet _Q: paperwork photos, securement report and this truck\'s messages at the end, after the truck chat, so Nick\'s loads, instructions and chat stay near the top.'),
 
     # ---------------- office bell ----------------
     ('E15',
@@ -139,6 +149,11 @@ PATCHES = [
      r'className:"ml-auto tabular-nums font-bold shrink-0",style:{color:m.amber},children:ot(t-new Date(v.arrivedAt||t).getTime())',
      r'className:"ml-auto tabular-nums font-bold shrink-0",style:{color:ZZtoneColor(ZZtone(ZZwaitMs(v,t),e))},children:ot(t-new Date(v.arrivedAt||t).getTime())',
      'TV yard list: wait clock coloured by the wait goal.'),
+
+    ('E32',
+     r'className:"text-2xl font-bold truncate",children:g.truck',
+     r'className:"text-2xl font-bold truncate shrink-0",style:{maxWidth:"100%"},children:g.truck',
+     'TV doors: the truck number never gets cut off ("W." for W1, also in today\'s board); the driver name next to it shortens instead.'),
 
     ('E21',
      r'children:"Double-click anywhere to exit"',

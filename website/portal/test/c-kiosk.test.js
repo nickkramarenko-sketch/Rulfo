@@ -21,7 +21,8 @@ async function seedDoc(h, o = {}) {
     { ...base, id: 'zzk_tomorrow', code: '4822', driver: 'Tom Morrow', phone: '', truck: '9911', trailer: 'T99', scheduledAt: iso(now + 30 * HR), stage: 'scheduled' },
     { ...base, id: 'zzk_here', code: '5150', driver: 'Hana Here', phone: '775-555-0150', truck: '5150', trailer: 'T50', scheduledAt: iso(now - 60 * MIN), stage: 'arrived',
       dock: 'YD', arrivedAt: iso(now - 10 * MIN), checkedInBy: 'kiosk', driverLang: 'en' },
-    { ...base, id: 'zzk_eta', code: '6262', driver: 'Ivan Petrov', phone: '775-555-0162', truck: '6262', trailer: 'T62', scheduledAt: iso(now + 3 * HR), stage: 'scheduled', driverLang: 'ru' }
+    { ...base, id: 'zzk_eta', code: '6262', driver: 'Ivan Petrov', phone: '775-555-0162', truck: '6262', trailer: 'T62', scheduledAt: iso(now + 3 * HR), stage: 'scheduled', driverLang: 'ru' },
+    { ...base, id: 'zzk_cx', code: '7070', driver: 'Cory Cancel', phone: '775-555-0170', truck: '7070', trailer: 'T70', scheduledAt: iso(now + 2 * HR), stage: 'cancelled', cancelledAt: iso(now - 60 * MIN), cancelledBy: 'Customer' }
   );
   d.shipments.push({ id: 'zzk_s1', ref: 'ALX-77', customerId: 'cu_altex', trailerInId: 'zzk_today', trailerOutId: null, origin: '', dest: 'Reno, NV', lane: 'reno',
     units: { std: 14, lg: 0, crate: 0 }, weight: 0, commodity: 'Dry goods', status: 'expected', receivedAt: null, shippedAt: null, afterHours: false, rewrapPallets: 0, labor: [],
@@ -65,7 +66,7 @@ H.main('c-kiosk', async (h, t) => {
 
   /* ---------------- code path, start to finish ---------------- */
   t.section('code path: code, details, paperwork photo, check-in, done');
-  for (const [vw, viewport, freeDoor] of [['1024', TABLET, false], ['390', PHONE, true]]) {
+  for (const [vw, viewport, freeDoor] of [['1024', TABLET, false], ['390', PHONE, true], ['1400', DESK, false]]) {
     const p = await openKiosk(h, viewport, await seedDoc(h, { freeDoor }));
     await p.click('button[data-lang="es"]');
     await p.getByText('Tengo un código de 4 dígitos').click();
@@ -243,16 +244,30 @@ H.main('c-kiosk', async (h, t) => {
   }
 
   {
-    // a walk-in for a company we know skips the account form
+    // a walk-in for a company we know skips the account form; if that company has a truck booked today, the driver
+    // sees it first (tapping "walk-in" by mistake must not make a second truck)
     const p = await openKiosk(h, TABLET, await seedDoc(h));
     await p.click('button[data-lang="en"]');
     await p.getByText('Walk-in (no appointment)').click();
-    await p.fill('[data-zz=kiosk] main input', 'pine ridge');
+    await p.fill('[data-zz=kiosk] main input', 'altex');
     await p.waitForTimeout(150);
-    await p.getByText('Pine Ridge Freight').first().click();
-    t.eq(await kioskStep(p), 'kind', 'walk-in for a known company goes straight to drop-off / pickup');
+    await p.getByText('Altex Transportation').first().click();
+    t.eq(await kioskStep(p), 'truck', 'walk-in for a company with a truck booked today: its trucks come first');
+    t.ok(norm(await h.text(p)).includes('Truck 4521'), 'the booked truck is offered');
+    await h.check(p, 'walk-known-trucks-1024');
+    await p.getByRole('button', { name: "My truck isn't listed" }).click();
+    t.eq(await kioskStep(p), 'kind', '"My truck isn\'t listed" goes on to the walk-in (no account form)');
     await p.getByText('I am here to load freight').click();
     t.eq(await kioskStep(p), 'details', 'a pickup skips the pallet question');
+    // a known company with nothing booked today goes straight to drop-off / pickup
+    const free = await p.evaluate(() => { const d = window.__zz.doc; return (d.customers.find(c => /^cu_\d+$/.test(c.id) && !d.trailers.some(t => t.customerId === c.id && t.stage !== 'departed' && t.stage !== 'cancelled')) || {}).name; });
+    await p.getByRole('button', { name: /Start over/ }).click();
+    await p.click('button[data-lang="en"]');
+    await p.getByText('Walk-in (no appointment)').click();
+    await p.fill('[data-zz=kiosk] main input', free);
+    await p.waitForTimeout(150);
+    await p.locator('[data-zz=kiosk] main').getByText(free, { exact: true }).first().click();
+    t.eq(await kioskStep(p), 'kind', `walk-in for a known company with nothing booked (${free}) goes straight to drop-off / pickup`);
     await p.context().close();
   }
 
@@ -307,6 +322,18 @@ H.main('c-kiosk', async (h, t) => {
 
   /* ---------------- links and exit ---------------- */
   t.section('links: #kiosk, #tv, stations remembered, staff exit with office PIN');
+  {
+    // opening the kiosk or the driver page writes nothing to the doc, and neither do the kiosk's timers
+    const json = JSON.stringify(await seedDoc(h));
+    let p = await h.open('#kiosk', { viewport: TABLET, seed: json, now: Date.now() });
+    await p.clock.runFor(130000);
+    t.ok(await h.readDocRaw(p) === json, '#kiosk: nothing written on load or by its timers (130 s)');
+    await p.context().close();
+    p = await h.open('#eta6262', { viewport: PHONE, seed: json, now: Date.now() });
+    await p.clock.runFor(12000);
+    t.ok(await h.readDocRaw(p) === json, '#eta6262: nothing written on load');
+    await p.context().close();
+  }
   {
     let p = await h.open('#kiosk', { viewport: TABLET, seed: await seedDoc(h) });
     t.ok(await p.locator('[data-zz=kiosk]').count() === 1, '#kiosk opens the kiosk');
@@ -463,6 +490,115 @@ H.main('c-kiosk', async (h, t) => {
     await q.context().close();
   }
 
+  /* ---------------- review fixes: failures told honestly, cancelled codes, staff exit, themes ---------------- */
+  t.section('save failures, cancelled booking, details card, staff exit to stations, dark themes');
+  {
+    // a check-in whose save fails must not say "checked in"
+    let p = await openKiosk(h, TABLET, await seedDoc(h));
+    await p.click('button[data-lang="en"]');
+    await p.getByText('I have a 4‑digit code').click();
+    await keypad(p, '4821');
+    await p.getByRole('button', { name: /^Next/ }).click();
+    await p.evaluate(() => { const o = Storage.prototype.setItem; window.__zzSet = o; Storage.prototype.setItem = function (k, v) { if (k === 'cdweb:cd6:doc') throw new Error('blocked for the test'); return o.call(this, k, v); }; });
+    await p.getByRole('button', { name: /Skip — give papers to the office/ }).click();
+    await p.waitForTimeout(400);
+    let s = norm(await h.text(p));
+    t.ok(await kioskStep(p) === 'scan' && s.includes('Please go to the office') && s.includes('We could not save your check-in') && !(await p.locator('[data-zz=kiosk-done]').count()), 'a refused save sends the driver to the office (never "checked in")');
+    await p.evaluate(() => { Storage.prototype.setItem = window.__zzSet; });
+    t.ok(!trailer(await h.readDoc(p), 'zzk_today').arrivedAt, 'the refused check-in is not stored');
+    await h.check(p, 'savefail-1024');
+    await p.context().close();
+
+    // paperwork photos that cannot be saved: checked in, and told to hand the papers to the office
+    p = await openKiosk(h, PHONE, await seedDoc(h));
+    await p.click('button[data-lang="en"]');
+    await p.getByText('I have a 4‑digit code').click();
+    await keypad(p, '4821');
+    await p.getByRole('button', { name: /^Next/ }).click();
+    await p.locator('[data-zz=kiosk] input[type=file]').setInputFiles(h.UPLOAD_PNG);
+    await p.waitForFunction(() => document.querySelectorAll('[data-zz=kiosk] main img').length === 1);
+    await p.evaluate(() => { const o = Storage.prototype.setItem; window.__zzSet = o; Storage.prototype.setItem = function (k, v) { if (String(k).startsWith('cdweb:cd6:photos:paper:')) throw new Error('blocked for the test'); return o.call(this, k, v); }; });
+    await p.getByRole('button', { name: /Done — check me in/ }).click();
+    await p.waitForSelector('[data-zz=kiosk-done]');
+    await p.waitForTimeout(300);
+    await p.evaluate(() => { Storage.prototype.setItem = window.__zzSet; });
+    s = norm(await h.text(p));
+    const tr = trailer(await h.readDoc(p), 'zzk_today');
+    t.ok(tr.arrivedAt && !tr.paperCount && s.includes('Your paperwork photos did not save. Please give your papers to the office.'), 'photos not saved: checked in, no paperCount, driver told to give the papers to the office');
+    await h.check(p, 'paperfail-390');
+    await p.context().close();
+
+    // a cancelled booking's code says so instead of "wrong code"
+    for (const [vw, viewport] of [['1024', TABLET], ['390', PHONE]]) {
+      p = await openKiosk(h, viewport, await seedDoc(h));
+      const before = JSON.stringify((await h.readDoc(p)).trailers);
+      await p.click('button[data-lang="es"]');
+      await p.getByText('Tengo un código de 4 dígitos').click();
+      await keypad(p, '7070');
+      s = norm(await h.text(p));
+      t.ok(await kioskStep(p) === 'status' && s.includes('Esta cita fue cancelada.') && s.includes('Por favor vaya a la oficina') && !(await p.locator('[data-zz=place]').count()) && !s.includes('Imprimir orden'), `cancelled booking: "cancelled, go to the office", no place in line @${vw}`);
+      t.ok(JSON.stringify((await h.readDoc(p)).trailers) === before, `cancelled code writes nothing @${vw}`);
+      await h.check(p, `cancelled-${vw}`);
+      await p.context().close();
+    }
+
+    // the details card never says "0 pallets" for a truck without loads
+    p = await openKiosk(h, PHONE, await seedDoc(h));
+    await p.click('button[data-lang="en"]');
+    await p.getByText('I have a 4‑digit code').click();
+    await keypad(p, '6262');
+    t.ok(await kioskStep(p) === 'details' && !norm(await h.text(p)).includes('0 pallets'), 'details card without loads: no "0 pallets"');
+    await p.context().close();
+
+    // staff exit from a kiosk opened at Dock stations goes back to Dock stations (as the old kiosk did)
+    p = await openKiosk(h, TABLET, await seedDoc(h));
+    await p.getByRole('button', { name: 'Staff', exact: true }).click();
+    const box = p.locator('.fixed input');
+    await box.nth(0).fill('nick');
+    await box.nth(1).fill('2468');
+    await p.getByRole('button', { name: 'Exit kiosk' }).click();
+    await p.waitForTimeout(300);
+    t.ok(await p.locator('[data-zz=kiosk]').count() === 0 && (await h.text(p)).includes('Dock stations') && await p.evaluate(() => localStorage.getItem('cd6:session')) === null, 'staff exit from Dock stations returns to Dock stations and forgets the kiosk');
+    await p.context().close();
+
+    // Nick's dark themes (Clean, Hi-vis): kiosk done screen and driver page stay readable
+    for (const theme of ['hivis', 'clean']) {
+      for (const [vw, viewport] of [['390', PHONE], ['1400', DESK]]) {
+        const ctx = await h.newContext({ viewport, seed: await seedDoc(h) });
+        await ctx.addInitScript(th => { try { localStorage.setItem('cd6:theme', th); } catch (e) {} }, theme);
+        p = await h.open('#kiosk', { context: ctx });
+        await p.click('button[data-lang="en"]');
+        await p.getByText('I have a 4‑digit code').click();
+        await keypad(p, '4821');
+        await p.getByRole('button', { name: /^Next/ }).click();
+        await p.getByRole('button', { name: /Skip — give papers to the office/ }).click();
+        await p.waitForSelector('[data-zz=kiosk-done]');
+        const bg = await p.evaluate(() => getComputedStyle(document.querySelector('[data-zz=kiosk]')).backgroundColor);
+        t.ok(bg !== 'rgb(241, 245, 245)', `${theme}: the kiosk follows the theme (${bg}) @${vw}`);
+        await h.check(p, `theme-${theme}-done-${vw}`);
+        await p.close();
+        p = await h.open('#eta6262', { context: ctx });
+        await h.check(p, `theme-${theme}-eta-${vw}`, { full: true });
+        await ctx.close();
+      }
+    }
+  }
+  {
+    // the text for the dock names the day when the ETA is not today (dock time); fixed clock: Mon Oct 26 2026, 11:00 AM PDT
+    const p = await h.open('#eta0001', { viewport: PHONE, seed: await seedDoc(h), now: Date.parse('2026-10-26T18:00:00Z') });
+    await p.getByRole('button', { name: /Pick a time/ }).click();
+    await p.fill('[data-zz=eta] input[type=time]', '09:00');
+    await p.getByRole('button', { name: 'Save time' }).click();
+    await p.waitForTimeout(200);
+    const txt = norm(await p.locator('[data-zz=eta-text]').inputValue());
+    t.ok(/^Check-in code 0001: ETA Tue, Oct 27, 9:00 AM dock time$/.test(txt), `a time already past means tomorrow, and the text says so ("${txt}")`);
+    const p2 = await h.open('#eta6262', { viewport: PHONE, seed: await seedDoc(h) });
+    await p2.getByRole('button', { name: /English/ }).click();
+    t.ok(norm(await h.text(p2)).includes('Dock time (Pacific)'), 'booked times on the driver page say they are dock time (Pacific)');
+    t.eq(await p2.locator('[data-zz=eta] button.zzk-b').filter({ hasText: /^(15 min|30 min|1 hour|2 hours)$/ }).evaluateAll(bs => [...new Set(bs.map(b => getComputedStyle(b).backgroundColor))].length), 1, 'the four ETA buttons look the same (none looks already chosen)');
+    await p.context().close(); await p2.context().close();
+  }
+
   /* ---------------- driver texts ---------------- */
   t.section('ZZdriverText: door / yard / released / reminder in six languages (through ZZmsgs)');
   {
@@ -479,10 +615,13 @@ H.main('c-kiosk', async (h, t) => {
         const ms = z.h.ZZmsgs(doc, now).filter(m => m.event === 'driver');
         res[lang] = ['d1', 'd2', 'd3', 'd4'].map(id => (ms.find(m => m.trailerId === id) || {}).body || null);
       }
+      res.hhmm = z.h.ZZdockParts(I(now + 36e5)).hhmm;
       return res;
     });
     const want = { es: ['puerta D3', 'patio', 'liberado', 'recordatorio'], ru: ['воротам D3', 'площадке', 'свободен', 'напоминание'], uk: ['воріт D3', 'майданчику', 'відпущено', 'нагадування'],
       pa: ['ਡੋਰ D3', 'ਯਾਰਡ', 'ਰਿਲੀਜ਼', 'ਯਾਦ ਰਹੇ'], hi: ['डोर D3', 'यार्ड', 'रिलीज़', 'याद रहे'] };
+    t.ok(out.ru[3].includes(out.hhmm) && out.uk[3].includes(out.hhmm) && !/[AP]M/.test(out.ru[3] + out.uk[3]), `ru / uk reminders read the time the 24-hour way (${out.hhmm})`);
+    t.ok(/\d:\d\d\s?[AP]M/.test(out.es[3].replace(/[\u202f\xa0]/g, ' ')), 'es reminder keeps 12-hour time');
     for (const lang of Object.keys(want)) {
       t.ok(out[lang].every((b, k) => b && b.startsWith('24HR Crossdock: Luis, ') && b.includes(want[lang][k]) && b.includes('41')), `driver texts in ${lang}: ${out[lang].map(b => (b || 'MISSING').slice(0, 40)).join(' | ')}`);
     }

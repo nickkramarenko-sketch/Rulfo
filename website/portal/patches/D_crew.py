@@ -27,10 +27,11 @@ PATCHES = [
      'xj rail: red when the wait is at or over the goal.'),
 
     ('D04',
-     r'(0,i.jsxs)("div",{className:"text-sm mt-0.5",style:{color:m.mut},children:[b&&x.reload>0&&',
-     r'(0,i.jsx)(ZZd_Clock,{t:l,doc:t,now:a,size:16}),(0,i.jsxs)("div",{className:"text-sm mt-0.5",style:{color:m.mut},children:[b&&x.reload>0&&',
-     'nJ title card: a line with the wait clock against the goal, or "Working 22m · 1h 4m left on the 2-hour promise" while working. '
-     'Anchored just before the sub line (the plan anchor l.workStartedBy sits mid-line, which would split it).'),
+     r'(ie(l.paperCount)>0||it.length>0)&&(0,i.jsx)("div",{className:"mt-3 pt-3 space-y-1.5"',
+     r'(0,i.jsx)(ZZd_Clock,{t:l,doc:t,now:a,size:17,line:!0}),(ie(l.paperCount)>0||it.length>0)&&(0,i.jsx)("div",{className:"mt-3 pt-3 space-y-1.5"',
+     'nJ title card: a full-width line under the door and title with the wait clock against the goal, or '
+     '"Working 22m · 1h 4m left on the 2-hour promise" while working. (The plan anchor l.workStartedBy sits mid-line and the '
+     'title column is narrow on a phone, so the line goes under the whole row instead.)'),
 
     ('D05',
      r'if(e==="crew"&&(f.filter(h=>h.arrivedAt&&h.stage!=="done").forEach(h=>o(`arrived:${h.id}`',
@@ -40,9 +41,10 @@ PATCHES = [
     # ---------------- door picker ----------------
     ('D06',
      r'(0,i.jsx)("div",{className:"grid grid-cols-5 gap-1.5",children:[...Gi,Ee].map(U=>{let ft=X.includes(U)&&U!==Ee;return(0,i.jsx)("button",{disabled:ft&&l.dock!==U,onClick:()=>{r.assignDock(l.id,l.dock===U?null:U),G(!1)},className:"py-3 rounded-lg text-sm font-black transition active:scale-95 disabled:opacity-25",style:l.dock===U?{background:m.orange,color:"#0A0A0A"}:{...ne,color:ft?m.dim:m.text},children:U},U)})}),(0,i.jsx)("div",{className:"text-xs mt-2",style:{color:m.dim},children:R("Dimmed doors',
-     r'(0,i.jsx)("div",{className:"grid grid-cols-3 sm:grid-cols-5 gap-1.5",children:[...Gi,Ee].map(U=>{let ft=X.includes(U)&&U!==Ee;return(0,i.jsx)("button",{disabled:ft&&l.dock!==U,onClick:()=>{r.assignDock(l.id,l.dock===U?null:U),G(!1)},"data-door":U,className:"py-2 px-1 rounded-lg text-sm font-black transition active:scale-95 disabled:opacity-50 min-w-0",style:{minHeight:64,...(l.dock===U?{background:m.orange,color:"#0A0A0A"}:{...ne,color:m.text})},children:(0,i.jsx)(ZZDoorLbl,{door:U,doc:t,now:a,self:l})},U)})}),(0,i.jsx)("div",{className:"text-xs mt-2",style:{color:m.dim},children:R("Dimmed doors',
+     r'(0,i.jsx)("div",{className:"grid gap-1.5",style:{gridTemplateColumns:"repeat(auto-fill,minmax(max(96px,calc((100% - 24px) / 5)),1fr))"},children:[...Gi,Ee].map(U=>{let ft=X.includes(U)&&U!==Ee;return(0,i.jsx)("button",{disabled:ft&&l.dock!==U,onClick:()=>{r.assignDock(l.id,l.dock===U?null:U),G(!1)},"data-door":U,className:"py-2 px-1 rounded-lg text-sm font-black transition active:scale-95 disabled:opacity-50 min-w-0",style:{minHeight:64,...(l.dock===U?{background:m.orange,color:"#0A0A0A"}:{...ne,color:m.text})},children:(0,i.jsx)(ZZDoorLbl,{door:U,doc:t,now:a,self:l})},U)})}),(0,i.jsx)("div",{className:"text-xs mt-2",style:{color:m.dim},children:R("Dimmed doors',
      'Door picker: busy doors show who is there (ZZDoorLbl: door, short company, clock); dimmed style opacity-25 -> opacity-50; '
-     '3 columns on a phone so the labels fit; 64 px tall buttons (gloves).'),
+     '3 columns on a phone so the labels fit, 5 on a wider screen as before (inline grid: the compiled CSS has no sm:grid-cols-5); '
+     '64 px tall buttons (gloves).'),
 
     # ---------------- counting ----------------
     ('D08',
@@ -56,13 +58,14 @@ PATCHES = [
      'tJ Save: stays disabled while the count is off and the note is empty; a changed note alone also counts as a change.'),
 
     ('D09',
-     r'kind:ok?"good":"primary",className:"flex-1",onClick:()=>{r.patchShipment(U.id,{pullCount:ie(c),pullCountAt:ye(Date.now())}),so(!0)}',
-     r'kind:ok?"good":"primary",className:"flex-1",disabled:!ok&&off&&!!zdoc&&!znote.trim(),onClick:()=>{if(off&&zdoc&&!znote.trim())return;r.patchShipment(U.id,{pullCount:ie(c),pullCountAt:ye(Date.now())}),off&&zdoc&&ZZd_pullExc(U,r,ie(c),w,znote),so(!0)}',
-     'ZZPull (outbound): a count that does not match needs a note, and confirming it opens a Short or Over report (addException) once.'),
+     U(r'kind:ok?"good":"primary",className:"flex-1",onClick:()=>{r.patchShipment(U.id,{pullCount:ie(c),pullCountAt:ye(Date.now())}),so(!0)},children:ok?"Count confirmed ~u2713":off?"Confirm "+ie(c)+" (not "+w+")":"Count is correct"'),
+     U(r'kind:ok?"good":"primary",className:"flex-1",disabled:!ok&&off&&!!zdoc&&!znote.trim(),onClick:()=>{if(off&&zdoc&&!znote.trim())return;r.patchShipment(U.id,{pullCount:ie(c),pullCountAt:ye(Date.now())}),off&&zdoc&&!ok&&ZZd_pullExc(U,r,ie(c),w,znote),so(!0)},children:ok?R("Count confirmed ~u2713"):off?ZZd_f("Confirm {n} (not {w})",{n:ie(c),w}):R("Count is correct")'),
+     'ZZPull (outbound): a count that does not match needs a note, and confirming it opens a Short or Over report (addException) once '
+     '(a second tap on "Count confirmed" does not open another). Button text goes through R().'),
 
     ('D34',
      U(r'''ok&&off&&(0,i.jsx)("div",{className:"text-xs font-bold",style:{color:m.amber},children:"Count doesn't match the paperwork ~u2014 dispatch will see it."})'''),
-     U(r'''off&&!ok&&zdoc&&(0,i.jsx)(ZZd_Note,{value:znote,onChange:znoteS,short:ie(c)<w,n:Math.abs(ie(c)-w),out:!0}),ok&&off&&(0,i.jsx)("div",{className:"text-xs font-bold",style:{color:m.amber},children:"Count doesn't match the paperwork ~u2014 dispatch will see it."})'''),
+     U(r'''off&&!ok&&zdoc&&(0,i.jsx)(ZZd_Note,{value:znote,onChange:znoteS,short:ie(c)<w,n:Math.abs(ie(c)-w),out:!0}),ok&&off&&(0,i.jsx)("div",{className:"text-xs font-bold",style:{color:m.amber},children:R("Count doesn't match the paperwork ~u2014 dispatch will see it.")})'''),
      'ZZPull: the required note box for a count that does not match (shown until the count is confirmed).'),
 
     ('D10',
@@ -99,8 +102,9 @@ PATCHES = [
 
     ('D15',
      r'u==="Damaged"&&(0,i.jsxs)("div",{className:"flex items-center gap-3 pt-1"',
-     r'u==="Damaged"&&(0,i.jsx)(ZZd_DmgList,{s:e,onAdd:()=>zdS("add")}),u==="Damaged"&&(0,i.jsxs)("div",{className:"flex items-center gap-3 pt-1"',
-     'tJ Damaged block: this load\'s photo damage reports with their photos, and a button for another report.'),
+     r'u==="Damaged"&&(0,i.jsx)(ZZd_DmgList,{s:e,rw:!0,onAdd:()=>zdS("add")}),u==="Damaged"&&(0,i.jsxs)("div",{className:"flex items-center gap-3 pt-1"',
+     'tJ Damaged block: this load\'s photo damage reports with their photos, a button for another report, and (when a report '
+     'already prices rewrap) a line saying the old "Rewrap how many?" stepper is not charged again.'),
 
     # ---------------- damage report (ZZDmg) from the outbound pull card ----------------
     ('D16',
@@ -113,6 +117,26 @@ PATCHES = [
      U(r'''children:zdoc?(0,i.jsx)(ZZd_PullDmg,{s:U,doc:zdoc,actions:r,open:dm,setOpen:sd}):sent?(0,i.jsx)("div",{className:"text-sm font-bold",style:{color:m.red},children:"Damage reported ~u2014 dispatch was told."}):dm?(0,i.jsxs)("div",{className:"space-y-2",children:[(0,i.jsx)(se,{value:nt,onChange:e=>sn(e.target.value),placeholder:"What's damaged? e.g. 2 pallets crushed on the corner"})'''),
      'ZZPull: "Damage? Report it" opens ZZDmg (photos, kinds, fix lines) and lists this load\'s reports. '
      'The old text-only box (D18 text, unchanged) stays as the fallback when doc is missing.'),
+
+    ('D36',
+     r'style:{color:m.mut},children:"lane"})',
+     r'style:{color:m.mut},children:R("lane")})',
+     'ZZPull: "lane" through R().'),
+
+    ('D37',
+     r'children:"1. Count"}',
+     r'children:R("1. Count")}',
+     'ZZPull: "1. Count" through R().'),
+
+    ('D38',
+     r'children:"2. Photo"}',
+     r'children:R("2. Photo")}',
+     'ZZPull: "2. Photo" through R().'),
+
+    ('D39',
+     r'children:ok?pc?"3. Load it":"3. Load it (no photo)":"Confirm the count first"}',
+     r'children:ok?pc?R("3. Load it"):R("3. Load it (no photo)"):R("Confirm the count first")}',
+     'ZZPull: the load button text through R().'),
 
     ('D19',
      r'(0,i.jsx)(ZZPull,{s:U,r,tid:l.id,hot:!0},U.id)',
@@ -127,8 +151,8 @@ PATCHES = [
     # ---------------- secure the load ----------------
     ('D21',
      r'(0,i.jsxs)(hm,{n:Xe("photos"),title:"Photo log"',
-     r'zn&&(0,i.jsx)(ZZSecure,{t:l,doc:t,actions:r,n:Xe("secure"),open:Nc("secure"),onOpen:()=>Oc("secure"),done:zs,onNext:()=>P(null)}),(0,i.jsxs)(hm,{n:Xe("photos"),title:"Photo log"',
-     'nJ: the "Secure the load" section (ZZSecure) before Photo log, for trucks that need it.'),
+     r'zn&&(0,i.jsx)(ZZSecure,{t:l,doc:t,actions:r,n:Xe("secure"),open:Nc("secure"),onOpen:()=>Oc("secure"),done:zs,onNext:()=>P(null)}),(0,i.jsxs)(hm,{n:Xe("photos"),title:R("Photo log")',
+     'nJ: the "Secure the load" section (ZZSecure) before Photo log, for trucks that need it. The Photo log title goes through R().'),
 
     ('D23',
      r'He=!b&&Y.length>0,',

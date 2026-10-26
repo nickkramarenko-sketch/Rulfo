@@ -42,23 +42,32 @@ ZZo_useToast=()=>{let[items,setItems]=(0,H.useState)([]),
   push=(0,H.useCallback)((text,tone)=>{let x={id:Ce(),text,tone:tone||"good"};setItems(b=>[...b,x]);setTimeout(()=>setItems(b=>b.filter(d=>d.id!==x.id)),8e3)},[]),
   drop=(0,H.useCallback)(id=>setItems(b=>b.filter(d=>d.id!==id)),[]);return[items,push,drop]},
 ZZo_Toasts=({items,onDismiss})=>items.length?ZZo_h(AQ,{items,onDismiss,onUndo:()=>{}}):null,
+/* one save at a time: a second tap while the first is still saving does nothing (no double rows) */
+ZZo_useOnce=()=>{let r=(0,H.useRef)(!1),[b,setB]=(0,H.useState)(!1),
+  run=(0,H.useCallback)(async fn=>{if(r.current)return;r.current=!0;setB(!0);try{return await fn()}catch(x){console.error(x)}finally{r.current=!1;setB(!1)}},[]);return[b,run]},
 /* copy to the clipboard; when that is blocked (it can be inside the viewer) select the text so Ctrl+C works */
 ZZo_copy=async(text,el)=>{try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);return"copied"}}catch{}
   try{if(el){el.focus();el.select();try{if(document.execCommand&&document.execCommand("copy"))return"copied"}catch{}return"selected"}}catch{}return"failed"},
-ZZo_CopyBox=({text,label})=>{let r=(0,H.useRef)(null),[st,setSt]=(0,H.useState)("");
+ZZo_CopyBox=({text,label,href})=>{let r=(0,H.useRef)(null),[st,setSt]=(0,H.useState)(""),link=href?ZZsafeUrl(href):"";
   return ZZo_h("div",null,label?ZZo_h("div",{className:"text-[11px] font-semibold mb-1",style:{color:m.mut}},label):null,
     ZZo_h("div",{className:"flex items-center gap-2"},
-      ZZo_h("input",{ref:r,readOnly:!0,value:text,onFocus:e=>e.target.select(),"aria-label":label||"Link",className:"w-full rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--accent)]",style:{...ne,color:m.text,minWidth:0}}),
-      ZZo_h(Z,{size:"sm",onClick:async()=>{let s=await ZZo_copy(text,r.current);setSt(s);setTimeout(()=>setSt(""),4e3)}},st==="copied"?"Copied":"Copy")),
+      ZZo_h("input",{ref:r,readOnly:!0,value:text,onFocus:e=>e.target.select(),"aria-label":label||"Link",className:"w-full rounded-lg px-2.5 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--accent)]",style:{...ne,color:m.text,minWidth:0,minHeight:44}}),
+      ZZo_h(Z,{onClick:async()=>{let s=await ZZo_copy(text,r.current);setSt(s);setTimeout(()=>setSt(""),4e3)}},st==="copied"?"Copied":"Copy"),
+      /* https links only (ZZsafeUrl); opens in a new tab without giving that page any hold on this one */
+      link?ZZo_h("a",{href:link,target:"_blank",rel:"noopener noreferrer",className:"rounded-lg font-semibold inline-flex items-center justify-center px-4 py-2.5 text-sm shrink-0",style:{background:m.raised,color:m.text,border:`1px solid ${m.line}`}},"Open"):null),
     st==="selected"?ZZo_h("div",{className:"text-[11px] mt-1",style:{color:m.amber}},"Copy is blocked here. The link is selected: press Ctrl+C (or long-press and Copy)."):null)},
+/* bottom tab bar with more tabs than fit (E03): a soft shadow on the edge that has more tabs. CSS only (the cover layers
+   scroll with the tabs, the shadow layers stay put), so nothing re-renders while scrolling. Colors follow the theme. */
+ZZo_tabShade=()=>{let c=m.panel,sh=m.mut+"73",tr="rgba(0,0,0,0)";
+  return{background:`linear-gradient(to right, ${c} 30%, ${tr}) left center / 40px 100% no-repeat local, linear-gradient(to left, ${c} 30%, ${tr}) right center / 40px 100% no-repeat local, radial-gradient(farthest-side at 0 50%, ${sh}, ${tr}) left center / 14px 100% no-repeat scroll, radial-gradient(farthest-side at 100% 50%, ${sh}, ${tr}) right center / 14px 100% no-repeat scroll`,scrollbarWidth:"thin"}},
 /* small pieces in Nick's style */
 ZZo_Tile=({label,value,sub,color,onClick,title,stat})=>ZZo_h(de,{className:"p-3",onClick,style:onClick?{cursor:"pointer"}:{}},
   ZZo_h("div",{className:"text-xs font-semibold mb-1",style:{color:m.mut},"data-stat":stat,title},label),
   ZZo_h("div",{className:"text-2xl font-black tabular-nums",style:{color:color||m.text},"data-stat-value":stat},value),
   ZZo_h("div",{className:"text-xs",style:{color:m.dim}},sub)),
 ZZo_Chips=({opts,value,onChange,label})=>ZZo_h("div",{className:"flex gap-1.5 flex-wrap",role:"group","aria-label":label},
-  opts.map(([k,l])=>ZZo_h("button",{key:k,type:"button",onClick:()=>onChange(k),"aria-pressed":value===k,className:"px-3 py-1.5 rounded-lg text-xs font-bold",
-    style:value===k?{background:m.orange,color:"#0A0A0A",border:`1px solid ${m.orange}`}:{...ne,color:m.mut}},l))),
+  opts.map(([k,l])=>ZZo_h("button",{key:k,type:"button",onClick:()=>onChange(k),"aria-pressed":value===k,className:"px-3 py-2 rounded-lg text-sm font-bold",
+    style:{minHeight:44,...(value===k?{background:m.orange,color:"#0A0A0A",border:`1px solid ${m.orange}`}:{...ne,color:m.mut})}},l))),
 ZZo_Group=({label,children})=>ZZo_h("div",{role:"group","aria-label":label},ZZo_h("span",{className:"block text-xs font-semibold mb-1.5",style:{color:m.mut}},label),children),
 ZZo_Banner=({tone,title,children})=>{let c=tone==="bad"?m.red:tone==="info"?m.blue:m.amber,bg=tone==="bad"?"rgba(255,77,77,0.10)":tone==="info"?"rgba(75,155,255,0.10)":"rgba(255,176,32,0.1)",bd=tone==="bad"?"rgba(255,77,77,0.35)":tone==="info"?"rgba(75,155,255,0.35)":"rgba(255,176,32,0.35)";
   return ZZo_h("div",{className:"rounded-lg p-3 text-sm",style:{background:bg,border:`1px solid ${bd}`},role:tone==="bad"?"alert":void 0},
@@ -138,7 +147,7 @@ ZZYard=({doc:e,now:t,openTrailer:v})=>{
           :ZZo_h("div",{className:"text-xs",style:{color:m.amber}},`At the door ${ot(t-ZZo_ms(x.dockedAt||x.arrivedAt||t))}, crew not started`),
         ZZo_h("div",{className:"text-xs mt-1",style:{color:m.mut}},sub2(x)),
         p.elapsedMin!=null?ZZo_h("div",{className:"text-xs font-semibold",style:{color:late?m.red:warnP?m.amber:m.mut}},
-          x.workDoneAt?`Took ${ot(p.doneMin*6e4)} from check-in (${p.kept?"within":"over"} ${ZZo_promShort(lim)})`:`Since check-in ${ot(p.elapsedMin*6e4)} of ${ZZo_promShort(lim)}${late?" \xB7 past the promise":""}`):null,
+          x.workDoneAt?`Took ${ot(p.doneMin*6e4)} from check-in (${p.kept?"within":"over"} ${ZZo_promShort(lim)})`:`${ot(p.elapsedMin*6e4)} since check-in \xB7 ${late?"past the promise":`promise ${ZZo_promShort(lim)}`}`):null,
         dblSet.has(x.id)||sec?ZZo_h("div",{className:"flex gap-1.5 flex-wrap mt-1"},dblSet.has(x.id)?ZZo_h(ve,{label:"Same door twice",color:m.red}):null,sec):null)},
     doneCard=x=>{let p=ZZpromise(e,x,t),wm=x.workStartedAt?ZZwaitMs(x,t):null,dm=SH.filter(s=>s.trailerInId===x.id||s.trailerOutId===x.id).reduce((a,s)=>a+(s.exceptions||[]).filter(q=>q&&q.kind==="Damage").length,0);
       return ZZo_h(ZZo_Card,{key:x.id,tid:x.id,rail:p.kept===!1?m.red:m.green,onClick:()=>open(x),label:`Open truck ${x.truck||""}`},
@@ -187,10 +196,10 @@ ZZo_MsgRow=({q,doc,open,onToggle,onTruck})=>{let c=ZZo_cust(doc,q.cid),tk=q.tid&
         ZZo_h("span",{className:"ml-auto tabular-nums shrink-0",style:{color:m.dim}},ZZo_when(q.ts,Date.now()))),
       ZZo_h("div",{className:"text-sm font-semibold truncate mt-1"},q.channel==="sms"?q.body:q.subject||q.body),
       ZZo_h("div",{className:"text-[11px] mt-0.5",style:{color:q.deliverable?m.mut:m.amber}},
-        q.deliverable?`to ${q.toName?q.toName+" \xB7 ":""}${q.to}`:`no ${q.channel==="sms"?"cell number":"email"} on file — this one would never send`,q.about?` \xB7 about ${q.about}`:"")),
+        q.deliverable?`to ${q.toName?q.toName+" \xB7 ":""}${q.to}`:`no ${q.channel==="sms"?"cell number":"email"} on file, so this can't go out`,q.about?` \xB7 about ${q.about}`:"")),
     open?ZZo_h("div",{className:"px-3 pb-3"},
       ZZo_h("pre",{className:"text-xs whitespace-pre-wrap leading-relaxed break-words",style:{color:m.text,fontFamily:"inherit",margin:0}},q.channel==="email"&&q.subject?`Subject: ${q.subject}\n\n`:"",q.body),
-      tk?ZZo_h("div",{className:"mt-2"},ZZo_h(Z,{size:"sm",icon:Ca,onClick:()=>onTruck(tk)},`Open truck ${tk.truck||""}`)):null):null)},
+      tk&&onTruck?ZZo_h("div",{className:"mt-2"},ZZo_h(Z,{icon:Ca,onClick:()=>onTruck(tk)},`Open truck ${tk.truck||""}`)):null):null)},
 ZZOutbox=({doc:e,now:t,actions:a,openTrailer:v})=>{
   let[view,setView]=(0,H.useState)("msgs"),[ev,setEv]=(0,H.useState)(""),[cid,setCid]=(0,H.useState)(""),[ch,setCh]=(0,H.useState)("all"),[open,setOpen]=(0,H.useState)(null),[more,setMore]=(0,H.useState)(!1),
     [toasts,toast,drop]=ZZo_useToast(),
@@ -220,11 +229,11 @@ ZZOutbox=({doc:e,now:t,actions:a,openTrailer:v})=>{
             ZZo_h("option",{value:""},"All companies"),...custs.map(c=>ZZo_h("option",{key:c.id,value:c.id},c.name)))),
           ZZo_h(ZZo_Group,{label:"Text or email"},ZZo_h(ZZo_Chips,{label:"Text or email",value:ch,onChange:setCh,opts:[["all","All"],["sms","Texts"],["email","Emails"]]}))),
         ZZo_h("div",{className:"flex items-center gap-2 text-xs",style:{color:m.mut}},
-          ZZo_h("span",{"data-count":rows.length},rows.length===all.length?`${ZZo_plural(all.length,"message")}, newest first. Last 14 days.`:`${ZZo_plural(rows.length,"message")} match \xB7 ${all.length} in all`),
-          ev||cid||ch!=="all"?ZZo_h("button",{type:"button",className:"font-bold ml-auto",style:{color:m.orange},onClick:()=>{setEv("");setCid("");setCh("all")}},"Clear filters"):null),
-        ZZo_h("div",{className:"space-y-1.5"},shown.length?shown.map(q=>ZZo_h(ZZo_MsgRow,{key:q.id,q,doc:e,open:open===q.id,onToggle:()=>setOpen(open===q.id?null:q.id),onTruck:x=>v&&v(x)}))
+          ZZo_h("span",{"data-count":rows.length},rows.length===all.length?`${ZZo_plural(all.length,"message")}, newest first. Alerts from the last 14 days.`:`${ZZo_plural(rows.length,"message")} match \xB7 ${all.length} in all`),
+          ev||cid||ch!=="all"?ZZo_h("button",{type:"button",className:"font-bold ml-auto px-2",style:{color:m.orange,minHeight:44},onClick:()=>{setEv("");setCid("");setCh("all")}},"Clear filters"):null),
+        ZZo_h("div",{className:"space-y-1.5"},shown.length?shown.map(q=>ZZo_h(ZZo_MsgRow,{key:q.id,q,doc:e,open:open===q.id,onToggle:()=>setOpen(open===q.id?null:q.id),onTruck:v?x=>v(x):null}))
           :ZZo_h(ZZo_Empty,null,all.length?"No messages match these filters.":"Nothing yet. Messages show up here as trucks are booked, checked in and finished.")),
-        rows.length>shown.length?ZZo_h(Z,{size:"sm",onClick:()=>setMore(!0)},`Show more (${rows.length-shown.length} older)`):null)),
+        rows.length>shown.length?ZZo_h(Z,{onClick:()=>setMore(!0)},`Show more (${rows.length-shown.length} older)`):null)),
     ZZo_h(ZZo_Toasts,{items:toasts,onDismiss:drop}))},
 
 /* ========================== Friday summaries (a view inside Outbox) ========================== */
@@ -238,15 +247,19 @@ ZZo_fridayText=(doc,c,w,now,name)=>{let st=ZZS(doc),from=ZZo_day(w.from||now),to
       `Questions? Call or text the dock: ${ZZo_phone()}.`,"Thank you for trucking with us.",`— ${Uo}`].join("\n"),
     sms:`${Uo}: your week so far: ${ZZo_plural(w.trucks,"truck")}, ${w.done} done${w.promiseKeptPct==null?"":`, ${w.promiseKeptPct}% within our ${ZZo_promName(st.promiseMin)} promise`}, ${ZZo_plural(dm,"damage report")}. Details are in your portal.`}},
 ZZFriday=({doc:e,now:t,actions:a,toast})=>{
-  let[pv,setPv]=(0,H.useState)(null),[busy,setBusy]=(0,H.useState)(!1),week=ZZweekKey(t),
+  let[pv,setPv]=(0,H.useState)(null),[busy,once]=ZZo_useOnce(),week=ZZweekKey(t),
     queued=(e.zzOutbox||[]).filter(o=>o&&o.event==="friday"&&o.week===week),qSet=new Set(queued.map(o=>o.customerId)),
     rows=(0,H.useMemo)(()=>(e.customers||[]).map(c=>({c,w:ZZweek(e,c.id,t)})).filter(r=>r.w.trucks>0).sort((x,y)=>x.c.name.localeCompare(y.c.name)),[e,t]),
     on=rows.filter(r=>r.c.fridaySummary!==!1),off=rows.filter(r=>r.c.fridaySummary===!1),
-    entriesFor=r=>{let out=[];ZZrecips(r.c,"friday").forEach(p=>p.channels.forEach(chn=>{let tx=ZZo_fridayText(e,r.c,r.w,t,p.name);
-      out.push({customerId:r.c.id,channel:chn,to:chn==="sms"?p.phone:p.email,toName:p.name||r.c.name,subject:chn==="email"?tx.subject:"",body:chn==="email"?tx.body:tx.sms})}));return out},
-    todo=on.filter(r=>!qSet.has(r.c.id)&&entriesFor(r).length),
-    queue=async()=>{if(busy)return;setBusy(!0);let n=0;try{n=await a.zzQueueFriday(week,on.flatMap(entriesFor))}catch(x){console.error(x)}setBusy(!1);
-      toast(n?`Queued ${ZZo_plural(n,"Friday summary","Friday summaries")}. They're in the Outbox, not sent.`:"Nothing new to queue. This week's summaries are already in the Outbox.",n?"good":"info")};
+    /* only summaries with an address to go to: a customer with no email or cell on file is left out, so it can be queued
+       later this week once the office adds a contact (zzQueueFriday queues each customer once per week) */
+    entriesFor=r=>{let out=[];ZZrecips(r.c,"friday").forEach(p=>p.channels.forEach(chn=>{let to=String((chn==="sms"?p.phone:p.email)||"").trim();if(!to)return;let tx=ZZo_fridayText(e,r.c,r.w,t,p.name);
+      out.push({customerId:r.c.id,channel:chn,to,toName:p.name||r.c.name,subject:chn==="email"?tx.subject:"",body:chn==="email"?tx.body:tx.sms})}));return out},
+    todo=on.filter(r=>!qSet.has(r.c.id)&&entriesFor(r).length),noAddr=on.filter(r=>!qSet.has(r.c.id)&&!entriesFor(r).length),
+    queue=()=>once(async()=>{let n=await a.zzQueueFriday(week,todo.flatMap(entriesFor))||0;
+      let na=noAddr.length?`${ZZo_plural(noAddr.length,"customer")} still ${noAddr.length===1?"has":"have"} no email or cell on file.`:"";
+      toast(n?`Queued ${ZZo_plural(n,"Friday summary","Friday summaries")}. They're in the Outbox, not sent.${na?" "+na:""}`
+        :na?`Nothing new queued. ${na}`:"Nothing new to queue. This week's summaries are already in the Outbox.",n?"good":"info")});
   return ZZo_h("div",{className:"space-y-3","data-zz":"friday"},
     ZZo_h(de,{className:"p-4 space-y-3",rail:m.blue},
       ZZo_h("div",{className:"flex items-start justify-between gap-3 flex-wrap"},
@@ -254,17 +267,19 @@ ZZFriday=({doc:e,now:t,actions:a,toast})=>{
           ZZo_h("div",{className:"text-xs mt-0.5",style:{color:m.mut}},"One summary per customer, built from their trucks since Monday. It goes to the contacts who turned the Friday summary on (or the account email). Customers can switch it off in their portal.")),
         ZZo_h(Z,{kind:"primary",icon:un,disabled:busy||!on.length,onClick:queue},busy?"Queuing…":"Queue Friday summaries")),
       queued.length?ZZo_h("div",{className:"text-xs",style:{color:m.mut},"data-queued":qSet.size},
-        `Already queued this week for ${ZZo_plural(qSet.size,"customer")} (last ${ZZo_when(queued.reduce((b,o)=>ZZo_ms(o.at)>ZZo_ms(b)?o.at:b,queued[0].at),t)}). Queuing again only adds customers who are not queued yet${todo.length?` (${todo.length} now)`:""}.`):null),
+        `Already queued this week for ${ZZo_plural(qSet.size,"customer")} (last ${ZZo_when(queued.reduce((b,o)=>ZZo_ms(o.at)>ZZo_ms(b)?o.at:b,queued[0].at),t)}). Queuing again only adds customers who are not queued yet${todo.length?` (${todo.length} now)`:""}.`):null,
+      noAddr.length?ZZo_h("div",{className:"text-xs",style:{color:m.amber,overflowWrap:"anywhere"},"data-noaddr":noAddr.length},
+        `Left out until they have an email or cell on file: ${noAddr.map(r=>r.c.name).join(", ")}. Add a contact to the account, then queue again.`):null),
     on.length?ZZo_h("div",{className:"grid lg:grid-cols-2 gap-3"},on.map(r=>{let{c,w}=r,rc=ZZrecips(c,"friday"),en=entriesFor(r),q=qSet.has(c.id),tx=ZZo_fridayText(e,c,w,t,rc[0]&&rc[0].name),
         kv=[["Trucks",`${w.trucks} (${w.done} done)`],["Pallets",`${w.palletsIn} in \xB7 ${w.palletsOut} out`],["Avg wait",w.avgWaitMin==null?"—":ot(w.avgWaitMin*6e4)],
           ["Avg at the door",w.avgDoorMin==null?"—":ot(w.avgDoorMin*6e4)],["Promise kept",w.promiseKeptPct==null?"—":w.promiseKeptPct+"%"],
           ["Damage",w.damageReports?`${ZZo_plural(w.damageReports,"report")}${w.damageApproved?`, ${w.damageApproved} approved`:""}`:"None"],["Our gear out",ZZo_gearText(w.gearOut)||"None"]];
       return ZZo_h(de,{key:c.id,className:"p-3 space-y-2"},
-        ZZo_h("div",{className:"flex items-center gap-2"},ZZo_h("div",{className:"font-bold truncate flex-1 min-w-0","data-friday":c.id},c.name),q?ZZo_h(ve,{label:"Queued",color:m.violet}):ZZo_h(ve,{label:"Ready",color:m.green})),
+        ZZo_h("div",{className:"flex items-center gap-2"},ZZo_h("div",{className:"font-bold truncate flex-1 min-w-0","data-friday":c.id},c.name),q?ZZo_h(ve,{label:"Queued",color:m.violet}):en.length?ZZo_h(ve,{label:"Ready",color:m.green}):ZZo_h(ve,{label:"No address",color:m.amber})),
         ZZo_h("div",{className:"grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm"},kv.map(([k,x])=>ZZo_h("div",{key:k,style:{minWidth:0}},ZZo_h("div",{className:"text-[11px]",style:{color:m.mut}},k),ZZo_h("div",{className:"font-semibold",style:{overflowWrap:"anywhere"}},x)))),
         ZZo_h("div",{className:"text-xs",style:{color:en.length&&en.some(x=>x.to)?m.mut:m.amber,overflowWrap:"anywhere"}},
           !rc.length?"No contact has the Friday summary turned on, so there is nobody to send it to.":`Goes to: ${rc.map(p=>`${p.name||c.name} (${p.channels.map(x=>x==="sms"?p.phone||"no cell":p.email||"no email").join(", ")})`).join("; ")}`),
-        ZZo_h("div",null,ZZo_h(Z,{size:"sm",icon:Ud,onClick:()=>setPv(pv===c.id?null:c.id)},pv===c.id?"Hide preview":"Preview email")),
+        ZZo_h("div",null,ZZo_h(Z,{icon:Ud,onClick:()=>setPv(pv===c.id?null:c.id)},pv===c.id?"Hide preview":"Preview email")),
         pv===c.id?ZZo_h("pre",{className:"text-xs whitespace-pre-wrap leading-relaxed rounded-lg p-3",style:{...ne,color:m.text,fontFamily:"inherit",margin:0,overflowWrap:"anywhere"}},`Subject: ${tx.subject}\n\n${tx.body}`):null)}))
       :ZZo_h(ZZo_Empty,null,"No customer with Friday summaries on had a truck this week."),
     off.length?ZZo_h("div",{className:"text-xs",style:{color:m.dim}},`Turned off by the customer: ${off.map(r=>r.c.name).join(", ")}.`):null)},
@@ -272,15 +287,15 @@ ZZFriday=({doc:e,now:t,actions:a,toast})=>{
 /* ========================== Gear (office tab "Gear") ========================== */
 ZZo_srcLbl={secure:"secured load",return:"returned",manual:"logged by the office"},
 ZZo_GearLog=({doc:e,init,actions:a,onClose,onDone})=>{
-  let[f,setF]=(0,H.useState)(()=>({customerId:"",dir:"back",type:"plywood",qty:"",tags:[],tagText:"",note:"",...init})),[err,setErr]=(0,H.useState)(""),
+  let[f,setF]=(0,H.useState)(()=>({customerId:"",dir:"back",type:"plywood",qty:"",tags:[],tagText:"",note:"",...init})),[err,setErr]=(0,H.useState)(""),[busy,once]=ZZo_useOnce(),
     out=f.customerId?ZZgearOut(e,f.customerId):null,c=ZZo_cust(e,f.customerId),
     withGear=(e.customers||[]).filter(x=>ZZo_hasGear(ZZgearOut(e,x.id))).sort((x,y)=>x.name.localeCompare(y.name)),
     others=(e.customers||[]).filter(x=>!withGear.includes(x)).sort((x,y)=>x.name.localeCompare(y.name)),
     set=p=>{setF({...f,...p});setErr("")},
-    save=async()=>{let q=Math.round(ie(f.qty));if(!f.customerId)return setErr("Pick the company.");if(!(q>0))return setErr("Type how many.");
+    save=()=>once(async()=>{let q=Math.round(ie(f.qty));if(!f.customerId)return setErr("Pick the company.");if(!(q>0))return setErr("Type how many.");
       let tags=f.dir==="back"?f.tags:String(f.tagText||"").split(/[,\s]+/).map(x=>x.trim()).filter(Boolean),
         r=a.zzGear({customerId:f.customerId,type:f.type,qty:q,dir:f.dir,tags,note:f.note});if(!r)return setErr("That could not be saved. Check the numbers.");await r;
-      onDone&&onDone(`Logged: ${q} ${ZZo_gearW[f.type][q===1?0:1]} ${f.dir==="back"?"back from":"out to"} ${c?c.name:"the customer"}.`);onClose()},
+      onDone&&onDone(`Logged: ${q} ${ZZo_gearW[f.type][q===1?0:1]} ${f.dir==="back"?"back from":"out to"} ${c?c.name:"the customer"}.`);onClose()}),
     gearBtn=g=>{let n=out?ie(out[g.k]):0,onp=f.type===g.k;return ZZo_h("button",{key:g.k,type:"button",onClick:()=>set({type:g.k}),"aria-pressed":onp,className:"rounded-lg px-2 py-2 text-left",
       style:onp?{background:m.orange,color:"#0A0A0A",border:`1px solid ${m.orange}`}:{...ne,color:m.text}},ZZo_h("div",{className:"text-sm font-bold"},g.label),ZZo_h("div",{className:"text-[11px]",style:{color:onp?"#0A0A0A":m.dim}},out?`${n} out now`:g.hint))};
   return ZZo_h(Gt,{open:!0,onClose,title:f.dir==="back"?"Log gear coming back":"Log gear going out"},
@@ -295,14 +310,14 @@ ZZo_GearLog=({doc:e,init,actions:a,onClose,onDone})=>{
       ZZo_h(xe,{label:"How many",hint:out&&f.dir==="back"&&ie(f.qty)>ie(out[f.type])?`That is more than the ${ie(out[f.type])} we show out. It saves anyway; the count never goes below zero.`:void 0},
         ZZo_h(se,{type:"number",inputMode:"numeric",min:1,value:f.qty,onChange:x=>set({qty:x.target.value}),placeholder:"0","aria-label":"How many"})),
       f.dir==="back"?out&&out.tags.length?ZZo_h(ZZo_Group,{label:"Tags coming back (tap each one)"},ZZo_h("div",{className:"flex gap-1.5 flex-wrap"},out.tags.map(tg=>{let onp=f.tags.includes(tg);
-          return ZZo_h("button",{key:tg,type:"button","aria-pressed":onp,onClick:()=>set({tags:onp?f.tags.filter(x=>x!==tg):[...f.tags,tg]}),className:"px-2.5 py-1.5 rounded-lg text-xs font-bold",
-            style:onp?{background:m.orange,color:"#0A0A0A",border:`1px solid ${m.orange}`}:{...ne,color:m.text}},tg)}))):null
+          return ZZo_h("button",{key:tg,type:"button","aria-pressed":onp,onClick:()=>set({tags:onp?f.tags.filter(x=>x!==tg):[...f.tags,tg]}),className:"px-3 py-2 rounded-lg text-sm font-bold",
+            style:{minHeight:44,minWidth:52,...(onp?{background:m.orange,color:"#0A0A0A",border:`1px solid ${m.orange}`}:{...ne,color:m.text})}},tg)}))):null
         :ZZo_h(xe,{label:"Tag numbers (optional)",hint:"Separate with commas."},ZZo_h(se,{value:f.tagText,onChange:x=>set({tagText:x.target.value}),placeholder:"e.g. B-17, B-18"})),
       ZZo_h(xe,{label:"Note (optional)"},ZZo_h(se,{value:f.note,onChange:x=>set({note:x.target.value}),placeholder:f.dir==="back"?"e.g. driver dropped them at D2":"e.g. lent for a reload"})),
       err?ZZo_h("div",{className:"text-sm",style:{color:m.red},role:"alert"},err):null,
-      ZZo_h("div",{className:"flex gap-2"},ZZo_h(Z,{className:"flex-1",onClick:onClose},"Cancel"),ZZo_h(Z,{kind:"primary",className:"flex-1",icon:br,onClick:save},f.dir==="back"?"Save return":"Save"))))},
+      ZZo_h("div",{className:"flex gap-2"},ZZo_h(Z,{className:"flex-1",onClick:onClose},"Cancel"),ZZo_h(Z,{kind:"primary",className:"flex-1",icon:br,disabled:busy,onClick:save},busy?"Saving…":f.dir==="back"?"Save return":"Save"))))},
 ZZGearOffice=({doc:e,now:t,actions:a,openTrailer:v,officeUser:o})=>{
-  let[log,setLog]=(0,H.useState)(null),[toasts,toast,drop]=ZZo_useToast(),G=(e.zzGear||[]).filter(Boolean),
+  let[log,setLog]=(0,H.useState)(null),[toasts,toast,drop]=ZZo_useToast(),[busy,once]=ZZo_useOnce(),G=(e.zzGear||[]).filter(Boolean),
     ids=[...new Set(G.map(g=>g.customerId).filter(Boolean))],
     rows=ids.map(id=>({c:ZZo_cust(e,id),id,g:ZZgearOut(e,id)})).filter(r=>ZZo_hasGear(r.g)).sort((x,y)=>(x.c?x.c.name:"").localeCompare(y.c?y.c.name:"")),
     tot={plywood:0,bars:0,straps:0,airbags:0};rows.forEach(r=>ZZGEAR.forEach(x=>{tot[x.k]+=r.g[x.k]}));
@@ -313,11 +328,11 @@ ZZGearOffice=({doc:e,now:t,actions:a,openTrailer:v,officeUser:o})=>{
     ZZo_h("div",{className:"grid grid-cols-2 lg:grid-cols-4 gap-3"},ZZGEAR.map(x=>ZZo_h(ZZo_Tile,{key:x.k,stat:"gear-"+x.k,label:`${x.label} out`,value:tot[x.k],sub:tot[x.k]?`with ${ZZo_plural(rows.filter(r=>r.g[x.k]>0).length,"customer")}`:"all back",color:tot[x.k]?m.orange:m.mut}))),
     ZZo_h(de,{className:"p-4 space-y-3"},
       ZZo_h("div",{className:"flex items-start justify-between gap-3 flex-wrap"},
-        ZZo_h("div",null,ZZo_h("div",{className:"font-bold"},"Our gear out with customers"),ZZo_h("div",{className:"text-xs mt-0.5",style:{color:m.mut}},"From the crew's securement reports, minus what came back. Customers see the same numbers in their portal.")),
+        ZZo_h("div",null,ZZo_h("div",{className:"font-bold"},"Our gear out with customers"),ZZo_h("div",{className:"text-xs mt-0.5",style:{color:m.mut}},"From the crew's securement reports, minus what came back. Log it here when a driver brings gear back.")),
         ZZo_h(Z,{kind:"primary",icon:wa,onClick:()=>setLog({})},"Log a return")),
       rows.length?ZZo_h("div",{className:"grid lg:grid-cols-2 gap-3"},rows.map(r=>ZZo_h("div",{key:r.id,className:"rounded-lg p-3 space-y-2",style:ne,"data-gear-row":r.id},
         ZZo_h("div",{className:"flex items-center gap-2"},ZZo_h("div",{className:"font-bold truncate flex-1 min-w-0"},r.c?r.c.name:"Unknown company"),
-          ZZo_h(Z,{size:"sm",onClick:()=>setLog({customerId:r.id,dir:"back",type:(ZZGEAR.find(x=>r.g[x.k]>0)||ZZGEAR[0]).k})},"Log return")),
+          ZZo_h(Z,{onClick:()=>setLog({customerId:r.id,dir:"back",type:(ZZGEAR.find(x=>r.g[x.k]>0)||ZZGEAR[0]).k})},"Log return")),
         ZZo_h("div",{className:"grid grid-cols-4 gap-1.5"},ZZGEAR.map(x=>ZZo_h("div",{key:x.k,className:"rounded-lg px-2 py-1.5",style:{background:m.panel,border:`1px solid ${m.line}`},"data-gear":x.k},
           ZZo_h("div",{className:"text-[10px] font-bold truncate",style:{color:m.mut},title:x.label},ZZo_gearShort[x.k]||x.label),ZZo_h("div",{className:"text-lg font-black tabular-nums leading-tight",style:{color:r.g[x.k]?m.text:m.dim}},r.g[x.k])))),
         r.g.tags.length?ZZo_h("div",{className:"flex gap-1.5 flex-wrap items-center"},ZZo_h("span",{className:"text-[11px]",style:{color:m.mut}},"Tags out:"),r.g.tags.map(tg=>ZZo_h(ve,{key:tg,label:tg,color:m.orange,dot:!1}))):null)))
@@ -330,16 +345,16 @@ ZZGearOffice=({doc:e,now:t,actions:a,openTrailer:v,officeUser:o})=>{
           ZZo_h("div",{className:"flex-1",style:{minWidth:180}},
             ZZo_h("div",{className:"text-sm"},ZZo_h("b",{style:{color:back?m.green:m.orange}},`${back?"−":"+"}${g.qty} ${w[g.qty===1?0:1]}`),` ${back?"back from":"out to"} `,ZZo_h("b",null,c?c.name:"—")),
             ZZo_h("div",{className:"text-[11px]",style:{color:m.mut}},[ZZo_srcLbl[g.src]||"",g.by?`by ${g.by}`:"",(g.tags||[]).length?`tags ${g.tags.join(", ")}`:"",g.note||""].filter(Boolean).join(" \xB7 "))),
-          k?ZZo_h(Z,{size:"sm",icon:Ca,onClick:()=>v&&v(k)},`Truck ${k.truck||""}`):null)}))
+          k&&v?ZZo_h(Z,{icon:Ca,onClick:()=>v(k)},`Truck ${k.truck||""}`):null)}))
         :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"Nothing logged yet.")),
     ZZo_h(de,{className:"p-4 space-y-2",rail:m.violet},
       ZZo_h("div",{className:"font-bold"},`Interested in the securement plan \xB7 ${wants.filter(c=>!c.securementCalledAt).length}`),
-      ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Plan price customers see: ${Fe(plan.price)} per ${plan.months} months (change it in Setup). They tap "I'm interested" in their portal; call them back.`),
+      ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Plan price: ${Fe(plan.price)} per ${plan.months} months (change it in Setup). These customers tapped "I'm interested" in their portal. Call them back.`),
       wants.length?ZZo_h("div",{className:"space-y-1.5"},wants.map(c=>ZZo_h("div",{key:c.id,className:"rounded-lg px-3 py-2 flex items-center gap-3 flex-wrap",style:{...ne,opacity:c.securementCalledAt?.65:1},"data-interest":c.id},
         ZZo_h("div",{className:"flex-1",style:{minWidth:180}},ZZo_h("div",{className:"font-bold"},c.name),
           ZZo_h("div",{className:"text-[11px]",style:{color:m.mut}},[`asked ${ZZo_when(c.securementInterest,t)}${c.securementInterestBy?` by ${c.securementInterestBy}`:""}`,c.person||"",c.phone||"",c.contact||""].filter(Boolean).join(" \xB7 "))),
         c.securementCalledAt?ZZo_h("span",{className:"text-xs",style:{color:m.green}},`Called ${ZZo_when(c.securementCalledAt,t)}${c.securementCalledBy?` by ${c.securementCalledBy}`:""}`)
-          :ZZo_h(Z,{size:"sm",kind:"good",icon:Ze,onClick:()=>a.zzCustomer(c.id,{securementCalledAt:ye(Date.now()),securementCalledBy:o||"Office"})},"Mark called"))))
+          :ZZo_h(Z,{kind:"good",icon:Ze,disabled:busy,onClick:()=>once(async()=>{let r=a.zzCustomer(c.id,{securementCalledAt:ye(Date.now()),securementCalledBy:o||"Office"});r&&await r})},"Mark called"))))
         :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"Nobody yet. Customers see the plan under Inventory in their portal.")),
     log?ZZo_h(ZZo_GearLog,{doc:e,init:log,actions:a,onClose:()=>setLog(null),onDone:x=>toast(x)}):null,
     ZZo_h(ZZo_Toasts,{items:toasts,onDismiss:drop}))},
@@ -347,27 +362,28 @@ ZZGearOffice=({doc:e,now:t,actions:a,openTrailer:v,officeUser:o})=>{
 /* ========================== Dock settings card (Setup, before "Crew on the floor") ========================== */
 ZZDockSet=({doc:e,actions:a})=>{
   let st=ZZS(e),r=Ln(e,null),init={promiseMin:String(st.promiseMin),promiseText:st.promiseText,waitGoalMin:String(st.waitGoalMin),newPallet:String(ie(r.newPallet,20)),planPrice:String(ie(st.gearPlan.price,2e3)),planMonths:String(ie(st.gearPlan.months,6))},
-    key=JSON.stringify(init),[f,setF]=(0,H.useState)(init),base=(0,H.useRef)(key),[toasts,toast,drop]=ZZo_useToast(),[err,setErr]=(0,H.useState)("");
+    key=JSON.stringify(init),[f,setF]=(0,H.useState)(init),base=(0,H.useRef)(key),[toasts,toast,drop]=ZZo_useToast(),[err,setErr]=(0,H.useState)(""),[busy,once]=ZZo_useOnce();
   /* someone else saved: take the new values unless this form has unsaved edits */
   (0,H.useEffect)(()=>{if(key!==base.current){setF(cur=>JSON.stringify(cur)===base.current?init:cur);base.current=key}},[key]);
   let dirty=JSON.stringify(f)!==key,set=p=>{setF({...f,...p});setErr("")},
-    save=async()=>{let pm=Math.round(ie(f.promiseMin)),wg=Math.round(ie(f.waitGoalMin)),np=ie(f.newPallet,-1),pp=ie(f.planPrice,-1),mo=Math.round(ie(f.planMonths));
+    save=()=>once(async()=>{let pm=Math.round(ie(f.promiseMin)),wg=Math.round(ie(f.waitGoalMin)),np=ie(f.newPallet,-1),pp=ie(f.planPrice,-1),mo=Math.round(ie(f.planMonths));
       if(!(pm>=15&&pm<=1440))return setErr("The promise must be between 15 and 1440 minutes.");if(!(wg>=5&&wg<=600))return setErr("The wait goal must be between 5 and 600 minutes.");
-      if(!String(f.promiseText||"").trim())return setErr("Write the promise the way customers should read it.");if(!(np>=0))return setErr("The pallet price must be a number.");
-      if(!(pp>=0))return setErr("The plan price must be a number.");if(!(mo>=1&&mo<=36))return setErr("The plan length must be 1 to 36 months.");
-      let p=a.zzSettings({promiseMin:pm,promiseText:String(f.promiseText).trim(),waitGoalMin:wg,gearPlan:{price:pp,months:mo},rates:{newPallet:np}});p&&await p;toast("Dock settings saved.")},
+      if(!String(f.promiseText||"").trim())return setErr("Write the promise the way customers should read it.");if(!String(f.newPallet).trim()||!(np>=0))return setErr("Type the replacement pallet price (a number, 0 or more).");
+      if(!String(f.planPrice).trim()||!(pp>=0))return setErr("Type the securement plan price (a number, 0 or more).");if(!(mo>=1&&mo<=36))return setErr("The plan length must be 1 to 36 months.");
+      let p=a.zzSettings({promiseMin:pm,promiseText:String(f.promiseText).trim(),waitGoalMin:wg,gearPlan:{price:pp,months:mo},rates:{newPallet:np}});p&&await p;toast("Dock settings saved.")}),
+    pmN=Math.round(ie(f.promiseMin)),
     num=(k,label,hint,w)=>ZZo_h(xe,{label,hint},ZZo_h(se,{type:"number",inputMode:"decimal",value:f[k],onChange:x=>set({[k]:x.target.value}),"aria-label":label,style:w?{maxWidth:w}:{}}));
   return ZZo_h("div",{"data-zz":"dockset"},ZZo_h(de,{className:"p-4 space-y-3"},
-    ZZo_h("div",null,ZZo_h("div",{className:"font-bold"},"Dock promise and wait goal"),ZZo_h("div",{className:"text-xs mt-0.5",style:{color:m.mut}},"Customers see the promise on their truck. The wait goal colors the yard, crew and door clocks: amber at 75%, red at the goal.")),
+    ZZo_h("div",null,ZZo_h("div",{className:"font-bold"},"Dock promise and wait goal"),ZZo_h("div",{className:"text-xs mt-0.5",style:{color:m.mut}},"The promise is what we tell customers: the yard board, the door map, the TV and the alert texts measure against it. The wait goal colors the yard, crew and door clocks: amber at 75%, red at the goal.")),
     ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3"},
-      num("promiseMin","Our promise, in minutes from check-in to done",`${ie(f.promiseMin)>0&&ie(f.promiseMin)%60===0?ie(f.promiseMin)/60+" hours":"120 = 2 hours"}. Doors on the board and the TV turn red after this.`),
+      num("promiseMin","Our promise, in minutes from check-in to done",`${pmN>=15&&pmN<=1440?`${ot(pmN*6e4)} from check-in to done`:"120 = 2 hours"}. Doors on the board and the TV turn red after this.`),
       ZZo_h(xe,{label:"The promise, the way customers read it",hint:"Change this too when you change the minutes."},ZZo_h(se,{value:f.promiseText,onChange:x=>set({promiseText:x.target.value}),"aria-label":"Promise wording"})),
       num("waitGoalMin","Wait goal, in minutes until a door","Clocks turn red when a truck waits this long."),
       num("newPallet","Replacement pallet price ($)","Used in the crew's damage fix suggestions."),
-      num("planPrice","Securement plan price ($)","Shown to customers in their portal."),
+      num("planPrice","Securement plan price ($)","The price for our gear on loan, shown with the plan."),
       num("planMonths","Securement plan length (months)","")),
     err?ZZo_h("div",{className:"text-sm",style:{color:m.red},role:"alert"},err):null,
-    ZZo_h("div",{className:"flex items-center gap-2 flex-wrap"},ZZo_h(Z,{kind:"primary",icon:br,disabled:!dirty,onClick:save},"Save dock settings"),
+    ZZo_h("div",{className:"flex items-center gap-2 flex-wrap"},ZZo_h(Z,{kind:"primary",icon:br,disabled:!dirty||busy,onClick:save},busy?"Saving…":"Save dock settings"),
       dirty?ZZo_h(Z,{kind:"quiet",onClick:()=>{setF(init);setErr("")}},"Undo changes"):ZZo_h("span",{className:"text-xs",style:{color:m.dim}},`Now: ${st.promiseText} \xB7 goal ${st.waitGoalMin} min`))),
     ZZo_h(ZZo_Toasts,{items:toasts,onDismiss:drop}))},
 
@@ -377,76 +393,83 @@ ZZo_Pills=({t,doc,now})=>{if(!t)return null;let code=/^\d{4}$/.test(String(t.cod
   return ZZo_h(H.Fragment,null,code?ZZo_h(ve,{label:`Code ${code}`,color:m.orange,dot:!1}):null,ZZo_needsOk(doc,t)?ZZo_h(ve,{label:"Needs your OK",color:m.amber}):null,
     t.stage==="scheduled"&&t.eta&&t.eta.at?ZZo_h(ve,{label:`ETA ${ZZo_hm(t.eta.at)}`,color:m.blue}):null,late?ZZo_h(ve,{label:`Past the ${ZZo_promShort(ZZS(doc).promiseMin)} promise`,color:m.red}):null)},
 ZZo_Sec=({title,children,full})=>ZZo_h("div",{className:"rounded-lg p-3 space-y-2",style:{...ne,...(full?{gridColumn:"1 / -1"}:{}),minWidth:0}},ZZo_h("div",{className:"text-xs font-bold",style:{color:m.mut}},title),children),
-ZZTruckExtra=({t,doc:e,now:n,actions:a})=>{
+/* the sheet grows in two places so Nick's own sections (loads, crew instructions, truck chat) stay near the top:
+   part "top" (under the action buttons, E19): what the office acts on now. Before check-in: code + driver link, ETA + Set ETA,
+     booking (Confirm time, Check in now), tracking + driver language. After check-in: one clock box (wait, promise), plus the code
+     and driver link until the crew starts.
+   part "end" (after the truck chat, E31): paperwork photos, securement report, this truck's messages. */
+ZZTruckExtra=({t,doc:e,now:n,actions:a,part})=>{
   let[etaOpen,setEtaOpen]=(0,H.useState)(!1),[etaT,setEtaT]=(0,H.useState)(""),[etaNote,setEtaNote]=(0,H.useState)(""),[etaErr,setEtaErr]=(0,H.useState)(""),
-    [ask,setAsk]=(0,H.useState)(!1),[busy,setBusy]=(0,H.useState)(!1),[res,setRes]=(0,H.useState)(null),[openM,setOpenM]=(0,H.useState)(null),[toasts,toast,drop]=ZZo_useToast(),
-    tid=t&&t.id,msgs=(0,H.useMemo)(()=>tid?ZZo_allMsgs(e,Date.now()).filter(q=>q.tid===tid):[],[e,tid,n]);
+    [ask,setAsk]=(0,H.useState)(!1),[res,setRes]=(0,H.useState)(null),[openM,setOpenM]=(0,H.useState)(null),[toasts,toast,drop]=ZZo_useToast(),[busy,once]=ZZo_useOnce(),
+    tid=t&&t.id,top=part!=="end",end=part!=="top",msgs=(0,H.useMemo)(()=>tid&&end?ZZo_allMsgs(e,Date.now()).filter(q=>q.tid===tid):[],[e,tid,n,end]);
   if(!t)return null;
   let act=ZZactive(t),code=/^\d{4}$/.test(String(t.code??""))?String(t.code):null,st=ZZS(e),lang=ZZLANGS.find(l=>l.k===(t.driverLang||"en")),
-    url=ZZsafeUrl(t.trackUrl),eta=t.eta&&t.eta.at?t.eta:null,appt=ZZo_ms(t.scheduledAt),preArr=act&&!t.arrivedAt,
-    setEta=async(ms,note)=>{let p=a.zzEta(t.id,{at:ms,source:"office",note:note||""});if(!p){setEtaErr("That ETA could not be saved.");return}await p;toast(`ETA set to ${ZZo_when(ms,Date.now())}.`);setEtaOpen(!1);setEtaT("");setEtaNote("");setEtaErr("")},
+    url=ZZsafeUrl(t.trackUrl),eta=t.eta&&t.eta.at?t.eta:null,appt=ZZo_ms(t.scheduledAt),preArr=act&&!t.arrivedAt,showCode=act&&!t.workStartedAt&&!t.workDoneAt,
+    setEta=(ms,note)=>once(async()=>{let p=a.zzEta(t.id,{at:ms,source:"office",note:note||""});if(!p){setEtaErr("That ETA could not be saved.");return}await p;
+      toast(`ETA set to ${ZZo_when(ms,Date.now())}.`);setEtaOpen(!1);setEtaT("");setEtaNote("");setEtaErr("")}),
     pickEta=()=>{if(!/^\d{1,2}:\d{2}$/.test(etaT))return setEtaErr("Pick a time.");let day=ZZo_today(Date.now()),iso=ZZzonedIso(day,etaT),ms=ZZo_ms(iso);
       if(!isFinite(ms))return setEtaErr("That time does not exist.");if(ms<Date.now()-15*6e4){let nx=new Date(Date.UTC(+day.slice(0,4),+day.slice(5,7)-1,+day.slice(8,10)+1)).toISOString().slice(0,10);ms=ZZo_ms(ZZzonedIso(nx,etaT))}setEta(ms,etaNote)},
-    checkIn=async()=>{if(busy)return;setBusy(!0);let r=null;try{r=await a.zzKioskIn(t.id,{by:"office"})}catch(x){console.error(x)}setBusy(!1);setAsk(!1);setRes(r||{failed:!0})},
+    checkIn=()=>once(async()=>{let r=null;try{r=await a.zzKioskIn(t.id,{by:"office"})}catch(x){console.error(x)}setAsk(!1);setRes(r||{failed:!0})}),
+    confirm=()=>once(async()=>{let r=a.zzConfirm(t.id);r&&await r;toast("Time confirmed. The “booking confirmed” alert is in the Outbox.")}),
     w=ZZwaitMs(t,n),p=ZZpromise(e,t,n),late=ZZo_late(e,t,n),out=t.direction==="outbound",sec=t.secure&&t.secure.signedAt?t.secure:null,
-    bookedLine=[t.bookedVia==="client"?"Booked by the customer":t.bookedVia==="office"?"Booked by the office":t.bookedVia==="kiosk"||t.checkedInBy==="kiosk"&&!t.scheduledAt?"Walk-in at the kiosk":"Booked",t.bookedBy?`(${t.bookedBy})`:"",t.createdAt?ZZo_when(t.createdAt,n):""].filter(Boolean).join(" ");
-  return ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3","data-zz":"truck-extra"},
-    /* check-in code and driver link */
-    ZZo_h(ZZo_Sec,{title:"Check-in code and driver link"},
+    who=t.bookedVia==="client"?"Booked by the customer":t.bookedVia==="office"?"Booked by the office":t.bookedVia==="kiosk"||t.checkedInBy==="kiosk"&&!t.scheduledAt?"Walk-in at the kiosk":"",
+    /* older trucks carry none of this: say nothing rather than a bare "Booked" */
+    bookedLine=who||t.bookedBy||t.createdAt?[who||"Booked",t.bookedBy?`(${t.bookedBy})`:"",t.createdAt?ZZo_when(t.createdAt,n):""].filter(Boolean).join(" "):"",
+    resBox=res?ZZo_h("div",{className:"text-sm font-semibold",style:{color:res.failed?m.red:m.green},role:"status"},
+      res.failed?"That did not save. Try again.":res.already?`Already checked in${res.dock&&res.dock!==Ee?`, at door ${res.dock}`:res.place?`, #${res.place} in line`:""}.`
+        :res.dock&&res.dock!==Ee?`Checked in. Send the driver to door ${res.dock}.`:`Checked in. #${res.place||"?"} in the yard line${res.estMin?`, about ${res.estMin} min`:""}.`):null,
+    codeSec=ZZo_h(ZZo_Sec,{title:"Check-in code and driver link"},
       code?ZZo_h(H.Fragment,null,
         ZZo_h("div",{className:"flex items-baseline gap-3"},ZZo_h("span",{className:"text-3xl font-black tabular-nums",style:{color:m.orange,letterSpacing:"0.08em"},"data-code":code},code),
           ZZo_h("span",{className:"text-xs",style:{color:m.mut}},"The driver types this at the kiosk. It is not the company's portal PIN.")),
-        act?ZZo_h(ZZo_CopyBox,{text:ZZetaLink(t),label:"Driver page: ETA updates and door number"}):null)
-      :act?ZZo_h(H.Fragment,null,ZZo_h("div",{className:"text-sm",style:{color:m.mut}},"No check-in code yet. This truck was booked before codes existed."),
-          ZZo_h(Z,{size:"sm",onClick:()=>a.zzEnsureCode(t.id)},"Make a code and driver link"))
-        :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"No check-in code.")),
-    /* ETA and clocks */
-    ZZo_h(ZZo_Sec,{title:preArr?"ETA":"Clock"},
-      preArr?ZZo_h(H.Fragment,null,
-        eta?ZZo_h("div",null,ZZo_h("div",{className:"text-xl font-black tabular-nums"},`ETA ${ZZo_when(eta.at,n)}`),
-            ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`from ${ZZo_srcName[eta.source]||"an update"}${eta.by?` (${eta.by})`:""}, ${ZZo_ago(eta.updatedAt,n)}${eta.note?` \xB7 "${eta.note}"`:""}`))
-          :ZZo_h("div",{className:"text-sm",style:{color:m.mut}},isFinite(appt)?`No ETA yet. Going by the appointment, ${ZZo_when(appt,n)}.`:"No ETA and no appointment time."),
-        (eta?ZZo_ms(eta.at):appt)<n?ZZo_h("div",{className:"text-xs font-bold",style:{color:m.red}},`Late: ${ot(n-(eta?ZZo_ms(eta.at):appt))} past the ${eta?"ETA":"appointment"}`):null,
-        etaOpen?ZZo_h("div",{className:"space-y-2"},
-          ZZo_h("div",{className:"flex gap-1.5 flex-wrap"},[[15,"In 15 min"],[30,"In 30 min"],[60,"In 1 hour"],[120,"In 2 hours"]].map(([mn,l])=>ZZo_h(Z,{key:mn,size:"sm",onClick:()=>setEta(Date.now()+mn*6e4,etaNote)},l))),
-          ZZo_h("div",{className:"flex gap-2 items-end flex-wrap"},ZZo_h("div",{style:{width:130}},ZZo_h(xe,{label:"Or a time (dock time)"},ZZo_h(se,{type:"time",step:60,value:etaT,onChange:x=>{setEtaT(x.target.value);setEtaErr("")},"aria-label":"ETA time"}))),
-            ZZo_h("div",{className:"flex-1",style:{minWidth:140}},ZZo_h(xe,{label:"Note (optional)"},ZZo_h(se,{value:etaNote,onChange:x=>setEtaNote(x.target.value),placeholder:"e.g. driver called, traffic"})))),
-          etaErr?ZZo_h("div",{className:"text-xs",style:{color:m.red},role:"alert"},etaErr):null,
-          ZZo_h("div",{className:"flex gap-2"},ZZo_h(Z,{size:"sm",kind:"primary",onClick:pickEta},"Save ETA"),ZZo_h(Z,{size:"sm",kind:"quiet",onClick:()=>{setEtaOpen(!1);setEtaErr("")}},"Cancel")))
-          :ZZo_h(Z,{size:"sm",icon:Fd,onClick:()=>setEtaOpen(!0)},"Set ETA"))
-      :t.arrivedAt?ZZo_h(H.Fragment,null,
+        ZZo_h(ZZo_CopyBox,{text:ZZetaLink(t),label:preArr?"Driver page: ETA updates and door number":"Driver page: place in line and door number"}))
+      :ZZo_h(H.Fragment,null,ZZo_h("div",{className:"text-sm",style:{color:m.mut}},"No check-in code yet. This truck was booked before codes existed."),
+          ZZo_h("div",null,ZZo_h(Z,{disabled:busy,onClick:()=>once(async()=>{let r=a.zzEnsureCode(t.id);r&&await r})},"Make a code and driver link")))),
+    etaSec=ZZo_h(ZZo_Sec,{title:"ETA"},
+      eta?ZZo_h("div",null,ZZo_h("div",{className:"text-xl font-black tabular-nums"},`ETA ${ZZo_when(eta.at,n)}`),
+          ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`from ${ZZo_srcName[eta.source]||"an update"}${eta.by?` (${eta.by})`:""}, ${ZZo_ago(eta.updatedAt,n)}${eta.note?` \xB7 "${eta.note}"`:""}`))
+        :ZZo_h("div",{className:"text-sm",style:{color:m.mut}},isFinite(appt)?`No ETA yet. Going by the appointment, ${ZZo_when(appt,n)}.`:"No ETA and no appointment time."),
+      (eta?ZZo_ms(eta.at):appt)<n?ZZo_h("div",{className:"text-xs font-bold",style:{color:m.red}},`Late: ${ot(n-(eta?ZZo_ms(eta.at):appt))} past the ${eta?"ETA":"appointment"}`):null,
+      etaOpen?ZZo_h("div",{className:"space-y-2"},
+        ZZo_h("div",{className:"flex gap-1.5 flex-wrap"},[[15,"In 15 min"],[30,"In 30 min"],[60,"In 1 hour"],[120,"In 2 hours"]].map(([mn,l])=>ZZo_h(Z,{key:mn,disabled:busy,onClick:()=>setEta(Date.now()+mn*6e4,etaNote)},l))),
+        ZZo_h("div",{className:"flex gap-2 items-end flex-wrap"},ZZo_h("div",{style:{width:140}},ZZo_h(xe,{label:"Or a time (dock time)"},ZZo_h(se,{type:"time",step:60,value:etaT,onChange:x=>{setEtaT(x.target.value);setEtaErr("")},"aria-label":"ETA time"}))),
+          ZZo_h("div",{className:"flex-1",style:{minWidth:140}},ZZo_h(xe,{label:"Note (optional)"},ZZo_h(se,{value:etaNote,onChange:x=>setEtaNote(x.target.value),placeholder:"e.g. driver called, traffic"})))),
+        etaErr?ZZo_h("div",{className:"text-xs",style:{color:m.red},role:"alert"},etaErr):null,
+        ZZo_h("div",{className:"flex gap-2"},ZZo_h(Z,{kind:"primary",disabled:busy,onClick:pickEta},"Save ETA"),ZZo_h(Z,{kind:"quiet",onClick:()=>{setEtaOpen(!1);setEtaErr("")}},"Cancel")))
+        :ZZo_h("div",null,ZZo_h(Z,{icon:Fd,onClick:()=>setEtaOpen(!0)},"Set ETA"))),
+    bookSec=ZZo_h(ZZo_Sec,{title:"Booking"},
+      bookedLine?ZZo_h("div",{className:"text-xs",style:{color:m.mut}},bookedLine):null,
+      t.confirmedAt?ZZo_h("div",{className:"text-sm",style:{color:m.green}},`Time confirmed${t.confirmedBy?` by ${t.confirmedBy}`:""}, ${ZZo_when(t.confirmedAt,n)}`)
+        :ZZo_needsOk(e,t)?ZZo_h(H.Fragment,null,ZZo_h("div",{className:"text-sm font-semibold",style:{color:m.amber}},"The customer asked for this time. It is not confirmed yet."),
+            ZZo_h("div",null,ZZo_h(Z,{kind:"primary",icon:Ze,disabled:busy,onClick:confirm},"Confirm time")))
+          :t.stage==="scheduled"?ZZo_h("div",{className:"text-xs",style:{color:m.dim}},"Booked straight onto the schedule. Nothing to confirm."):null,
+      t.stage==="scheduled"?ask?ZZo_h("div",{className:"rounded-lg p-2.5 space-y-2",style:{background:m.panel,border:`1px solid ${m.line}`}},
+          ZZo_h("div",{className:"text-sm"},`Check in truck ${t.truck||"—"} now, as the kiosk would? It gets the first open door, or a place in the yard line. The “checked in” alert and the driver's door text go to the Outbox.`),
+          ZZo_h("div",{className:"flex gap-2 flex-wrap"},ZZo_h(Z,{kind:"primary",disabled:busy,onClick:checkIn},busy?"Checking in…":"Yes, check in"),ZZo_h(Z,{disabled:busy,onClick:()=>setAsk(!1)},"Not now")))
+        :ZZo_h("div",null,ZZo_h(Z,{icon:Ca,onClick:()=>{setAsk(!0);setRes(null)}},"Check in now (driver skipped the kiosk)")):null,
+      resBox),
+    trackSec=ZZo_h(ZZo_Sec,{title:"Tracking and driver"},
+      ZZo_h("div",{className:"grid grid-cols-2 gap-2 text-sm"},
+        ZZo_h("div",null,ZZo_h("div",{className:"text-[11px]",style:{color:m.mut}},"ETA updates"),ZZo_h("div",{className:"font-semibold"},ZZo_trName[t.tracking]||"Not chosen")),
+        ZZo_h("div",null,ZZo_h("div",{className:"text-[11px]",style:{color:m.mut}},"Driver's language"),ZZo_h("div",{className:"font-semibold"},lang?lang.name:"English"))),
+      url?ZZo_h(ZZo_CopyBox,{text:url,href:url,label:t.tracking==="samsara"?"Samsara live map link":"Live map link"})
+        :t.tracking==="samsara"||t.tracking==="gps"?ZZo_h("div",{className:"text-xs",style:{color:m.amber}},"Live map link not pasted yet."):null),
+    clockSec=ZZo_h(ZZo_Sec,{title:t.arrivedAt?"Check-in and promise":"Booking"},
+      resBox,
+      t.arrivedAt?ZZo_h(H.Fragment,null,
         ZZo_h("div",{className:"text-sm"},`Checked in ${ZZo_when(t.arrivedAt,n)}${t.checkedInBy==="office"?" by the office":t.checkedInBy==="kiosk"?" at the kiosk":""}`),
         w!=null?ZZo_h("div",{className:"text-sm",style:{color:t.workStartedAt?m.mut:ZZtoneColor(ZZtone(w,e))}},t.workStartedAt?`Waited ${ot(w)} for a door`:`Waiting ${ot(w)} \xB7 goal ${st.waitGoalMin} min`):null,
         p.elapsedMin!=null?ZZo_h("div",{className:"text-sm font-semibold",style:{color:p.kept===!0?m.green:late||p.kept===!1?m.red:m.text}},
           p.doneMin!=null?`Done in ${ot(p.doneMin*6e4)}, ${p.kept?"within":"over"} our ${ZZo_promName(st.promiseMin)} promise`:`${ot(p.elapsedMin*6e4)} since check-in \xB7 ${p.leftMin>=0?`${ot(p.leftMin*6e4)} left on the promise`:"past the promise"}`):null)
-        :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"Never checked in.")),
-    /* booking: confirm time, check in now */
-    ZZo_h(ZZo_Sec,{title:"Booking"},
-      ZZo_h("div",{className:"text-xs",style:{color:m.mut}},bookedLine),
-      t.confirmedAt?ZZo_h("div",{className:"text-sm",style:{color:m.green}},`Time confirmed${t.confirmedBy?` by ${t.confirmedBy}`:""}, ${ZZo_when(t.confirmedAt,n)}`)
-        :ZZo_needsOk(e,t)?ZZo_h(H.Fragment,null,ZZo_h("div",{className:"text-sm font-semibold",style:{color:m.amber}},"The customer asked for this time. It is not confirmed yet."),
-            ZZo_h("div",null,ZZo_h(Z,{size:"sm",kind:"primary",icon:Ze,onClick:async()=>{let r=a.zzConfirm(t.id);r&&await r;toast("Time confirmed. The customer sees it in their portal.")}},"Confirm time")))
-          :t.stage==="scheduled"&&act?ZZo_h("div",{className:"text-xs",style:{color:m.dim}},"Booked straight onto the schedule. Nothing to confirm."):null,
-      t.stage==="scheduled"&&preArr?ask?ZZo_h("div",{className:"rounded-lg p-2.5 space-y-2",style:{background:m.panel,border:`1px solid ${m.line}`}},
-          ZZo_h("div",{className:"text-sm"},`Check in truck ${t.truck||"—"} now? It gets the first open door, or a place in the yard line. The "checked in" alert and the driver's door text get queued in the Outbox.`),
-          ZZo_h("div",{className:"flex gap-2"},ZZo_h(Z,{size:"sm",kind:"primary",disabled:busy,onClick:checkIn},busy?"Checking in…":"Yes, check in"),ZZo_h(Z,{size:"sm",onClick:()=>setAsk(!1)},"Not now")))
-        :ZZo_h("div",null,ZZo_h(Z,{size:"sm",icon:Ca,onClick:()=>{setAsk(!0);setRes(null)}},"Check in now (driver skipped the kiosk)")):null,
-      res?ZZo_h("div",{className:"text-sm font-semibold",style:{color:res.failed?m.red:m.green},role:"status"},
-        res.failed?"That did not save. Try again.":res.already?`Already checked in${res.dock&&res.dock!==Ee?`, at door ${res.dock}`:res.place?`, #${res.place} in line`:""}.`
-          :res.dock&&res.dock!==Ee?`Checked in. Send the driver to door ${res.dock}.`:`Checked in. #${res.place||"?"} in the yard line${res.estMin?`, about ${res.estMin} min`:""}.`):null),
-    /* tracking and driver */
-    ZZo_h(ZZo_Sec,{title:"Tracking and driver"},
-      ZZo_h("div",{className:"grid grid-cols-2 gap-2 text-sm"},
-        ZZo_h("div",null,ZZo_h("div",{className:"text-[11px]",style:{color:m.mut}},"ETA updates"),ZZo_h("div",{className:"font-semibold"},ZZo_trName[t.tracking]||"Not chosen")),
-        ZZo_h("div",null,ZZo_h("div",{className:"text-[11px]",style:{color:m.mut}},"Driver's language"),ZZo_h("div",{className:"font-semibold"},lang?lang.name:"English"))),
-      url?ZZo_h(ZZo_CopyBox,{text:url,label:t.tracking==="samsara"?"Samsara live map link":"Live map link"})
-        :t.tracking==="samsara"||t.tracking==="gps"?ZZo_h("div",{className:"text-xs",style:{color:m.amber}},"Live map link not pasted yet."):null),
-    /* paperwork photos */
-    ZZo_h(ZZo_Sec,{title:`Paperwork${ie(t.paperCount)?` \xB7 ${ZZo_plural(ie(t.paperCount),"photo")}`:""}`},
+        :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},t.stage==="cancelled"?"Cancelled before it checked in.":"Never checked in."),
+      /* outbound: securement status here too, next to "Release truck" (the full report is at the end of the sheet) */
+      out&&t.arrivedAt?ZZo_h("div",{className:"text-sm font-semibold",style:{color:sec?ie(sec.confidence)>=4?m.green:m.amber:t.stage==="done"||t.stage==="departed"?m.red:m.amber}},
+        sec?`Secured ${sec.confidence}/5${sec.seal?` \xB7 seal ${sec.seal}`:""} (report below)`:t.stage==="departed"?"Left without a securement report":"Not secured yet. The crew secures it before release."):null,
+      bookedLine||lang&&lang.k!=="en"?ZZo_h("div",{className:"text-xs",style:{color:m.mut}},[bookedLine,lang&&lang.k!=="en"?`driver speaks ${lang.name}`:""].filter(Boolean).join(" \xB7 ")):null),
+    paperSec=t.arrivedAt||ie(t.paperCount)>0?ZZo_h(ZZo_Sec,{title:`Paperwork${ie(t.paperCount)?` \xB7 ${ZZo_plural(ie(t.paperCount),"photo")}`:""}`},
       ZZo_h(lr,{ownerId:dt.paper(t.id),size:56,empty:"No paperwork scanned yet."}),
-      t.paperBy?ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},`by ${t.paperBy}`):null),
-    /* securement */
-    out||sec?ZZo_h(ZZo_Sec,{title:"Securement"},
+      t.paperBy?ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},`by ${t.paperBy}`):null):null,
+    secSec=out||sec?ZZo_h(ZZo_Sec,{title:"Securement"},
       sec?ZZo_h(H.Fragment,null,
         ZZo_h("div",{className:"text-sm font-semibold",style:{color:ie(sec.confidence)>=4?m.green:ie(sec.confidence)===3?m.amber:m.red}},`Secured ${sec.confidence}/5${sec.seal?` \xB7 seal ${sec.seal}`:""}`),
         ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Signed by ${sec.signedBy||sec.signature||"the crew"}, ${ZZo_when(sec.signedAt,n)}`),
@@ -455,11 +478,14 @@ ZZTruckExtra=({t,doc:e,now:n,actions:a})=>{
         sec.note?ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Note: ${sec.note}`):null,
         ZZo_h("div",{className:"space-y-1"},ZZSECSLOTS.map(sl=>ZZo_h(lr,{key:sl.k,ownerId:`sec:${t.id}:${sl.k}`,size:44,label:sl.label}))))
       :ZZo_h("div",{className:"text-sm",style:{color:t.stage==="done"||t.stage==="departed"?m.red:m.amber}},t.stage==="done"||t.stage==="departed"?"No securement report.":"Not secured yet. The crew does this before the truck leaves.")):null,
-    /* messages for this truck */
-    ZZo_h(ZZo_Sec,{title:`Messages for this truck \xB7 ${msgs.length}`,full:!0},
-      msgs.length?ZZo_h("div",{className:"space-y-1.5"},msgs.slice(0,8).map(q=>ZZo_h(ZZo_MsgRow,{key:q.id,q,doc:e,open:openM===q.id,onToggle:()=>setOpenM(openM===q.id?null:q.id),onTruck:()=>{}})))
+    msgSec=ZZo_h(ZZo_Sec,{title:`Messages for this truck \xB7 ${msgs.length}`,full:!0},
+      msgs.length?ZZo_h("div",{className:"space-y-1.5"},msgs.slice(0,8).map(q=>ZZo_h(ZZo_MsgRow,{key:q.id,q,doc:e,open:openM===q.id,onToggle:()=>setOpenM(openM===q.id?null:q.id),onTruck:null})))
         :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"No texts or emails for this truck yet."),
-      ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},"Not sent for real yet. The Outbox tab has every message.")),
+      ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},`Not sent for real yet.${msgs.length>8?` Showing the newest 8 of ${msgs.length}.`:""} The Outbox tab has every message.`));
+  return ZZo_h(H.Fragment,null,
+    top?ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3","data-zz":"truck-extra"},
+      ...(preArr?[codeSec,etaSec,bookSec,trackSec]:showCode?[clockSec,codeSec]:[ZZo_h("div",{key:"c",style:{gridColumn:"1 / -1",minWidth:0}},clockSec)])):null,
+    end?ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3","data-zz":"truck-more"},paperSec,secSec,msgSec):null,
     ZZo_h(ZZo_Toasts,{items:toasts,onDismiss:drop}))},
 
 /* ========================== TV exit: office PIN ========================== */
