@@ -9,7 +9,7 @@
 ZZFLAGS=(()=>{let f={kiosk2:!0,secureStep:!0};try{let o=window.__ZZTEST&&window.__ZZFLAGS;if(o&&typeof o==="object")Object.keys(f).forEach(k=>{typeof o[k]==="boolean"&&(f[k]=o[k])})}catch{}return f})(),
 ZZPUBLIC_URL="https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv",
 ZZLANGS=[{k:"en",name:"English"},{k:"es",name:"Español"},{k:"ru",name:"Русский"},{k:"uk",name:"Українська"},{k:"pa",name:"ਪੰਜਾਬੀ"},{k:"hi",name:"हिन्दी"}],
-ZZEVENTS=[{k:"booked",label:"Booking confirmed"},{k:"eta",label:"ETA changed"},{k:"arrived",label:"Truck checked in"},{k:"waiting",label:"Waiting over the goal"},{k:"started",label:"Unloading or loading started"},{k:"damage",label:"Damage found"},{k:"done",label:"Done, with photos"},{k:"secured",label:"Loaded and secured"},{k:"friday",label:"Friday summary"}],
+ZZEVENTS=[{k:"booked",label:"Booking confirmed"},{k:"eta",label:"ETA changed"},{k:"arrived",label:"Truck checked in"},{k:"waiting",label:"Waiting too long for a door"},{k:"started",label:"Unloading or loading started"},{k:"damage",label:"Damage found"},{k:"done",label:"Done, with photos"},{k:"secured",label:"Loaded and secured"},{k:"friday",label:"Friday summary"}],
 /* default alert choices for a new contact: {<event>:{text, email}} */
 ZZALERTS={booked:{text:!1,email:!0},eta:{text:!1,email:!1},arrived:{text:!0,email:!1},waiting:{text:!0,email:!1},started:{text:!1,email:!1},damage:{text:!0,email:!0},done:{text:!1,email:!0},secured:{text:!1,email:!0},friday:{text:!1,email:!0}},
 ZZGEAR=[{k:"plywood",label:"Plywood sheets",hint:"Usually 5 to 6"},{k:"bars",label:"Load bars",hint:"Usually 2"},{k:"straps",label:"Straps",hint:"Usually 4"},{k:"airbags",label:"Airbags",hint:"Only for gaps"}],
@@ -42,7 +42,9 @@ ZZS=doc=>{let s=(doc&&doc.settings)||{},o={promiseMin:120,promiseText:"Unloaded 
 ZZactive=t=>!!t&&t.stage!=="departed"&&t.stage!=="cancelled",
 /* t.code, or a stable 4-digit code worked out from t.id (older trucks; nothing is written) */
 ZZcode=t=>{if(!t)return"";let c=String(t.code??"");if(/^\d{4}$/.test(c))return c;let s=String(t.id||""),h=7;for(let k=0;k<s.length;k++)h=(h*31+s.charCodeAt(k))>>>0;return String(1e3+h%9e3)},
-ZZa_usedCodes=doc=>{let u=new Set;((doc&&doc.trailers)||[]).forEach(t=>{ZZactive(t)&&u.add(ZZcode(t))});return u},
+ZZa_usedCodes=doc=>{let u=new Set;((doc&&doc.trailers)||[]).forEach(t=>{ZZactive(t)&&u.add(ZZcode(t))});
+  /* a check-in code goes to drivers, so it is never anyone's PIN (customer portal, office or crew login) */
+  let st=(doc&&doc.settings)||{};[...((doc&&doc.customers)||[]),...(st.admins||[]),...(st.crewMembers||[])].forEach(p=>{p&&p.pin!=null&&u.add(String(p.pin))});return u},
 ZZnewCode=doc=>{let u=ZZa_usedCodes(doc);for(let k=0;k<400;k++){let c=String(1e3+Math.floor(Math.random()*9e3));if(!u.has(c))return c}for(let k=1e3;k<1e4;k++)if(!u.has(String(k)))return String(k);return String(1e3+Math.floor(Math.random()*9e3))},
 ZZokCode=(doc,c)=>{c=String(c??"").trim();return /^\d{4}$/.test(c)&&!ZZa_usedCodes(doc).has(c)?c:ZZnewCode(doc)},
 ZZbyCode=(doc,code)=>{let c=String(code??"").trim();if(!/^\d{4}$/.test(c))return null;let L=((doc&&doc.trailers)||[]).filter(t=>ZZactive(t)&&ZZcode(t)===c);return L.find(t=>String(t.code??"")===c)||L[0]||null},
@@ -108,9 +110,10 @@ ZZgearOut=(doc,cid)=>{let o={plywood:0,bars:0,straps:0,airbags:0,tags:[]};
     if(["plywood","bars","straps","airbags"].includes(g.type))o[g.type]+=sg*ie(g.qty);
     (g.tags||[]).forEach(tg=>{tg=String(tg);if(sg>0){o.tags.includes(tg)||o.tags.push(tg)}else o.tags=o.tags.filter(x=>x!==tg)})});
   ["plywood","bars","straps","airbags"].forEach(k=>{o[k]=Math.max(0,o[k])});return o},
-/* suggested fix lines; labels match the ZZEst quick lines */
+/* suggested fix lines. The labor line is "Labor hours" (0.5 = half an hour), not Nick's quick line "Labor, 1 hour",
+   so a customer never reads "Labor, 1 hour" next to half the hourly price */
 ZZdmgLines=(doc,s,pallets)=>{let r=Ln(doc,s&&s.customerId),p=Math.max(0,ie(pallets,1));
-  return[{k:"rewrap",label:"Rewrap pallet",qty:p,unit:ie(r.rewrap,15),on:!0},{k:"labor",label:"Labor, 1 hour",qty:.5,unit:ie(r.laborHour,120),on:!0},{k:"pallet",label:"Replacement pallet",qty:1,unit:ie(r.newPallet,20)||20,on:!1}]},
+  return[{k:"rewrap",label:"Rewrap pallet",qty:p,unit:ie(r.rewrap,15),on:!0},{k:"labor",label:"Labor hours",qty:.5,unit:ie(r.laborHour,120),on:!0},{k:"pallet",label:"Replacement pallet",qty:1,unit:ie(r.newPallet,20)||20,on:!1}]},
 /* true when rewrap is already on the bill through an approved damage estimate ("Damage: Rewrap pallet" adjustment):
    then Im does not bill rewrapPallets again for the same pallets (patch A38) */
 ZZrewrapBilled=s=>((s&&s.adjustments)||[]).some(a=>a&&/^Damage: /.test(String(a.label||""))&&/rewrap/i.test(String(a.label||""))),
@@ -176,7 +179,7 @@ ZZmsgs=(doc,now)=>{now=ZZa_nowMs(now);let out=[];try{let T=(doc&&doc.trailers)||
   byT=new Map,ld=t=>byT.get(t.id)||[];SH.forEach(s=>{let a=s.trailerInId,b=s.trailerOutId;a&&(byT.get(a)||byT.set(a,[]).get(a)).push(s);b&&b!==a&&(byT.get(b)||byT.set(b,[]).get(b)).push(s)});
   let push=(ev,key,c,t,ts,txt)=>{ts=ZZa_ms(ts);if(!c||!isFinite(ts)||ts<since||ts>now)return;ZZrecips(c,ev).forEach(r=>r.channels.forEach(ch=>{let to=ch==="sms"?r.phone:r.email;
     out.push({id:`${ev}:${key}:${r.idx}:${ch}`,channel:ch,to:to||"",toName:r.name,subject:ch==="email"?txt.subject:null,
-      body:ch==="email"?`Hi ${r.name||c.name},\n\n${txt.email||txt.sms}\n\nYou can see it live in your portal.\n\n— ${Uo}`:`${Uo}: ${txt.sms}`,
+      body:ch==="email"?`Hi ${r.name||c.name},\n\n${txt.email||txt.sms}\n\nQuestions? Call us at 916-616-3481.\n\n— ${Uo}`:`${Uo}: ${txt.sms}`,
       ts,about:`truck ${(t&&t.truck)||"—"}`,deliverable:!!to,event:ev,customerId:c.id,trailerId:t?t.id:null,lang:"en"})}))};
   T.forEach(t=>{try{let c=cu(t.customerId),tk=t.truck||"—",out2=t.direction==="outbound",door=t.dock&&Gi.includes(t.dock)?t.dock:null;
     if(c){let bts=t.confirmedAt||((c.dispatch||t.bookedVia==="office")&&t.createdAt),
@@ -211,10 +214,22 @@ ZZmsgs=(doc,now)=>{now=ZZa_nowMs(now);let out=[];try{let T=(doc&&doc.trailers)||
   let tm=new Map(T.map(t=>[t.id,t]));
   SH.forEach(s=>{try{let t=tm.get(s.trailerInId)||tm.get(s.trailerOutId)||null,c2=cu(s.customerId||(t&&t.customerId));
     (s.exceptions||[]).forEach(x=>{if(!x||x.kind!=="Damage"||!x.id)return;let pl=ie(x.pallets);
-      push("damage",x.id,c2,t,x.at,{subject:`Damage found: ${s.ref}`,sms:`Damage found on ${s.ref}${pl?` (${ZZa_plural(pl,"pallet")})`:""}. Photos and the fix price are in your portal.`})})}catch(x){console.error("ZZmsgs load",s&&s.id,x)}})
+      push("damage",x.id,c2,t,x.at,{subject:`Damage found: ${s.ref}`,sms:`Damage found on ${s.ref}${pl?` (${ZZa_plural(pl,"pallet")})`:""}. We have photos and the fix price for you. Call 916-616-3481.`})})}catch(x){console.error("ZZmsgs load",s&&s.id,x)}})
   }catch(x){console.error("ZZmsgs",x)}
   return out.sort((a,b)=>b.ts-a.ts)},
 
+/* Lists that open inside the dark white-text headers (.zzhd: office, customer, crew) - today the bell. Nick's head CSS
+   forces white text on everything inside .zzhd (!important), so on the light theme the list was white on white.
+   These rules give the open list the theme's text colours and its rows their card look and urgency edge again,
+   and lift the header above the office tab bar while the list is open.
+   Rendered by the office / staff header (patch A40) and the customer header (ZZCSS); the crew screen has its own copy. */
+ZZa_rgb=c=>{let h=String(c||"").replace("#","");if(!/^[0-9a-f]{6}$/i.test(h))return String(c||"");return`rgb(${parseInt(h.slice(0,2),16)}, ${parseInt(h.slice(2,4),16)}, ${parseInt(h.slice(4,6),16)})`},
+ZZhdCSS=()=>`.zzhd .fixed.inset-0 div,.zzhd .fixed.inset-0 button,.zzhd .fixed.inset-0 a,.zzhd .fixed.inset-0 span:not([class*="rounded-full"]){color:${m.text}!important}`+
+  `.zzhd .fixed.inset-0 .tabular-nums,.zzhd .fixed.inset-0 .leading-relaxed{color:${m.mut}!important}`+
+  `.zzhd .fixed.inset-0 button[style*="background"]{background:${m.raised}!important;border-color:${m.line}!important}`+
+  [m.red,m.amber,m.green,m.blue,m.orange,m.mut].map(c=>`.zzhd .fixed.inset-0 button[style*="${ZZa_rgb(c)}"]{border-left-color:${c}!important}`).join("")+
+  /* while the list is open its sticky header sits above the office tab bar (both were z 30, so the tab bar covered the list) */
+  `.zzhd:has(.fixed.inset-0),.zz-hdr:has(.fixed.inset-0),div[style*="sticky"]:has(.zzhd .fixed.inset-0){z-index:60!important}`,
 /* ---------- actions: spread into the actions object by patch A09 ----------
    S saves (one write), C adds an activity line, M / N patch a load / truck, L() role label, B() person, w toast. */
 ZZacts=({S,C,M,N,L,B,w})=>{
@@ -314,7 +329,7 @@ ZZacts=({S,C,M,N,L,B,w})=>{
   /* 14. queue Friday summaries once per customer per week; resolves to how many were queued */
   zzQueueFriday:async(week,entries)=>{let n=0;await S(x=>{let ob=x.zzOutbox||[],had=new Set(ob.filter(o=>o&&o.event==="friday"&&o.week===week).map(o=>o.customerId)),now=ye(Date.now()),add=[];n=0;
       (entries||[]).forEach(en=>{if(!en||!en.customerId||had.has(en.customerId))return;add.push({id:Ce(),at:now,event:"friday",week,customerId:en.customerId,trailerId:null,channel:en.channel==="sms"?"sms":"email",to:String(en.to||""),toName:String(en.toName||""),subject:String(en.subject||""),body:String(en.body||"")})});
-      if(!add.length)return null;n=add.length;x.zzOutbox=[...add,...ob].slice(0,300);return C(x,L(),"outbox",`Queued ${ZZa_plural(n,"Friday summary")} for the week of ${week}`)});
+      if(!add.length)return null;n=add.length;x.zzOutbox=[...add,...ob].slice(0,300);return C(x,L(),"outbox",`Queued ${ZZa_plural(n,"Friday summary")} for the week of ${ZZa_day(ZZzonedIso(week,"12:00"))||week}`)});
     return n}
   }},
 /* the red save banner on the kiosk (role "driver"): a driver cannot fix storage or retry a staff change, so the

@@ -362,13 +362,13 @@ H.main('e-office', async (h, t) => {
     t.eq([await val('plywood'), await val('bars')], ['6', '2'], 'Altex: 6 plywood, 2 load bars');
     t.ok(/Tags out:[\s\S]*B-17[\s\S]*B-18/.test(await row.innerText()), 'Altex tags out B-17, B-18');
     await h.check(p, 'gear-1400');
-    await row.getByRole('button', { name: 'Log return' }).click();
+    await row.getByRole('button', { name: 'Log gear back' }).click();
     await p.waitForTimeout(300);
     await h.check(p, 'gear-log-1400');
     await p.locator('input[aria-label="How many"]').fill('2');
     await p.getByRole('button', { name: 'B-18' }).click();
     // two quick taps on Save (a double tap) must log the return once
-    await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim() === 'Save return'); b.click(); b.click(); });
+    await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => x.innerText.trim() === 'Log gear back' && x.closest('.fixed.inset-0')); b.click(); b.click(); });
     await p.waitForTimeout(700);
     const doc = await h.readDoc(p);
     const back = doc.zzGear.filter(g => g.dir === 'back');

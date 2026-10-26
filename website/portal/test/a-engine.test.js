@@ -311,7 +311,7 @@ H.main('a-engine', async (h, t) => {
     t.eq(r4.g1, { plywood: 6, bars: 1, straps: 0, airbags: 0, tags: ['B-2'] }, 'ZZgearOut per customer: out minus back, never below 0, returned tags removed');
     t.eq(r4.all.airbags, 4, 'ZZgearOut for all customers');
     t.eq(r4.months, [['2026-10', 2, 3, 1, 0, 1, 'x2,x1'], ['2026-09', 1, 3, 0, 1, 0, 'x3']], 'ZZdmgMonths: Damage only, by month, newest first');
-    t.eq(r4.lines.map(l => [l.label, l.qty, l.unit, l.on]), [['Rewrap pallet', 3, 15, true], ['Labor, 1 hour', 0.5, 120, true], ['Replacement pallet', 1, 20, false]], 'ZZdmgLines match the ZZEst quick lines (newPallet default 20)');
+    t.eq(r4.lines.map(l => [l.label, l.qty, l.unit, l.on]), [['Rewrap pallet', 3, 15, true], ['Labor hours', 0.5, 120, true], ['Replacement pallet', 1, 20, false]], 'ZZdmgLines match the ZZEst quick lines (newPallet default 20)');
     await p.context().close();
   }
 
@@ -627,6 +627,13 @@ H.main('a-engine', async (h, t) => {
     c = await h.open('#office', { viewport: PHONE, seed: on });
     t.ok((await h.text(c)).includes('Test mode: open an account without a PIN'), 'test-mode login list shows when settings.showLogins === true');
     await c.context().close();
+    // the staff page warning "Test mode is on" follows the same switch (it never says test mode is on while it is off)
+    c = await h.open('#staff', { viewport: PHONE, seed: base });
+    t.ok(!(await h.text(c)).includes('Test mode is on'), 'staff page: no "Test mode is on" warning by default');
+    await c.context().close();
+    c = await h.open('#staff', { viewport: PHONE, seed: on });
+    t.ok((await h.text(c)).includes('Test mode is on'), 'staff page: "Test mode is on" warning while showLogins is on');
+    await c.context().close();
   }
 
   /* ================= 9. demo, rates, photos, storage full ================= */
@@ -924,5 +931,38 @@ H.main('a-engine', async (h, t) => {
     });
     t.ok(other && other.stage === 'arrived', 'a second page in the same context sees the same database');
     await ctx.close();
+  }
+
+  /* ================= 12. polish: codes are never a PIN, the bell list is readable, honest words ================= */
+  t.section('polish: check-in codes never equal a PIN; the bell list is readable on the light theme; honest bell footnote for customers');
+  {
+    const p = await h.openAs('office', { viewport: PHONE, seed: base });
+    await ready(p);
+    const r = await calc(p, (hh) => {
+      // every 4-digit code is someone's PIN except 4242 (customers, office and crew logins all count)
+      const pins = []; for (let k = 1000; k < 10000; k++) if (k !== 4242 && k !== 5150 && k !== 6161) pins.push(String(k));
+      const d = { trailers: [], customers: pins.map((pin, i) => ({ id: 'c' + i, pin })), settings: { admins: [{ name: 'Nick', pin: '5150' }], crewMembers: [{ id: 'm1', name: 'Roman', pin: '6161' }] } };
+      const seen = new Set(); for (let k = 0; k < 30; k++) seen.add(hh.ZZnewCode(d));
+      return { free: [...seen], ok: hh.ZZokCode(d, '7788'), keep: hh.ZZokCode(d, '4242') };
+    });
+    t.eq(r.free, ['4242'], 'ZZnewCode never hands out a customer, office or crew PIN as a check-in code');
+    t.ok(r.ok === '4242' && r.keep === '4242', 'ZZokCode replaces a code that is a PIN (7788) and keeps a free one');
+    await p.locator('button[aria-label^="Notifications"]').first().click();
+    await p.waitForTimeout(400);
+    const bell = await p.evaluate(() => {
+      const ov = [...document.querySelectorAll('.fixed.inset-0')].pop(), row = ov.querySelector('.text-sm.leading-snug'), panel = ov.firstElementChild;
+      const pr = panel.getBoundingClientRect(), x = pr.left + pr.width / 2, y = Math.min(innerHeight - 10, pr.bottom - 10), top = document.elementFromPoint(x, y);
+      return { color: getComputedStyle(row).color, bg: getComputedStyle(panel).backgroundColor, covered: !ov.contains(top) };
+    });
+    t.ok(bell.color === 'rgb(15, 47, 54)' && bell.bg === 'rgb(255, 255, 255)', `office bell list: dark text on the white panel on the light theme (was white on white; text ${bell.color})`);
+    t.ok(!bell.covered, 'the office tab bar no longer covers the bottom of the bell list');
+    await h.check(p, 'a-engine-bell-light-390');
+    await p.context().close();
+    const c = await h.openAs('customer', { viewport: PHONE, seed: base });
+    await c.locator('button[aria-label^="Notifications"]').first().click();
+    await c.waitForTimeout(400);
+    const ct = await c.evaluate(() => { const ov = [...document.querySelectorAll('.fixed.inset-0')].pop(); return { foot: ov.querySelector('.leading-relaxed').innerText, color: getComputedStyle(ov.querySelector('.leading-relaxed')).color }; });
+    t.ok(/^Worked out from the trucks and loads in your portal\. Texts and emails are not switched on yet\.$/.test(ct.foot) && ct.color !== 'rgb(255, 255, 255)', 'customer bell: an honest footnote (not "live from the dock"), readable');
+    await c.context().close();
   }
 });

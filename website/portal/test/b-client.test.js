@@ -279,7 +279,7 @@ H.main('b-client', async (h, t) => {
     t.ok(await note.count() === 1 && (await txt(note)).includes(expect), 'done note: "' + expect + '"');
     const wk = await txt(p.locator('[data-zzb=week]'));
     const ws = await calc(p, (hh, d) => hh.ZZweek(d, 'cu_altex', Date.now()));
-    t.ok(wk.includes('This week so far') && wk.includes(`${ws.done} done`) && wk.includes(`${ws.palletsIn} / ${ws.palletsOut}`) && wk.includes("We'll email this summary on Friday"), `"This week so far" matches ZZweek (${ws.trucks} trucks, ${ws.done} done, ${ws.palletsIn}/${ws.palletsOut} pallets)`);
+    t.ok(wk.includes('This week so far') && wk.includes(`${ws.done} done`) && wk.includes(`${ws.palletsIn} / ${ws.palletsOut}`) && wk.includes('Since Monday.') && !/We'll email/.test(wk), `"This week so far" matches ZZweek (and promises no email, which is not connected yet) (${ws.trucks} trucks, ${ws.done} done, ${ws.palletsIn}/${ws.palletsOut} pallets)`);
     await h.check(p, 'client-schedule-390', { full: true });
     await noSide(t, p, 'Schedule tab with live cards');
     await note.getByRole('button', { name: 'Open' }).click();

@@ -124,6 +124,28 @@ one-time setup lazily, like `ZZtr`). Change data only through `props.actions.*`;
 - `ZZFLAGS` (`kiosk2`, `secureStep`): read them **at render time** (`ZZFLAGS.kiosk2?ZZKiosk:XQ`), never copy them at
   load. Tests can switch them per page with the harness option `flags` (only when the test flag is set; the real page
   always uses the values in `engine-source.js`). Regression uses `{kiosk2:false}` to keep checking the old kiosk walk-in.
+- **Polish (A40-A43 and wording).** Nick's head CSS forces white text inside `.zzhd` headers, so the bell list (it opens
+  inside the header) was white on white on the light theme for office and customers. `ZZhdCSS()` (engine) gives an open
+  list inside a `.zzhd` header the theme colours and lifts its header above the office tab bar; the staff header `ps`
+  renders it (**A40**), the customer `ZZCSS` appends it, the crew screen keeps its own copy. **A41**: the customer bell
+  footnote says what the list is ("Worked out from the trucks and loads in your portal ...") instead of "live from the
+  dock"; staff keep Nick's text. **A42**: the sheet close X is a 40 px target (same header size). **A43**: the staff page
+  "Test mode is on" warning shows only while `settings.showLogins` is on (A17 rule).
+- Check-in codes (`ZZnewCode` / `ZZokCode`) are never a customer, office or crew PIN (`ZZa_usedCodes` adds them).
+- Honest words (customers on the public link never see dock data, and nothing is texted or emailed yet): the customer
+  schedule panel is "Your trucks today" (only trucks on the way with an ETA today, at the dock or done; plain bookings
+  stay in Nick's week calendar), no "We'll email this summary on Friday", the alerts sheet says texts and emails are not
+  switched on yet, no "We watch the truck come in", alert emails end with the phone number instead of "You can see it
+  live in your portal", the damage text no longer says "Photos and the fix price are in your portal", the crew secure
+  step says "Saving keeps the report and photos with this truck" (es / ru too), the kiosk done screen adds "Need help?
+  Ask in the office." under "Watch for our text", the office Outbox / Friday / Gear notes no longer claim the
+  customers' portal choices reach the office.
+- Same names everywhere: "Check-in code" (driver page, was "Kiosk code"), "Log gear back" (office Gear, was "Log
+  return"), event "Waiting too long for a door" (was "Waiting over the goal"), Friday week shown as "Mon, Oct 26".
+- The crew's suggested labor fix line (`ZZdmgLines`) is "Labor hours" (qty 0.5 = half an hour). It was "Labor, 1 hour" at
+  0.5, so the customer read "Labor, 1 hour ... $60" and the bill "Damage: Labor, 1 hour $60". Nick's own office quick
+  line "Labor, 1 hour" (qty 1) is unchanged. Crew door tiles show "High Desert" / "Great Basin" instead of "High" /
+  "Great" (`ZZd_short`: two words when they fit and the second is not "Freight", "Logistics" ...).
 - Two A patches beyond the plan list: **A36** (Setup "Logins card" button follows the new showLogins rule) and
   **A37** (addTrailer renumbers `seq` after empty rows are dropped). Their anchors belong to A.
 

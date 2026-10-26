@@ -153,4 +153,24 @@ PATCHES = [
      r'`Counted ${X} against ${fe(k)} on the BOL`} \u2014 ${B()} at the door`',
      r'`Counted ${X} against ${fe(k)} on the BOL${(z9=>z9?": "+z9:"")(String((I!==void 0?I:k.qc?.note)??"").trim())}`} \u2014 ${B()} at the door`',
      'crewSaveReceiving: a Short / Over exception note carries the crew\'s reason (qc.note), so the office bell and the customer see why.'),
+
+    # ---------------- polish (readability, honest words, tap targets) ----------------
+    ('A40',
+     r'ps=({title:e,sub:t,onBack:a,right:r,now:n})=>(0,i.jsxs)("div",{className:"sticky top-0 z-30 zzhd",style:{background:"#0F3B44",color:"#fff"},children:[(0,i.jsx)(us,{h:4}),',
+     r'ps=({title:e,sub:t,onBack:a,right:r,now:n})=>(0,i.jsxs)("div",{className:"sticky top-0 z-30 zzhd",style:{background:"#0F3B44",color:"#fff"},children:[(0,i.jsx)(us,{h:4}),(0,i.jsx)("style",{children:ZZhdCSS()}),',
+     'Staff header (office): the bell list opens inside the white-text header, so on the light theme its text was white on white. ZZhdCSS gives it the theme colours (the crew screen already had this fix).'),
+
+    ('A41',
+     r'''"These are worked out live from what's on the dock \u2014 nothing here can be stale. Phone push and text messages to drivers need a real backend; that's on the list."''',
+     r'''e==="client"?"Worked out from the trucks and loads in your portal. Texts and emails are not switched on yet.":"These are worked out live from what's on the dock \u2014 nothing here can be stale. Phone push and text messages to drivers need a real backend; that's on the list."''',
+     'Bell footnote: customers are told what the list really is (their portal, no texts yet) instead of "live from the dock", which is not true on the public link. Staff keep Nick\'s text.'),
+
+    ('A42',
+     r'(0,i.jsx)("button",{onClick:t,"aria-label":"Close",className:"p-1 rounded",style:{color:m.mut},children:(0,i.jsx)(dn,{size:20})})',
+     r'(0,i.jsx)("button",{onClick:t,"aria-label":"Close",className:"p-2.5 -m-1.5 rounded",style:{color:m.mut},children:(0,i.jsx)(dn,{size:20})})',
+     'Sheet close (X): a 40 px tap target instead of 28 px (gloves, phones); the negative margin keeps the header the same size.'),
+    ('A43',
+     r'J("div",{style:{marginTop:18,fontSize:14,padding:"10px 14px",borderRadius:4,background:"#FFF4E6",color:"#8A4A12",border:"1px solid #F2D2A8"}},"Test mode is on: each sign-in page has a list to open any account without a PIN. Turn this off before going live.")',
+     r'e.settings?.showLogins===!0?J("div",{style:{marginTop:18,fontSize:14,padding:"10px 14px",borderRadius:4,background:"#FFF4E6",color:"#8A4A12",border:"1px solid #F2D2A8"}},"Test mode is on: each sign-in page has a list to open any account without a PIN. Turn this off before going live."):null',
+     'Staff page: the "Test mode is on" warning shows only while the test-mode list is really on (settings.showLogins, A17), so it never says test mode is on when it is off.'),
 ]

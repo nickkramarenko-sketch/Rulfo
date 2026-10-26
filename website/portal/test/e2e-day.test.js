@@ -418,7 +418,7 @@ H.main('e2e-day', async (h, t) => {
     t.ok(ct.includes('Needs your answer') && ct.includes('2 pallets hurt') && ct.includes('Torn wrap') && ct.includes('Forks caught the wrap on 2 pallets') && /by Roman · truck 4417/.test(ct), 'the card: needs your answer, 2 pallets hurt, Torn wrap, what happened, by Roman, truck 4417');
     t.eq(await card.locator('img').count(), 2, 'the card shows the 2 damage photos');
     t.ok(/Rewrap pallet 2 × \$15\.00 \$30\.00/.test(ct.replace(/\s+/g, ' ')) || (ct.includes('Rewrap pallet') && ct.includes('$30.00')), 'fix line: Rewrap pallet, $30.00');
-    t.ok(ct.includes('Labor, 1 hour') && ct.includes('$60.00') && ct.includes('$90.00') && !ct.includes('Replacement pallet'), 'fix line: Labor $60.00; total $90.00; the replacement pallet the crew left off is not charged');
+    t.ok(ct.includes('Labor hours') && ct.includes('$60.00') && ct.includes('$90.00') && !ct.includes('Replacement pallet'), 'fix line: Labor $60.00; total $90.00; the replacement pallet the crew left off is not charged');
     await card.scrollIntoViewIfNeeded();
     await h.check(p, 'f-damage-card-390');
     await card.getByRole('button', { name: 'Accept $90.00' }).click();
@@ -434,7 +434,7 @@ H.main('e2e-day', async (h, t) => {
     let d = await h.readDoc(p), lb = S(d, L2), x = lb.exceptions.find(q => q.id === XID);
     t.ok(x.answer && x.answer.status === 'accepted' && x.answer.by === 'Pat Altex' && x.answer.total === 90 && !x.answer.auto && x.est.applied === true, 'saved: answer accepted by Pat Altex, $90, estimate applied');
     const adj = (lb.adjustments || []).map(a => a.label + ' ' + a.amount);
-    t.eq(adj, ['Damage: Rewrap pallet 30', 'Damage: Labor, 1 hour 60'], 'saved: the two damage charges on the load, once each');
+    t.eq(adj, ['Damage: Rewrap pallet 30', 'Damage: Labor hours 60'], 'saved: the two damage charges on the load, once each');
     t.ok((d.accountChat.cu_altex || []).some(m => /APPROVED damage charges of \$90\.00 on #E2E-B/.test(m.text)), 'the office gets an account-chat note: APPROVED $90.00 on #E2E-B');
     t.ok(/Approved by Pat Altex/.test(await txt(p.locator('[data-zzb=dmg-card]', { hasText: 'E2E-B' }).first())), 'the card now says "Approved by Pat Altex"');
     await p.locator('nav.zz-tabs button', { hasText: 'Bills' }).first().click();
@@ -443,9 +443,9 @@ H.main('e2e-day', async (h, t) => {
     const blk = sec.getByRole('button', { name: 'Load E2E-B', exact: true }).locator('xpath=../..');
     const bt = await txt(blk);
     const rw = (bt.match(/rewrap/gi) || []).length;
-    t.ok(rw === 1 && bt.includes('Damage: Rewrap pallet') && bt.includes('Damage: Labor, 1 hour') && !/Rewrap · \d+ plt/.test(bt), 'Bills: E2E-B shows the rewrap charge exactly once (Damage: Rewrap pallet; no extra "Rewrap · n plt" line)');
+    t.ok(rw === 1 && bt.includes('Damage: Rewrap pallet') && bt.includes('Damage: Labor hours') && !/Rewrap · \d+ plt/.test(bt), 'Bills: E2E-B shows the rewrap charge exactly once (Damage: Rewrap pallet; no extra "Rewrap · n plt" line)');
     const std = (await h.readDoc(p)).rates.std;
-    t.ok(bt.includes('Damage: Rewrap pallet 1 × $30.00 $30.00') && bt.includes('Damage: Labor, 1 hour 1 × $60.00 $60.00') && bt.includes(`Standard in · 8 8 × $${std.toFixed(2)}`) && bt.includes(`Total so far $${(8 * std + 90).toFixed(2)}`),
+    t.ok(bt.includes('Damage: Rewrap pallet 1 × $30.00 $30.00') && bt.includes('Damage: Labor hours 1 × $60.00 $60.00') && bt.includes(`Standard in · 8 8 × $${std.toFixed(2)}`) && bt.includes(`Total so far $${(8 * std + 90).toFixed(2)}`),
       `Bills: E2E-B = 8 pallets in × $${std.toFixed(2)} + $30.00 rewrap + $60.00 labor = $${(8 * std + 90).toFixed(2)}`);
     await blk.scrollIntoViewIfNeeded();
     await h.check(p, 'f-bills-390');
