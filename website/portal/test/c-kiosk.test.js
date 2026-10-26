@@ -504,6 +504,9 @@ H.main('c-kiosk', async (h, t) => {
     await p.waitForTimeout(400);
     let s = norm(await h.text(p));
     t.ok(await kioskStep(p) === 'scan' && s.includes('Please go to the office') && s.includes('We could not save your check-in') && !(await p.locator('[data-zz=kiosk-done]').count()), 'a refused save sends the driver to the office (never "checked in")');
+    // the red save banner above the kiosk speaks to the driver too: "Please see the office.", never "Please try again."
+    const ban = (await p.locator('[data-zz=banner]').allInnerTexts()).join(' ');
+    t.ok(/NOT saved/.test(ban) && ban.includes('Please see the office.') && !/try again/i.test(ban), 'kiosk red banner: "' + ban + '"');
     await p.evaluate(() => { Storage.prototype.setItem = window.__zzSet; });
     t.ok(!trailer(await h.readDoc(p), 'zzk_today').arrivedAt, 'the refused check-in is not stored');
     await h.check(p, 'savefail-1024');

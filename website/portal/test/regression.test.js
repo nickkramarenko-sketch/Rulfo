@@ -6,36 +6,49 @@
    3. old data still loads: a doc saved by the base build renders in this build and nothing is written
       (rev and the stored text stay the same) until the first action.
    Nothing here depends on stream A features, so it also passes on a base-only build (--streams "").
+   No sideways scroll at 390 px for any role (customer, office, crew, kiosk, TV): a scroll fails the run. Only a build
+   without stream E (which fixed the TV board on a phone) still reports today's TV scroll as a note.
    Screens that streams replace on purpose: the booking time (B: <input type=time> instead of the select) is filled
    either way; the kiosk (C, ZZFLAGS.kiosk2) is opened as built, and the old walk-in flow runs with the test-only
    flag override {kiosk2:false}, because the old kiosk XQ stays in the bundle as the fallback (PLAN 1.4). */
 const H = require('./harness');
+const fs = require('fs');
+const path = require('path');
 const { PHONE, DESK, TABLET } = H;
 
 const VIEWS = [['390', PHONE], ['1400', DESK]];
 const has = (s, re) => re instanceof RegExp ? re.test(s) : s.includes(re);
 
 H.main('regression', async (h, t) => {
+  // which streams this build has (build2 writes <!-- build2 <sha> streams=ABCDEF --> after </html>)
+  const tag = /<!-- build2 \S+ streams=(\w+) -->/.exec(fs.readFileSync(path.join(h.dist, 'portal.html'), 'utf8').slice(-300));
+  const hasE = !!(tag && tag[1].includes('E'));
+  /* check + screenshot; at 390 px a sideways scroll fails (h.check throws), and the pass is logged per role */
+  const chk = async (p, name, o) => {
+    const r = await h.check(p, name, o);
+    if (r.vw <= 400) t.ok(r.sw <= r.vw || !!(o && o.knownScroll), r.sw <= r.vw ? `${name}: no sideways scroll at ${r.vw} px (page ${r.sw} px)` : `${name}: known sideways scroll at ${r.vw} px (${o.knownScroll})`);
+    return r;
+  };
   /* ---------------- 1. every role opens ---------------- */
   t.section('every role opens and shows its main screen');
   for (const [vw, viewport] of VIEWS) {
     let p = await h.openAs('customer', { viewport });
     let s = await h.text(p);
     t.ok(has(s, 'Altex Transportation') && has(s, 'Schedule a truck') && has(s, 'This week'), `customer Schedule tab @${vw}`);
-    await h.check(p, `regression-customer-${vw}`);
+    await chk(p, `regression-customer-${vw}`);
     await p.context().close();
 
     p = await h.openAs('office', { viewport });
     s = await h.text(p);
     t.ok(has(s, 'Office · Nick') && has(s, 'On the floor') && has(s, 'Doors'), `office Board @${vw}`);
-    await h.check(p, `regression-office-${vw}`);
+    await chk(p, `regression-office-${vw}`);
     await p.context().close();
 
     p = await h.openAs('crew', { viewport });
     if (await p.getByRole('button', { name: 'Got it' }).count()) await p.getByRole('button', { name: 'Got it' }).click();
     s = await h.text(p);
     t.ok(has(s, 'Forklift crew') && has(s, /your next job/i) && has(s, 'Next job'), `crew Next job @${vw}`);
-    await h.check(p, `regression-crew-${vw}`);
+    await chk(p, `regression-crew-${vw}`);
     await p.context().close();
 
     for (const [kv, kvp] of vw === '390' ? [['390', PHONE], ['1024', TABLET]] : [['1400', DESK]]) {
@@ -50,7 +63,7 @@ H.main('regression', async (h, t) => {
         const k2 = await p.evaluate(() => !!(window.__zz && window.__zz.h && window.__zz.h.ZZFLAGS && window.__zz.h.ZZFLAGS.kiosk2));
         t.ok(k2 && !has(s, 'Dock stations') && s.trim().length > 10, `kiosk from #stations @${kv} (new kiosk, ZZFLAGS.kiosk2)`);
       }
-      await h.check(p, `regression-kiosk-${kv}`);
+      await chk(p, `regression-kiosk-${kv}`);
       await p.context().close();
     }
 
@@ -59,8 +72,9 @@ H.main('regression', async (h, t) => {
     await p.waitForTimeout(250);
     s = await h.text(p);
     t.ok(has(s, 'Doors') && has(s, 'D1') && has(s, 'D8'), `TV board @${vw}`);
-    // the wall board is built for a big screen; today's live portal already scrolls sideways on a phone (stream E owns the TV)
-    await h.check(p, `regression-tv-${vw}`, { knownScroll: 'TV board is a wall-screen layout' });
+    // stream E fixed the TV board on a phone: with E in the build a sideways scroll fails like any other role;
+    // a build without E still has today's live board, which scrolls sideways at 390 (reported, not failed)
+    await chk(p, `regression-tv-${vw}`, hasE ? {} : { knownScroll: 'TV board is a wall-screen layout (this build has no stream E)' });
     await p.context().close();
   }
 

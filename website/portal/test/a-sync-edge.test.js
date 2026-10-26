@@ -67,7 +67,8 @@ H.main('a-sync-edge', async (h, t) => {
     ev = await events(p);
     t.ok(ev.some(e => e.kind === 'doc' && /offline/.test(e.text)), 'a check-in refused while offline raises kind "doc" with the offline text (' + JSON.stringify(ev[ev.length - 1]) + ')');
     t.ok(!(await dump(p))['trailers/' + SCHED].arrivedAt, 'nothing was saved');
-    void r;
+    t.ok(r === null, 'zzKioskIn resolves null for the refused check-in (got ' + JSON.stringify(r) + '), so no screen says "checked in"');
+    t.ok(!(await p.evaluate(id => { const d = window.__zz.doc; const x = d && d.trailers.find(q => q.id === id); return x && x.arrivedAt; }, SCHED)), 'and the screen does not show it checked in either');
     await p.evaluate(() => window.__mockdb.setOffline(false));
     await ctx.close();
   }

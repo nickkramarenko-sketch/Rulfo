@@ -409,7 +409,9 @@ ZZTruckExtra=({t,doc:e,now:n,actions:a,part})=>{
       toast(`ETA set to ${ZZo_when(ms,Date.now())}.`);setEtaOpen(!1);setEtaT("");setEtaNote("");setEtaErr("")}),
     pickEta=()=>{if(!/^\d{1,2}:\d{2}$/.test(etaT))return setEtaErr("Pick a time.");let day=ZZo_today(Date.now()),iso=ZZzonedIso(day,etaT),ms=ZZo_ms(iso);
       if(!isFinite(ms))return setEtaErr("That time does not exist.");if(ms<Date.now()-15*6e4){let nx=new Date(Date.UTC(+day.slice(0,4),+day.slice(5,7)-1,+day.slice(8,10)+1)).toISOString().slice(0,10);ms=ZZo_ms(ZZzonedIso(nx,etaT))}setEta(ms,etaNote)},
-    checkIn=()=>once(async()=>{let r=null;try{r=await a.zzKioskIn(t.id,{by:"office"})}catch(x){console.error(x)}setAsk(!1);setRes(r||{failed:!0})}),
+    checkIn=()=>once(async()=>{let r=null;try{r=await a.zzKioskIn(t.id,{by:"office"})}catch(x){console.error(x)}setAsk(!1);setRes(r||{failed:!0});
+      /* null: the save failed or was refused (zzKioskIn), so the truck is NOT checked in */
+      r||toast("The check-in did NOT save. The truck is not checked in. Try again.","bad")}),
     confirm=()=>once(async()=>{let r=a.zzConfirm(t.id);r&&await r;toast("Time confirmed. The “booking confirmed” alert is in the Outbox.")}),
     w=ZZwaitMs(t,n),p=ZZpromise(e,t,n),late=ZZo_late(e,t,n),out=t.direction==="outbound",sec=t.secure&&t.secure.signedAt?t.secure:null,
     who=t.bookedVia==="client"?"Booked by the customer":t.bookedVia==="office"?"Booked by the office":t.bookedVia==="kiosk"||t.checkedInBy==="kiosk"&&!t.scheduledAt?"Walk-in at the kiosk":"",

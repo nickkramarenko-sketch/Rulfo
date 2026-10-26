@@ -238,6 +238,92 @@ H.main('b-review', async (h, t) => {
     await p.context().close();
   }
 
+  /* ---------- integration fixes: own-load reorder, "Call the dock" in dock time, one bill for an approved rewrap ---------- */
+  t.section('integration: truck sheet arrows move only my loads; Call the dock reads shifts in dock time; rewrap billed once');
+  {
+    // a truck carrying another company's loads between Altex's: the arrows swap Altex's loads only
+    const seed = clone(base);
+    seed.trailers.push(truckDoc({ id: 'tMx', truck: '7601', code: '7611', scheduledAt: iso(NOW + 5 * HOUR), createdAt: iso(NOW - DAY), loadOrder: true }));
+    seed.shipments.push(loadDoc({ id: 'mA1', ref: 'A-1', trailerInId: 'tMx', status: 'expected', seq: 0 }));
+    seed.shipments.push(loadDoc({ id: 'mX1', ref: 'X-1', customerId: 'cu_pine', trailerInId: 'tMx', status: 'expected', seq: 1 }));
+    seed.shipments.push(loadDoc({ id: 'mA2', ref: 'A-2', trailerInId: 'tMx', status: 'expected', seq: 2 }));
+    const p = await h.openAs('customer', { viewport: PHONE, seed });
+    await ready(p);
+    await tab(p, 'Trucks');
+    await p.locator('.zz-row', { hasText: 'Truck 7601' }).first().click();
+    await p.waitForTimeout(300);
+    const shown = async () => (await p.locator('[data-zzb=loads] .zz-narrow').innerText()).match(/\b[AX]-\d\b/g);
+    const before = await shown();
+    t.ok(before && before.join() === 'A-1,A-2', 'the truck sheet lists only my loads (' + (before || []).join(', ') + ')');
+    await p.locator('[data-zzb=loads] .zz-narrow button[aria-label="Move load A-2 up"]').click();
+    await p.waitForTimeout(500);
+    const after = await shown();
+    const seq = (await h.readDoc(p)).shipments.filter(x => x.trailerInId === 'tMx').sort((a, b) => a.seq - b.seq).map(x => x.ref);
+    t.ok(after && after.join() === 'A-2,A-1' && seq.join() === 'A-2,X-1,A-1', 'one tap on "up" moves A-2 above A-1 (screen ' + (after || []).join(', ') + '; saved ' + seq.join(', ') + '); X-1 keeps its place');
+    await h.check(p, 'client-int-reorder-390');
+    await p.context().close();
+  }
+  {
+    // "Call the dock": shifts are dock time even when the phone is in New York; an empty rank sorts last
+    const dockNow = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(NOW)).map(x => [x.type, x.value]));
+    const hh = +dockNow.hour % 24, fmt = v => String(((v % 24) + 24) % 24).padStart(2, '0') + ':00';
+    const seed = clone(base);
+    seed.settings.crewMembers = [
+      { id: 'cA', name: 'Ann Norank', pin: '5101', phone: '775-555-0101', rank: null, shift: { start: fmt(hh - 1), end: fmt(hh + 2), days: [0, 1, 2, 3, 4, 5, 6] } },
+      { id: 'cB', name: 'Bo Second', pin: '5102', phone: '775-555-0102', rank: 2, shift: { start: fmt(hh - 1), end: fmt(hh + 2), days: [0, 1, 2, 3, 4, 5, 6] } },
+      // on shift now only in New York time (3 hours ahead): not at the dock yet
+      { id: 'cC', name: 'Cy Eastern', pin: '5103', phone: '775-555-0103', rank: 1, shift: { start: fmt(hh + 2), end: fmt(hh + 4), days: [0, 1, 2, 3, 4, 5, 6] } }];
+    const p = await h.openAs('customer', { viewport: PHONE, seed, timezoneId: 'America/New_York' });
+    await ready(p);
+    await p.getByRole('button', { name: 'Call the dock' }).first().click();
+    await p.waitForTimeout(300);
+    const st = await txt(sheet(p));
+    t.ok(st.includes('Bo Second') && st.includes('775-555-0102') && !st.includes('Ann Norank') && !st.includes('Cy Eastern') && !st.includes('5102'),
+      'Call the dock: Bo (rank 2) beats Ann (no rank = last); Cy is on shift only in New York time; no PIN shown');
+    await h.check(p, 'client-int-calldock-390');
+    await p.context().close();
+  }
+  {
+    // an estimate that prices "Rewrap pallet" on a load whose door count already has rewrapPallets: approved on two
+    // phones at once (the second screen had not caught up) -> billed once, and rewrapPallets is not billed on top
+    const seed = clone(base);
+    const ld = seed.shipments.find(x => x.ref === '111927');
+    const dx = ld.exceptions.find(x => x.kind === 'Damage');
+    dx.est = { lines: [{ id: 'lr', label: 'Rewrap pallet', qty: 3, unit: 15 }, { id: 'll', label: 'Labor, 1 hour', qty: 1, unit: 120 }], sentAt: iso(NOW - HOUR) };
+    const ctx = await h.newContext({ viewport: PHONE, seed });
+    const pa = await h.openAs('customer', { context: ctx });
+    await ready(pa);
+    await pa.evaluate(() => localStorage.removeItem('cd6:session'));
+    const pb = await h.openAs('customer', { context: ctx });
+    await ready(pb);
+    const openAccept = async pg => {
+      await pg.getByRole('button', { name: 'Review' }).first().click();
+      await pg.waitForTimeout(300);
+      await pg.getByRole('button', { name: /^Accept \$/ }).first().click();
+      await pg.waitForTimeout(250);
+      await pg.fill('input[placeholder="First and last name"]', 'Pat Tester');
+      const box = pg.locator('input[type=checkbox]').last();
+      if (!(await box.isChecked())) await box.check();
+    };
+    await openAccept(pa);
+    await openAccept(pb);
+    const sh = await txt(sheet(pb));
+    t.ok(sh.includes('Rewrap pallet') && sh.includes('$165.00') && !/Rewrap 3 damaged pallets/.test(sh), 'the estimate shows the priced rewrap once ($165: rewrap $45 + labor $120), not the door rewrap again');
+    await pa.getByRole('button', { name: /^Approve \$/ }).click();
+    await pa.waitForTimeout(400);
+    const second = await pb.getByRole('button', { name: /^Approve \$/ }).click({ timeout: 3000 }).then(() => true, () => false);
+    await pb.waitForTimeout(600);
+    const doc = await h.readDoc(pa);
+    const s2 = doc.shipments.find(x => x.ref === '111927');
+    t.eq(s2.adjustments.filter(a => /^Damage: /.test(a.label)).map(a => [a.label, a.amount]), [['Damage: Rewrap pallet', 45], ['Damage: Labor, 1 hour', 120]],
+      'approved on two screens' + (second ? '' : ' (the second screen had already caught up)') + ': the charges are on the bill once');
+    const im = await pa.evaluate(id => { const d = JSON.parse(localStorage.getItem('cdweb:cd6:doc')), s = d.shipments.find(x => x.id === id);
+      return window.__zz.h.Im(s, window.__zz.h.Ln(d, s.customerId)).map(l => l.code + ':' + l.amount); }, s2.id);
+    t.ok(s2.rewrapPallets === 3 && !im.some(c => c.startsWith('REWRAP')) && im.includes('ADJ:45'), 'the bill has the approved rewrap (ADJ 45) and no second REWRAP line for rewrapPallets 3 (' + im.join(', ') + ')');
+    await h.check(pa, 'client-int-rewrap-390');
+    await ctx.close();
+  }
+
   /* ---------- dark themes: the damage total stays readable; light theme: plain checkboxes ---------- */
   t.section('themes');
   for (const theme of ['hivis', 'clean', 'brand']) {

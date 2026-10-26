@@ -52,9 +52,10 @@ PATCHES = [
      'RA refresh: keep the 5 s poll; also re-read on cd6:remote and show cd6:sync text in the existing red banner.'),
 
     ('A08',
-     r'ae=P=>(0,i.jsxs)("div",{style:{background:m.bg,minHeight:"100vh",color:m.text},children:[A&&',
-     r'ae=P=>(0,i.jsxs)("div",{style:{background:m.bg,minHeight:"100vh",color:m.text},children:[(0,i.jsx)(ZZModeBadge,{role:a}),window.__ZZTEST?(0,i.jsx)(ZZa_probe,{doc:e,actions:z,role:a}):null,A&&',
-     'Page wrapper: mode badge first (office and crew only); the test probe renders only when the test harness sets window.__ZZTEST.'),
+     r'ae=P=>(0,i.jsxs)("div",{style:{background:m.bg,minHeight:"100vh",color:m.text},children:[A&&(0,i.jsx)("div",{className:"px-4 py-2 text-sm text-center",style:{background:"rgba(255,77,77,0.14)",color:m.red},children:A})',
+     r'ae=P=>(0,i.jsxs)("div",{style:{background:m.bg,minHeight:"100vh",color:m.text},children:[(0,i.jsx)(ZZModeBadge,{role:a}),window.__ZZTEST?(0,i.jsx)(ZZa_probe,{doc:e,actions:z,role:a}):null,A&&(0,i.jsx)("div",{className:"px-4 py-2 text-sm text-center",style:{background:"rgba(255,77,77,0.14)",color:m.red},"data-zz":"banner",children:a==="driver"?ZZa_kioskBanner(A):A})',
+     'Page wrapper: mode badge first (office and crew only); the test probe renders only when the test harness sets window.__ZZTEST; '
+     'on the kiosk (role driver) the red save banner ends with "Please see the office." instead of a staff instruction (ZZa_kioskBanner).'),
 
     # ---------------- actions (2.5, 2.6) ----------------
     ('A09',
@@ -141,4 +142,15 @@ PATCHES = [
      r'console.error("photo save failed",a)',
      r'console.error("photo save failed",a),ZZsync.failed(a,"photo")',
      'Photo save failure: show it in the red banner instead of only a console line.'),
+
+    # ---------------- integration fixes ----------------
+    ('A38',
+     r'ie(e.rewrapPallets)>0){let u=ie(e.rewrapPallets);n.push({code:"REWRAP"',
+     r'ie(e.rewrapPallets)>0&&!ZZrewrapBilled(e)){let u=ie(e.rewrapPallets);n.push({code:"REWRAP"',
+     'Im (charges): rewrap already billed through an approved damage estimate ("Damage: Rewrap ..." adjustment) is not billed a second time from rewrapPallets.'),
+
+    ('A39',
+     r'`Counted ${X} against ${fe(k)} on the BOL`} \u2014 ${B()} at the door`',
+     r'`Counted ${X} against ${fe(k)} on the BOL${(z9=>z9?": "+z9:"")(String((I!==void 0?I:k.qc?.note)??"").trim())}`} \u2014 ${B()} at the door`',
+     'crewSaveReceiving: a Short / Over exception note carries the crew\'s reason (qc.note), so the office bell and the customer see why.'),
 ]

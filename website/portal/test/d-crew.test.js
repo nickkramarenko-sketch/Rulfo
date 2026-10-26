@@ -579,6 +579,45 @@ H.main('d-crew', async (h, t) => {
   await wait(p);
   await segs(h, p, 'gear-1400', { max: 3 });
   await p.context().close();
+
+  /* ================= photos left by a damage report that was never saved ================= */
+  t.section('damage photos of a report that was never saved are cleared when a damage report opens (local mode)');
+  {
+    const seed2 = clone(seed);
+    seed2.shipments.find(x => x.id === 'zzd_a').exceptions = [{ id: 'usedOld', kind: 'Damage', note: 'kept', at: iso(t0 - 3 * 1440 * MIN), openedBy: 'Roman', resolved: false,
+      pallets: 1, kinds: ['Wet'], photoOwner: 'dmg:usedOld', photoCount: 2, est: { lines: [] }, answer: null }];
+    const ctx = await h.newContext({ viewport: PHONE, seed: seed2 });
+    await ctx.addInitScript(([o, n]) => {
+      try {
+        if (localStorage.getItem('__zzorph')) return;
+        localStorage.setItem('__zzorph', '1');
+        const ph = at => JSON.stringify([{ id: 'p1', src: 'data:image/png;base64,AAAA', at }, { id: 'p2', src: 'data:image/png;base64,AAAA', at }]);
+        localStorage.setItem('cdweb:cd6:photos:dmg:orphanOld', ph(o));
+        localStorage.setItem('cdweb:cd6:photos:dmg:orphanNew', ph(n));
+        localStorage.setItem('cdweb:cd6:photos:dmg:usedOld', ph(o));
+      } catch (e) {}
+    }, [iso(Date.now() - 3 * 1440 * MIN), iso(Date.now() - 60 * MIN)]);
+    const q = await crew(h, { context: ctx });
+    const keys = () => q.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('cdweb:cd6:photos:dmg:')).sort());
+    const all3 = ['cdweb:cd6:photos:dmg:orphanNew', 'cdweb:cd6:photos:dmg:orphanOld', 'cdweb:cd6:photos:dmg:usedOld'];
+    await wait(q, 600);
+    t.eq(await keys(), all3, 'nothing is removed when the page loads');
+    await q.getByRole('button', { name: /^Start unloading/ }).first().click();
+    await wait(q, 500);
+    await q.getByRole('button', { name: /^\d Unload, count/ }).click();
+    await wait(q);
+    await q.getByRole('button', { name: /it's off, count it next/ }).click();
+    await wait(q, 500);
+    const cb = q.locator('div.rounded-lg').filter({ has: q.locator('span.font-black', { hasText: 'DB-200' }) }).last();
+    await cb.getByRole('button', { name: 'Damaged', exact: true }).click();
+    await cb.getByRole('button', { name: 'Save', exact: true }).click();
+    await wait(q, 1000);
+    t.ok(await q.locator('[data-zz=dmg]').count() === 1, 'Damaged + Save opens the damage report');
+    t.eq(await keys(), ['cdweb:cd6:photos:dmg:orphanNew', 'cdweb:cd6:photos:dmg:usedOld'],
+      'opening it removes only the day-old photos no report uses; a report\'s photos and a recent unsaved draft\'s photos stay');
+    await q.keyboard.press('Escape');
+    await ctx.close();
+  }
 });
 
 function ieq(a, b) { return (Number(a) || 0) === (Number(b) || 0); }

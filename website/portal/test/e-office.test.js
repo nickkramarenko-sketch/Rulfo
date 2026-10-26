@@ -436,6 +436,16 @@ H.main('e-office', async (h, t) => {
     await p.locator('[data-truck="zzeC2"]').click();
     await p.waitForTimeout(400);
     t.ok(/Booked straight onto the schedule/.test(await sheet.innerText()), 'dispatch booking: nothing to confirm');
+    // a check-in whose save is refused (storage full): a toast says it did NOT save, the truck stays not checked in
+    await p.evaluate(() => { const o = Storage.prototype.setItem; window.__zzSet = o; Storage.prototype.setItem = function (k, v) { if (k === 'cdweb:cd6:doc') throw new Error('blocked for the test'); return o.call(this, k, v); }; });
+    await sheet.getByRole('button', { name: 'Check in now (driver skipped the kiosk)' }).click();
+    await sheet.getByRole('button', { name: 'Yes, check in' }).click();
+    await p.waitForTimeout(800);
+    await p.evaluate(() => { Storage.prototype.setItem = window.__zzSet; });
+    const failTxt = await h.text(p);
+    t.ok(/The check-in did NOT save\. The truck is not checked in\. Try again\./.test(failTxt) && /That did not save\. Try again\./.test(await sheet.innerText()), 'Check in now that does not save: a toast and the sheet say so');
+    t.ok(!truckT(await h.readDoc(p), 'zzeC2').arrivedAt && await sheet.getByRole('button', { name: /Check in now/ }).count() === 1, 'nothing saved, and the screen does not show the truck as checked in (the button is still there)');
+    await h.check(p, 'truck-checkin-failed-1400');
     await sheet.getByRole('button', { name: 'Check in now (driver skipped the kiosk)' }).click();
     await sheet.getByRole('button', { name: 'Yes, check in' }).click();
     await p.waitForTimeout(800);

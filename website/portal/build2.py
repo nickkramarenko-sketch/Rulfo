@@ -35,6 +35,9 @@ import re
 import subprocess
 import sys
 
+# patch lists are exec()ed, never imported; also never leave __pycache__ folders in the repo
+sys.dont_write_bytecode = True
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASE_HTML = os.path.join(HERE, 'base', 'portal.base.html')
 BASE_CP = os.path.join(HERE, 'base', 'customer-portal-source.base.js')

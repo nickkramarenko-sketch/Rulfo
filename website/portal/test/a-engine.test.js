@@ -544,14 +544,20 @@ H.main('a-engine', async (h, t) => {
     t.ok(msgs.some(m => m.id === 'arrived:tM1:1:sms' && m.to === '775-555-0123'), "contact's own choice (arrived by text) is honored");
     t.ok(!msgs.some(m => m.trailerId === 'tOld'), 'only the last 14 days are listed');
     const drv = await p.evaluate(() => {
-      window.ZZdriverText = (l, k, v) => `[${l}] ${k} ${v.truck} ${v.dock}`;   // stands in for stream C's ZZdriverText
+      // stream C's real ZZdriverText when the build has it (the probe passes it on); a stand-in only when there is none
+      const real = typeof window.__zz.h.ZZdriverText === 'function';
+      if (!real) window.ZZdriverText = (l, k, v) => `[${l}] ${k} ${v.truck} ${v.dock}`;
       const d = JSON.parse(localStorage.getItem('cdweb:cd6:doc'));
-      d.trailers.find(x => x.truck === '52').driverLang = 'es';
+      const t52 = d.trailers.find(x => x.truck === '52');
+      t52.driverLang = 'es';
       const m = window.__zz.h.ZZmsgs(d, Date.now()).filter(x => x.event === 'driver');
-      delete window.ZZdriverText;
-      return [m.map(x => [x.id, x.body, x.lang, x.channel]), window.__zz.h.ZZmsgs(d, Date.now()).filter(x => x.event === 'driver').length];
+      const want = real ? window.__zz.h.ZZdriverText('es', 'door', { driver: t52.driver || '', truck: '52', dock: 'D5', time: '' }) : '[es] door 52 D5';
+      // and none without it: no ZZdriverText (stand-in removed), or the driver's language is English
+      if (!real) delete window.ZZdriverText; else t52.driverLang = 'en';
+      return { real, want, got: m.map(x => [x.id, x.body, x.lang, x.channel]), none: window.__zz.h.ZZmsgs(d, Date.now()).filter(x => x.event === 'driver').length };
     });
-    t.eq(drv, [[['sms:door:zzt2:D5:es', '[es] door 52 D5', 'es', 'sms']], 0], 'a translated driver text is added when driverLang is not English and ZZdriverText exists (none without it)');
+    t.ok(typeof drv.want === 'string' && drv.want.includes('52') && drv.want.includes('D5'), 'driver text for the door (' + (drv.real ? "stream C's ZZdriverText" : 'stand-in') + '): ' + drv.want);
+    t.eq([drv.got, drv.none], [[['sms:door:zzt2:D5:es', drv.want, 'es', 'sms']], 0], 'a translated driver text is added when driverLang is not English and ZZdriverText exists (none in English or without it)');
     const outbox = await calc(p, (h, doc) => h.pQ(doc, Date.now()).map(m => m.id));
     t.ok(outbox.includes('done:tM1:0:email') && outbox.some(id => id.startsWith('sms:')), 'the existing outbox (pQ) lists the new messages next to the old ones');
     await p.getByRole('button', { name: 'Setup' }).click();
@@ -606,7 +612,7 @@ H.main('a-engine', async (h, t) => {
     const wkStats = await calc(p, (h, doc) => h.ZZweek(doc, 'cu_altex', Date.now()));
     t.ok(typeof wkStats.trucks === 'number' && wkStats.done >= 1 && typeof wkStats.promiseKeptPct === 'number' && wkStats.gearOut && wkStats.from, 'ZZweek gives the week so far');
     const trail = await calc(p, (h, doc) => h.ZZtrail(doc, 'tM1'));
-    t.ok(trail.some(e => /^Received M-1: counted 22 of 22/.test(e.text) && e.sid === 'sM1') && trail.some(e => /^Done in 1h 0m/.test(e.text)) && trail.every((e, k) => !k || Date.parse(trail[k - 1].at) <= Date.parse(e.at)), 'ZZtrail lists truck and load events in time order');
+    t.ok(trail.some(e => /^Received M-1: counted 22 of 22/.test(e.text) && e.sid === 'sM1') && trail.some(e => /^Done \(unloaded in 1h 0m\)$/.test(e.text)) && trail.every((e, k) => !k || Date.parse(trail[k - 1].at) <= Date.parse(e.at)), 'ZZtrail lists truck and load events in time order');
     const rc = await calc(p, (h, doc) => [h.ZZrecips(doc.customers.find(c => c.id === 'cu_altex'), 'done').map(r => r.email + ':' + r.channels.join('+')),
       h.ZZrecips(doc.customers.find(c => c.id === 'cu_pine'), 'done').map(r => r.email + ':' + r.channels.join('+')), h.ZZrecips(doc.customers.find(c => c.id === 'cu_pine'), 'arrived').length]);
     t.eq(rc, [['dee@altex.example:email'], ['ops@pineridge.example:email'], 0], 'ZZrecips: contacts by their choices; with no contacts, email to customer.contact for done (not for arrived)');
@@ -779,13 +785,115 @@ H.main('a-engine', async (h, t) => {
     await f.context().close();
   }
 
+  /* ================= 11. integration fixes (cross-stream requests) ================= */
+  t.section('integration: check-in that does not save, booked text, original booked time, customer reorder, short/over reason, rewrap billed once, kiosk banner');
+  {
+    const seed = clone(base);
+    const now = Date.now();
+    const tr = o => ({ carrier: 'Altex Transportation', driver: '', phone: '', trailer: '', direction: 'inbound', customerId: 'cu_altex', needsMatch: false, stage: 'scheduled', dock: null,
+      arrivedAt: null, dockedAt: null, workStartedAt: null, workDoneAt: null, departedAt: null, chat: [], history: [], ...o });
+    seed.trailers.push(tr({ id: 'tNC', truck: '8801', scheduledAt: iso(now + 5 * HOUR), confirmedAt: iso(now - HOUR), createdAt: iso(now - 2 * HOUR) }));
+    seed.trailers.push(tr({ id: 'tYC', truck: '8802', code: '4455', scheduledAt: iso(now + 5 * HOUR), confirmedAt: iso(now - HOUR), createdAt: iso(now - 2 * HOUR) }));
+    seed.trailers.push(tr({ id: 'tH', truck: '8804', createdAt: iso(now - 3 * HOUR), scheduledAt: iso(now + 8 * HOUR),
+      history: [{ id: 'h1', at: iso(now - 2 * HOUR), by: 'Altex', text: 'Time changed to Tue, Oct 28, 2:00 PM (was Mon, Oct 27, 10:00 AM)' },
+        { id: 'h2', at: iso(now - HOUR), by: 'Altex', text: 'Time changed to Wed, Oct 29, 9:00 AM (was Tue, Oct 28, 2:00 PM)' }] }));
+    seed.trailers.push(tr({ id: 'tH0', truck: '8805', createdAt: iso(now - 3 * HOUR), scheduledAt: iso(now + 8 * HOUR),
+      history: [{ id: 'h3', at: iso(now - 2 * HOUR), by: 'Office', text: 'Time changed to Tue, Oct 28, 2:00 PM (was no time)' }] }));
+    seed.trailers.push(tr({ id: 'tMix', truck: '8803', scheduledAt: iso(now + 6 * HOUR), createdAt: iso(now - HOUR), loadOrder: true }));
+    for (const [id, cu, seq] of [['mA1', 'cu_altex', 0], ['mX1', 'cu_pine', 1], ['mA2', 'cu_altex', 2], ['mX2', 'cu_pine', 3]])
+      seed.shipments.push({ id, ref: id.toUpperCase(), customerId: cu, trailerInId: 'tMix', trailerOutId: null, units: { std: 4, lg: 0, crate: 0 }, exceptions: [], adjustments: [], chat: [], touches: [], lane: 'reno', status: 'expected', seq });
+    const p = await h.openAs('office', { viewport: DESK, seed });
+    await ready(p);
+    let doc = await h.readDoc(p);
+
+    // 1. zzKioskIn resolves null when its save fails (storage refused), and nothing is checked in
+    const t129 = doc.trailers.find(x => x.truck === '129');
+    const blocked = await p.evaluate(async id => {
+      const o = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) { if (k === 'cdweb:cd6:doc') throw new Error('blocked for the test'); return o.call(this, k, v); };
+      let r = 'unset';
+      try { r = await window.__zz.actions.zzKioskIn(id, { driver: 'Blocked' }); } finally { Storage.prototype.setItem = o; }
+      return r;
+    }, t129.id);
+    doc = await h.readDoc(p);
+    t.ok(blocked === null && !doc.trailers.find(x => x.id === t129.id).arrivedAt, 'zzKioskIn resolves null when the save is refused (got ' + JSON.stringify(blocked) + '), and the truck is not checked in');
+    const okIn = await act(p, 'zzKioskIn', t129.id, { driver: 'Saved' });
+    t.ok(okIn && okIn.trailerId === t129.id && !okIn.already && (await h.readDoc(p)).trailers.find(x => x.id === t129.id).arrivedAt, 'the same check-in saves once storage works again');
+
+    // 2. "Booking confirmed": check-in code and driver link only for a real saved code
+    const bk = await calc(p, (h, doc) => h.ZZmsgs(doc, Date.now()).filter(m => m.event === 'booked' && (m.trailerId === 'tNC' || m.trailerId === 'tYC')).map(m => [m.trailerId, m.channel, m.body]));
+    const nc = bk.filter(m => m[0] === 'tNC'), yc = bk.filter(m => m[0] === 'tYC');
+    t.ok(nc.length >= 1 && nc.every(m => !/Check-in code|Driver link|#eta/.test(m[2]) && /is booked/.test(m[2])), 'booked message for a truck with no saved code leaves out the code and the driver link');
+    t.ok(yc.length >= 1 && yc.every(m => m[2].includes('4455')) && yc.some(m => m[2].includes('Driver link for ETA updates: ') && m[2].includes('#eta4455')), 'booked message for a real code 4455 carries the code and the driver link');
+
+    // 7. the trail's "Booked for" line keeps the original time after a time change
+    // "Mon, Oct 27, 10:00 AM" in dock time, formatted by the browser (its ICU may use a narrow space before AM / PM)
+    const W = {};
+    const orig = doc.trailers.find(x => x.id === 'tYC').scheduledAt, n1 = iso(now + 9 * HOUR), n2 = iso(now + 11 * HOUR);
+    Object.assign(W, await p.evaluate(list => Object.fromEntries(list.map(v => { const d = new Date(v), z = 'America/Los_Angeles';
+      return [v, new Intl.DateTimeFormat('en-US', { timeZone: z, weekday: 'short', month: 'short', day: 'numeric' }).format(d) + ', ' + new Intl.DateTimeFormat('en-US', { timeZone: z, hour: 'numeric', minute: '2-digit' }).format(d)]; })),
+      [orig, n1, n2, doc.trailers.find(x => x.id === 'tMix').scheduledAt]));
+    const when = ms => W[iso(ms)];
+    await act(p, 'zzLog', 'tYC', `Time changed to ${when(Date.parse(n1))} (was ${when(Date.parse(orig))})`, { scheduledAt: n1 });
+    await act(p, 'zzLog', 'tYC', `Time changed to ${when(Date.parse(n2))} (was ${when(Date.parse(n1))})`, { scheduledAt: n2, bookedFor: iso(now) });
+    doc = await h.readDoc(p);
+    const yt = doc.trailers.find(x => x.id === 'tYC');
+    t.ok(yt.scheduledAt === n2 && yt.bookedFor === orig, 'zzLog keeps the original booked time (bookedFor) at the first time change only, and a caller cannot set it');
+    const booked = id => calc(p, (h, doc, id) => (h.ZZtrail(doc, id).find(x => /^Booked/.test(x.text)) || {}).text, id);
+    const by = await booked('tYC');
+    t.ok(by === 'Booked for ' + when(Date.parse(orig)), 'trail: "' + by + '" is the original time, not the current ' + when(Date.parse(n2)));
+    t.eq(await booked('tH'), 'Booked for Mon, Oct 27, 10:00 AM', 'older trucks: the "(was ...)" of the first time change in the history');
+    t.eq(await booked('tH0'), 'Booked', 'booked with no time first: just "Booked"');
+    t.eq(await booked('tMix'), 'Booked for ' + when(Date.parse(doc.trailers.find(x => x.id === 'tMix').scheduledAt)), 'never changed: the booked time');
+
+    // 8. customer reorder: swaps only with the same customer's loads; the office's swap is unchanged
+    const order = async () => (await h.readDoc(p)).shipments.filter(s => s.trailerInId === 'tMix').map((s, i) => [s.seq ?? i, s.id]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+    await act(p, 'zzReorder', 'mA2', 'tMix', 'up', 'cu_altex');
+    t.eq(await order(), ['mA2', 'mX1', 'mA1', 'mX2'], 'customer moves A2 up: it swaps with A1, the other company\'s loads keep their places');
+    const rv = (await h.readDoc(p)).rev;
+    await act(p, 'zzReorder', 'mX1', 'tMix', 'down', 'cu_altex');
+    await act(p, 'zzReorder', 'mA2', 'tMix', 'up', 'cu_altex');
+    t.ok((await h.readDoc(p)).rev === rv, 'a customer cannot move another company\'s load, nor past its own first load (nothing written)');
+    await act(p, 'zzReorder', 'mA1', 'tMix', 'down', 'cu_altex');
+    t.eq(await order(), ['mA2', 'mX1', 'mA1', 'mX2'], 'customer moves its last load down: nothing below it of its own, no change');
+    await act(p, 'zzReorder', 'mA2', 'tMix', 'down');
+    t.eq(await order(), ['mX1', 'mA2', 'mA1', 'mX2'], 'office / crew reorder (no customer) still swaps with the next load, as before');
+
+    // 9. Short / Over: the exception note carries the crew's reason
+    await act(p, 'crewSaveReceiving', 'mA1', { counted: 3, condition: 'Short', rewrap: 0, row: '', note: 'driver signed for 3, one pallet left at the shipper' });
+    doc = await h.readDoc(p);
+    let ex = (doc.shipments.find(s => s.id === 'mA1').exceptions || []).find(e => e.kind === 'Short');
+    t.ok(ex && ex.note === 'Counted 3 against 4 on the BOL: driver signed for 3, one pallet left at the shipper — Nick at the door', 'Short exception note: count, the crew\'s reason, who (' + (ex && ex.note) + ')');
+    await act(p, 'crewSaveReceiving', 'mX1', { counted: 5, condition: 'Over', rewrap: 0, row: '' });
+    doc = await h.readDoc(p);
+    ex = (doc.shipments.find(s => s.id === 'mX1').exceptions || []).find(e => e.kind === 'Over');
+    t.ok(ex && ex.note === 'Counted 5 against 4 on the BOL — Nick at the door', 'no reason given: the note is as before');
+
+    // 10. rewrap billed once: an approved estimate line "Rewrap pallet" replaces rewrapPallets on the bill
+    const bill = await calc(p, (h, doc) => {
+      const s = doc.shipments.find(x => x.ref === '111927'), rates = h.Ln(doc, s.customerId), rw = l => l.filter(x => x.code === 'REWRAP').length;
+      const s2 = { ...s, adjustments: [...(s.adjustments || []), { id: 'zx', label: 'Damage: Rewrap pallet', amount: 45 }] };
+      const s3 = { ...s, adjustments: [...(s.adjustments || []), { id: 'zy', label: 'Damage: Labor, 1 hour', amount: 120 }] };
+      return { door: s.rewrapPallets, a: rw(h.Im(s, rates)), b: rw(h.Im(s2, rates)), c: rw(h.Im(s3, rates)), adj: h.Im(s2, rates).filter(x => x.code === 'ADJ' && /Rewrap/.test(x.label)).length };
+    });
+    t.eq(bill, { door: 3, a: 1, b: 0, c: 1, adj: 1 }, 'Im bills rewrapPallets (3) only while no approved damage estimate already bills rewrap');
+
+    // 12. kiosk banner wording
+    const kb = await p.evaluate(() => ['Your last change was NOT saved on this device. Please try again.', 'Photo NOT saved to the shared data. Please try again.',
+      'Storage on this device is full: your last change was NOT saved. Delete old photos or use another device, and tell the office.',
+      'You can look but not change shared data.'].map(window.__zz.h.ZZa_kioskBanner));
+    t.eq(kb, ['Your last change was NOT saved on this device. Please see the office.', 'Photo NOT saved to the shared data. Please see the office.',
+      'Storage on this device is full: your last change was NOT saved. Please see the office.', 'You can look but not change shared data.'], 'kiosk banner: the staff instruction becomes "Please see the office."; notices stay as they are');
+    await p.context().close();
+  }
+
   /* ================= 10. harness shared mode + mock-db (groundwork for A1) ================= */
   t.section('mock-db sanity (A1 builds shared mode on it)');
   {
-    const ctx = await h.newContext({ viewport: PHONE, mode: 'shared', mock: { cachedFirst: true } });
+    const ctx = await h.newContext({ viewport: PHONE, mode: 'shared', mock: { cachedFirst: true, isOwner: false, canEdit: false, can: false } });
     const a = await h.openAs('office', { context: ctx });
     await ready(a);
-    t.ok((await a.evaluate(() => window.__zz.h.sync.mode)) === 'local' && (await a.evaluate(() => window.__mockdb.writes.length)) === 0, 'A0 stays in local mode even when db is available, and writes nothing to the database');
+    t.ok((await a.evaluate(() => window.__zz.h.sync.mode)) === 'local' && (await a.evaluate(() => window.__mockdb.writes.length)) === 0, 'a viewer the platform says cannot write stays in local mode even when db is available, and writes nothing to the database (A1: staff go shared, see a-sync)');
     const b = await ctx.newPage();
     await b.goto(h.origin + '/blank');
     const r = await a.evaluate(async () => {
@@ -810,7 +918,7 @@ H.main('a-engine', async (h, t) => {
     t.ok(r.seen.some(s => /added/.test(s.ch)) && r.seen.some(s => /modified/.test(s.ch)), 'docChanges reports added / modified');
     t.eq(r.t1.nest, { a: 1, b: 2 }, 'update merges nested objects');
     t.ok(r.upd === 'invalid_argument' && r.big === 'invalid_argument' && r.bad === true, 'update on a missing doc and a 256 KiB+ body reject invalid_argument; a bad path throws TypeError');
-    t.ok(r.nested === 1 && r.l1 && r.can === true && r.owner === true, 'nested photo paths, acquire, user switches');
+    t.ok(r.nested === 1 && r.l1 && r.can === false && r.owner === false, 'nested photo paths, acquire, user switches');
     const other = await b.evaluate(async () => {
       return JSON.parse(localStorage.getItem('__mockdb') || '{}')['trailers/t1'];
     });

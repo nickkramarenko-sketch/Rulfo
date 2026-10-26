@@ -41,7 +41,8 @@ python3 -c "import sys;s=open('website/portal/base/portal.base.html').read();pri
 ```
 
 Anchors are found in the base only, and replacements run from the end of the file backwards, so your `new` text
-can never create a second copy of someone's anchor.
+can never create a second copy of someone's anchor. Patch files are `exec()`ed, never imported, and build2 sets
+`sys.dont_write_bytecode`, so no `__pycache__` appears (it is in `.gitignore` too).
 
 ## Source files (chain files)
 
@@ -55,6 +56,12 @@ one-time setup lazily, like `ZZtr`). Change data only through `props.actions.*`;
 - Actions return the save promise (await it if you need the write done); `zzKioskIn` resolves the result object,
   `zzQueueFriday` the count. Refused input returns `null` and shows a toast (zzReportDamage < 2 photos, zzSecure,
   zzTrack with a non-https link, zzGear with a bad type).
+- A save that fails or is refused (storage full, shared data offline or look-only) makes the bundle's `S()` resolve
+  `null` (bQ catches it, and A34 raises the red banner). `zzKioskIn` then resolves **`null`** too, never the door / place
+  it worked out: the kiosk shows "Please go to the office", the office "Check in now" shows a toast ("The check-in did
+  NOT save ...") and "That did not save. Try again." Only the first run of the check-in change is real: after a failed
+  save the bundle's `S` re-runs a change on the screen's copy, and for a check-in that would show a truck at a door that
+  was never saved (and the kiosk would answer "already checked in"), so `zzKioskIn` ignores that second run.
 - `zzEstLines` saves and auto-approves at once when the customer's limit allows; it refuses to change an estimate
   that is already applied. Call it with the whole line list. `ZZdmgLines` lines carry `k` and `on`; actions drop
   lines with `on:false`, and `ZZestTotal` skips them.
@@ -64,19 +71,56 @@ one-time setup lazily, like `ZZtr`). Change data only through `props.actions.*`;
   returns `settings.crew` placeholder entries (`placeholder:true`, no phone).
 - `ZZdayLoad` blocks are `{from, to}` hours (6..22), `label`, `trucks`, `level`; plus `outside` (after-hours count).
 - `ZZmsgs` ids are `<event>:<record id>:<contact index>:<channel>`; driver-text copies have `event:'driver'`.
+  "Booking confirmed" carries the check-in code and the driver link **only when `t.code` is a real saved 4-digit code**
+  (older trucks have none until the office taps "Make a code and driver link"), the same rule the customer (B) and
+  office (E) screens use; a worked-out code is never sent.
   A damage report is listed once (even when its load sits on an inbound and a pickup truck) and goes to the load's
   customer; the `done` text counts only the truck customer's own loads. "Booking confirmed" is sent for
   `confirmedAt`, or `createdAt` for dispatch accounts **and for bookings the office made** (`bookedVia:'office'`).
   Stream C: `ZZdriverText(lang, key, {driver, truck, dock, time})` returns a string (or null) for keys
   `door`, `yard`, `released`, `reminder`.
 - `ZZtrail(doc, tid)` lists only the truck customer's own loads (another company's load on the same truck stays
-  private); `ZZtrail(doc, tid, sid)` shows that one load.
+  private); `ZZtrail(doc, tid, sid)` shows that one load. Its "Booked for ..." line is the **original** booked time:
+  `t.bookedFor` (zzLog keeps the old `scheduledAt` there at the first time change; callers cannot set it), else the
+  "(was ...)" of the oldest "Time changed to ..." history line, else `scheduledAt`. Its done line reads
+  "Done (unloaded in 30m)" / "Done (loaded in 30m)": the time at the door, from start to done. It never says "Done in",
+  because the live card next to it says "Done in 56m, within our 2-hour promise" (check-in to done).
+- `zzReorder(sid, tid, dir, cid)`: with `cid` (the customer portal's truck sheet, for inbound and pickups) the load must be
+  that customer's and it swaps with the next load of the same customer, so other companies' loads keep their places;
+  without `cid` (office, crew) it swaps with the next load as before. Nick's `reorderLoad` is unchanged.
+- Rewrap is billed once: `ZZrewrapBilled(s)` is true when an approved damage estimate already put a
+  "Damage: ...rewrap..." adjustment on the load; then `Im` (patch **A38**) leaves out the REWRAP line from
+  `rewrapPallets`. `ZZestOf` shows the door rewrap (auto line) only when no damage estimate on the load prices rewrap.
+  `ZZanswer` saves the answer and the charges in one write worked out on the saved load: an estimate already applied
+  (auto-approve, or a second phone that had not caught up) adds nothing.
+- **A39**: a Short / Over exception from `crewSaveReceiving` carries the crew's reason:
+  "Counted 3 against 4 on the BOL: <reason> — Roman at the door".
+- Outbound count off on the crew pull card (`ZZd_pullExc`): one Short / Over report per load. When the load already has
+  an open report of that kind (for example the Short from receiving), the loading count and its required note are added
+  to that report's note ("... · Counted 11 against 12 on the BOL while loading: <note>") instead of being dropped.
+- On the kiosk (role `driver`) the red save banner ends with "Please see the office." instead of a staff instruction
+  ("Please try again.", "Delete old photos ...", "Tell the owner ..."); `ZZa_kioskBanner`, patch A08.
+- Damage-report photos (`dmg:<id>`) taken in a report that was never saved: when a damage report opens, the crew page
+  removes, in local mode only, `dmg:` photo keys that no report on this device uses, that are not an open draft and
+  whose newest photo is over a day old (`ZZd_sweep`). Shared-mode photos are not touched (orphans there stay).
 - `ZZzonedIso` returns `null` for a day or time that does not exist (Feb 30, 24:00, 9:75); a time skipped by the
   spring DST change moves forward an hour.
 - Trailer `history` entries also carry an `id`.
-- `ZZsync` (sync-source.js) is local-only in A0 with the full interface (mode, start, read, write, seed, fresh, failed,
-  lease, photoGet, photoSet, importLocal). Events: `cd6:sync {text}` (red banner), `cd6:remote`, `cd6:mode`.
-  Render A1's card only if it exists: `typeof ZZSyncCard!=="undefined"&&...`.
+- `ZZsync` (sync-source.js) runs **shared mode (A1) for real**, behind the same interface (mode, start, read, write,
+  seed, fresh, failed, ok, lease, photoGet, photoSet, importLocal, flush, stats). A page goes shared (`mode 'db'`) only
+  when `claude.use("db")` and `claude.use("user")` answer, the viewer is the owner, can edit or `can("data.write")`, and
+  every listener has had a server answer; no server answer within 20 s gives `'db-offline'` (look only, never seeds).
+  Everyone else (the public link, customers, drivers) stays `'local'`, today's behavior byte for byte. The layout
+  (one document per record, portal/meta, lists, photos, locks) is in the header of sync-source.js.
+- Events: `cd6:sync {text, kind, slot}` (red banner; `text ""` clears it). `kind` is `'doc'` or `'photo'` only when a
+  save of the dock data or of a photo failed just now (the kiosk listens for that, so a driver is never told "checked
+  in" when nothing was saved); otherwise `'net'` (connection notice), `'ro'` (look-only notice) or `'again'` (an earlier
+  failure shown again). `slot` is the banner's own bookkeeping. Also `cd6:remote` (data changed elsewhere, RA re-reads),
+  `cd6:mode` (mode or look-only changed), `cd6:queue {pending}`.
+- `ZZSYNC_SEED` (top of sync-source.js) picks what the owner's first visit writes into an EMPTY shared database:
+  `"demo"` (staging: today's demo without the 396 filler accounts) or `"empty"` (production: settings, rates and
+  logins only, like Setup > Clear demo data). It is `"demo"` now; switch it to `"empty"` before real use.
+- Render A1's card only if it exists: `typeof ZZSyncCard!=="undefined"&&...`.
 - `ZZFLAGS` (`kiosk2`, `secureStep`): read them **at render time** (`ZZFLAGS.kiosk2?ZZKiosk:XQ`), never copy them at
   load. Tests can switch them per page with the harness option `flags` (only when the test flag is set; the real page
   always uses the values in `engine-source.js`). Regression uses `{kiosk2:false}` to keep checking the old kiosk walk-in.
@@ -115,5 +159,23 @@ H.main('c-kiosk', async (h, t) => {
   pass it as `seed`. `{context}` shares a browser context (two pages = two devices). `{now}` installs `page.clock`.
 - Builds with stream A expose `window.__zz = {doc, actions, h}` when the harness sets `window.__ZZTEST` (it does
   by default): call actions and helpers from `page.evaluate` (see `act()` / `calc()` in `a-engine.test.js`).
-- `mode:'shared'` loads `test/mock-db.js` (db / user / assets per runtime contract 0.2.91) for A1.
-- Known in today's portal: the TV board scrolls sideways at 390 px (stream E owns the TV); regression notes it.
+- `mode:'shared'` loads `test/mock-db.js` (db / user / assets per runtime contract 0.2.91) for A1. Options go in
+  `mock` (`window.__MOCK`): `caps` (default `['db','user']`; add `'assets'` for asset photos), `isOwner`, `canEdit`, `can`
+  (all default true, so a mock page goes shared; pass `{isOwner:false, canEdit:false, can:false}` to stay local),
+  `canWrite`, `cachedFirst`, `serverDelay`, `neverServer`, `writeDelay`, `ackDelay`, `useDelay`, `useNever`, `seed`.
+  Hooks on `window.__mockdb`: `dump()` and `leases()` return **Promises** (await them), `writes`, `overlaps`, `stats()`,
+  `reset(seed)`, `failNext(code, n, op?)`, `listeners()`, `setOffline(bool)`, `killListeners(code)`, `opts`. Two pages
+  in one context share the "server" (IndexedDB, mirrored to localStorage `__mockdb`). Test-only knobs before load:
+  `window.__ZZSYNC_OFFLINE_MS`, `window.__ZZSYNC_RETRY_MS` (see `a-sync*.test.js`).
+- Regression fails on any sideways scroll at 390 px for every role (customer, office, crew, kiosk, TV); stream E fixed
+  the TV board on a phone. Only a build without stream E still reports today's TV scroll as a note. TV door cards
+  (E29/E30): the door number and its clock never touch or leave the card; a long clock ("1h 19m") moves under the
+  door number, at the right (1024 px tablet and phones).
+- `e2e-day.test.js` (integration): one load's whole day in ONE build, every role. Local mode: one browser context (one
+  device switching roles, `fresh()` clears `cd6:session` and closes the other pages), fixed dock clock (the next weekday
+  11:00 AM Pacific, `page.clock`, moved on with `ctx.clock.fastForward`), the base demo moved in time to that clock,
+  Altex made a non-dispatch account so its booking rings the office bell. Customer books a drop (2:17 PM, moved to
+  2:47 PM), office confirms, driver page (Russian) sets the ETA, kiosk check-in (Español), crew door / start / count /
+  damage, customer approves, crew finishes, office releases, pickup with Secure the load, gear, alerts, Outbox, Friday,
+  yard board, door map, TV, gear back. Shared mode: office, crew and kiosk pages on one mock database, plus a customer
+  page without `db`. Screenshots `<shots>/e2e-*.png` (it sets `SHOT_PREFIX=e2e`). About 2 minutes.

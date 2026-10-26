@@ -4,9 +4,10 @@ ZZPHONE="916-616-3481",ZZTEL="tel:+19166163481",
 ZZestOf=(s,x,y)=>{
   let lines=[];
   if(x.kind==="Damage"){
-    let first=(s.exceptions||[]).find(q=>q.kind==="Damage"),rw=ie(s.rewrapPallets);
-    /* the crew's fix lines (or the office) may already charge the rewrap: never charge it twice */
-    if(first&&first.id===x.id&&rw>0&&!(x.est?.lines||[]).some(l=>/rewrap/i.test(String(l&&l.label||""))))lines.push({label:`Rewrap ${rw} damaged pallet${rw>1?"s":""}`,qty:rw,unit:y.rewrap,amount:rw*y.rewrap,auto:!0});
+    let first=(s.exceptions||[]).find(q=>q.kind==="Damage"),rw=ie(s.rewrapPallets),rwl=q=>(q&&q.kind==="Damage"&&q.est?.lines||[]).some(l=>/rewrap/i.test(String(l&&l.label||"")));
+    /* the crew's fix lines (or the office) may already charge the rewrap, in this report or another one on the load,
+       or an approved estimate already billed it (ZZrewrapBilled): never charge it twice */
+    if(first&&first.id===x.id&&rw>0&&!(s.exceptions||[]).some(rwl)&&!(typeof ZZrewrapBilled==="function"&&ZZrewrapBilled(s)))lines.push({label:`Rewrap ${rw} damaged pallet${rw>1?"s":""}`,qty:rw,unit:y.rewrap,amount:rw*y.rewrap,auto:!0});
   }
   (x.est?.lines||[]).forEach(l=>{let q=ie(l.qty,1),u=ie(l.unit);lines.push({id:l.id,label:l.label,qty:q,unit:u,amount:q*u})});
   return{lines,total:lines.reduce((a,l)=>a+l.amount,0)};
@@ -14,11 +15,15 @@ ZZestOf=(s,x,y)=>{
 ZZneeds=(s,x,y)=>!x.resolved&&!x.answer&&(ZZestOf(s,x,y).total>0||!x.seenAt),
 ZZanswer=(a,s,x,status,by,note,cid,y)=>{
   let est=ZZestOf(s,x,y),now=ye(Date.now());
-  a.patchShipment(s.id,sh=>({exceptions:(sh.exceptions||[]).map(q=>q.id!==x.id?q:{...q,
-    answer:{status,by,note:note||"",at:now,total:est.total},
-    seenBy:q.seenBy||by,seenAt:q.seenAt||now,
-    est:q.est?{...q.est,applied:q.est.applied||status==="accepted"}:q.est})}));
-  if(status==="accepted"&&!x.est?.applied)est.lines.filter(l=>!l.auto).forEach(l=>a.addAdjustment(s.id,`Damage: ${l.label}`,l.amount));
+  /* one write, worked out on the saved load: the charges go on the bill only if this estimate was not applied
+     already (auto-approve, or a second tap from a screen that had not caught up), so nothing is billed twice */
+  a.patchShipment(s.id,sh=>{let q0=(sh.exceptions||[]).find(q=>q.id===x.id),e2=q0?ZZestOf(sh,q0,y):est,
+      bill=status==="accepted"&&!!q0&&!(q0.est&&q0.est.applied);
+    return{exceptions:(sh.exceptions||[]).map(q=>q.id!==x.id?q:{...q,
+      answer:{status,by,note:note||"",at:now,total:e2.total},
+      seenBy:q.seenBy||by,seenAt:q.seenAt||now,
+      est:q.est?{...q.est,applied:q.est.applied||status==="accepted"}:q.est}),
+      ...(bill?{adjustments:[...(sh.adjustments||[]),...e2.lines.filter(l=>!l.auto).map(l=>({id:Ce(),label:`Damage: ${l.label}`,amount:l.amount}))]}:{})}});
   a.sendAccountChat(cid,"dispatcher",
     status==="accepted"?`APPROVED damage charges of ${je(est.total)} on #${s.ref}. (${by})`
     :status==="declined"?`DECLINED damage charges of ${je(est.total)} on #${s.ref}.${note?" Reason: "+note+".":""} Please call me. (${by})`
@@ -137,9 +142,10 @@ ZZgroup=k=>be(k)==="reno"?"del":"pick",
 ZZREQ={info:{t:"Photos, size or weight",d:"We send photos, dimensions or weight for a load"},delivery:{t:"Third-party delivery",d:"$300 per delivery. We check availability first"},trailer:{t:"Rent a trailer",d:"Per drop: goes out and comes back, usually under 2 hours"},other:{t:"Something else",d:"Rewrap, relabel, sort, anything"}},
 ZZreqSt={new:["Waiting on us",m.amber],available:["Available, confirm it",m.orange],unavailable:["Not available",m.red],confirmed:["Booked",m.green],done:["Done",m.green],cancelled:["Cancelled",m.dim]},
 /* who to call: most senior crew member on shift right now, else the office */
-ZZlead=(e,t)=>{let d=new Date(t),mins=d.getHours()*60+d.getMinutes(),tm=s=>{let[h,mi]=String(s||"").split(":").map(Number);return h*60+(mi||0)},
-  on=(e.settings?.crewMembers||[]).filter(c=>c.phone&&c.shift&&(c.shift.days||[0,1,2,3,4,5,6]).includes(d.getDay())&&(()=>{let a=tm(c.shift.start),b=tm(c.shift.end);return a<=b?mins>=a&&mins<b:mins>=a||mins<b})());
-  on.sort((x,y)=>ie(x.rank,99)-ie(y.rank,99));return on[0]?{name:on[0].name,role:"Dock lead on shift",phone:on[0].phone}:{name:"Reno dock & office",role:"Main line",phone:ZZPHONE}},
+/* shifts are dock time (ZZcrewOnShift: days, overnight shifts, no PIN in the copies), whatever the browser's own zone */
+ZZlead=(e,t)=>{let rk=c=>c.rank==null||String(c.rank).trim()===""?99:ie(c.rank,99),
+  on=ZZcrewOnShift(e,ie(t,Date.now())).filter(c=>c&&c.phone&&!c.placeholder);
+  on.sort((x,y)=>rk(x)-rk(y));return on[0]?{name:on[0].name,role:"Dock lead on shift",phone:on[0].phone}:{name:"Reno dock & office",role:"Main line",phone:ZZPHONE}},
 ZZmeter=(lbl,v,max,txt)=>ZZh("div",{className:"zz-meter"},ZZh("div",{className:"zz-mt"},ZZh("span",null,lbl),ZZh("b",null,txt)),ZZh("div",{className:"zz-mb"},ZZh("i",{style:{width:`${Math.min(100,max?v/max*100:0)}%`,background:v>max?m.red:m.orange}}))),
 /* how much a set of loads fills a 53' trailer, and how much room is left */
 ZZfit=(plt,lb)=>{let n=Math.max(Math.ceil(plt/ZZTRL.spots),Math.ceil(lb/ZZTRL.lb),1),sp=n*ZZTRL.spots,wl=n*ZZTRL.lb;
@@ -884,7 +890,7 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
     let k=sel&&e.trailers.find(z2=>z2.id===sel);if(!k||k.customerId&&k.customerId!==o)return null;
     let inb=k.direction==="inbound",st=stOf(k),sched=k.stage==="scheduled",
       /* loads in their unload / load order (seq), the truck customer's own loads only */
-      /* same order rule as the bundle's ir() (seq ?? position), which reorderLoad / zzReorder swap against */
+      /* same order rule as the bundle's ir() (seq ?? position), which zzReorder swaps against */
       L=loadsOf(k).filter(s2=>!s2.customerId||s2.customerId===o).map((s2,j)=>({s2,j})).sort((u,v)=>(u.s2.seq??u.j)-(v.s2.seq??v.j)||u.j-v.j).map(z2=>z2.s2),
       tot=L.reduce((s2,z2)=>s2+fe(z2),0),lbs=L.reduce((s2,z2)=>s2+ZZwt(z2),0),
       T=tx[k.id]||{},setT=p=>setTx({...tx,[k.id]:{...T,...p}}),
@@ -892,7 +898,8 @@ ZZCP=({doc:e,now:t,actions:a,onExit:r,openShipment:n,customerId:o})=>{
       addOK=(T.ref||"").trim()&&ie(T.plt)>0,
       fin=!!k.workDoneAt||k.stage==="done"||k.stage==="departed",active=ZZactive(k),notIn=active&&!k.arrivedAt,
       ord=!!k.loadOrder,canOrd=sched&&L.length>1,
-      mv=(s2,d)=>inb?a.reorderLoad(s2.id,d):a.zzReorder(s2.id,k.id,d<0?"up":"down"),
+      /* zzReorder with this customer's id: swaps only with the customer's own loads (the only ones listed here) */
+      mv=(s2,d)=>a.zzReorder(s2.id,k.id,d<0?"up":"down",o),
       loadSt=s2=>inb?(s2.receivedAt?(s2.qc?.counted!=null?`Off, counted ${s2.qc.counted}`:"Off the truck"):"On the truck"):(s2.shippedAt?"Shipped":s2.loadedAt?"Loaded":"Planned"),
       pills=s2=>[s2.hazmat?ZZh("span",{key:"hz"},ZZpill("Hazmat",m.red)):null,s2.stackable===!1?ZZh("span",{key:"ns"},ZZpill("No stack",m.amber)):null].filter(Boolean),
       extra=s2=>[ie(s2.pieces)?ZZb_pl(ie(s2.pieces),"piece"):"",s2.dest&&!["Reno, NV","Sacramento, CA"].includes(s2.dest)?s2.dest:""].filter(Boolean).join(" \xB7 "),

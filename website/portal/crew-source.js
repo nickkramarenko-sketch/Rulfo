@@ -463,9 +463,14 @@ ZZd_bySeq=L=>L.map((s,j)=>({s,j})).sort((a2,b2)=>(a2.s.seq??a2.j)-(b2.s.seq??b2.
 ZZd_needDmg=s=>!((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner&&!x.resolved),
 /* rewrap priced in a photo report goes to the customer for approval; it is not billed again through rewrapPallets */
 ZZd_rewrap=(s,d,zi)=>{let inEst=zi&&zi.rewrapOn||((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner&&((x.est&&x.est.lines)||[]).some(l=>/rewrap/i.test((l&&l.label)||"")));return inEst?ie(s&&s.rewrapPallets):ie(d)},
-/* outbound count off: one Short or Over report with the crew's note (not twice for the same load) */
-ZZd_pullExc=(s,r,counted,want,note)=>{if(!s||!r||counted===want)return;let kind=counted<want?"Short":"Over";if((s.exceptions||[]).some(x=>x&&!x.resolved&&x.kind===kind))return;
-  let nt=String(note||"").trim();r.addException(s.id,kind,`Counted ${counted} against ${want} on the BOL while loading${nt?": "+nt:""}`)},
+/* outbound count off: one Short or Over report with the crew's note (not twice for the same load). When the load already
+   has an open report of that kind (for example from receiving), the loading count and its required note are added to
+   that report instead of being dropped */
+ZZd_pullExc=(s,r,counted,want,note)=>{if(!s||!r||counted===want)return;let kind=counted<want?"Short":"Over",
+    nt=String(note||"").trim(),txt=`Counted ${counted} against ${want} on the BOL while loading${nt?": "+nt:""}`,
+    open=(s.exceptions||[]).find(x=>x&&!x.resolved&&x.kind===kind);
+  if(open){String(open.note||"").includes(txt)||r.patchShipment(s.id,sh=>({exceptions:(sh.exceptions||[]).map(x=>x&&x.id===open.id?{...x,note:[x.note,txt].filter(Boolean).join(" \xB7 ")}:x)}));return}
+  r.addException(s.id,kind,txt)},
 
 /* ---------- small UI parts (big targets for gloves) ---------- */
 ZZd_H={fontSize:17,fontWeight:800,lineHeight:1.25},
@@ -565,11 +570,25 @@ ZZd_Shots=({owner,slots,onCount})=>{ZZtr3();
    The report id is made when the modal opens, so photos (owner dmg:<id>) can be taken before saving.
    A draft per load stays in memory, so closing by mistake and opening again keeps the photos and choices. */
 ZZd_draft={},
+/* photos of a damage report that was never saved (the draft lives only in memory, so a reload loses it) stay behind
+   under dmg:<id>. When the modal opens, this device removes them, only when ALL of these hold: local mode (shared
+   photos are not touched), no report on this device's saved data uses that id, it is not an open draft, and its newest
+   photo is over a day old. A user action, never on load; the dock data itself is not written. */
+ZZd_sweep=doc=>{try{if(typeof ZZsync!=="undefined"&&ZZsync.mode!=="local")return 0;let pre="cdweb:cd6:photos:dmg:",used=new Set,n=0,day=864e5,
+    mark=d=>((d&&d.shipments)||[]).forEach(s2=>((s2&&s2.exceptions)||[]).forEach(x=>{x&&x.photoOwner&&used.add(String(x.photoOwner))}));
+  let sd=null;try{sd=JSON.parse(localStorage.getItem("cdweb:cd6:doc")||"null")}catch{}if(!sd||!Array.isArray(sd.shipments))return 0;mark(sd);mark(doc);
+  Object.values(ZZd_draft).forEach(f=>{f&&f.id&&used.add("dmg:"+f.id)});
+  let keys=[];for(let k=0;k<localStorage.length;k++){let key=localStorage.key(k);key&&key.startsWith(pre)&&keys.push(key)}
+  keys.forEach(key=>{let own=key.slice("cdweb:cd6:photos:".length);if(used.has(own))return;let L=null;try{L=JSON.parse(localStorage.getItem(key)||"[]")}catch{return}
+    if(!Array.isArray(L))return;let last=Math.max(0,...L.map(q=>Date.parse(q&&q.at)||0));if(L.length&&!(last>0&&Date.now()-last>day))return;
+    try{localStorage.removeItem(key);n++}catch{}});return n}catch(x){console.error("ZZd_sweep",x);return 0}},
 ZZDmg=({s,doc,actions:a,onClose,onSaved,pallets:p0})=>{ZZtr3();
   let p1=Math.max(1,Math.round(ie(p0,1))||1),
     [f,setF]=(0,H.useState)(()=>ZZd_draft[s.id]||{id:Ce(),pal:p1,kinds:[],what:"",lines:ZZdmgLines(doc,s,p1),rq:!1}),
     [n,setN]=(0,H.useState)(0),[busy,setBusy]=(0,H.useState)(!1),gone=(0,H.useRef)(!1);
   (0,H.useEffect)(()=>{gone.current||(ZZd_draft[s.id]=f)},[f,s.id]);
+  /* once per opening, after this draft is remembered: clear photos left by reports that were never saved */
+  (0,H.useEffect)(()=>{let tm=setTimeout(()=>ZZd_sweep(doc),400);return()=>clearTimeout(tm)},[]);
   let up=p=>setF(o=>({...o,...p})),owner="dmg:"+f.id,
     cust=((doc&&doc.customers)||[]).find(c=>c.id===s.customerId),lim=ZZautoLimit(cust),total=ZZestTotal(f.lines),goes=lim!=null&&total>0&&total<lim,
     miss=[!f.kinds.length&&R("the kind of damage"),n<2&&(n===1?R("1 more photo"):R("2 photos (wide shot and close-up)"))].filter(Boolean),

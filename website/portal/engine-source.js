@@ -111,6 +111,9 @@ ZZgearOut=(doc,cid)=>{let o={plywood:0,bars:0,straps:0,airbags:0,tags:[]};
 /* suggested fix lines; labels match the ZZEst quick lines */
 ZZdmgLines=(doc,s,pallets)=>{let r=Ln(doc,s&&s.customerId),p=Math.max(0,ie(pallets,1));
   return[{k:"rewrap",label:"Rewrap pallet",qty:p,unit:ie(r.rewrap,15),on:!0},{k:"labor",label:"Labor, 1 hour",qty:.5,unit:ie(r.laborHour,120),on:!0},{k:"pallet",label:"Replacement pallet",qty:1,unit:ie(r.newPallet,20)||20,on:!1}]},
+/* true when rewrap is already on the bill through an approved damage estimate ("Damage: Rewrap pallet" adjustment):
+   then Im does not bill rewrapPallets again for the same pallets (patch A38) */
+ZZrewrapBilled=s=>((s&&s.adjustments)||[]).some(a=>a&&/^Damage: /.test(String(a.label||""))&&/rewrap/i.test(String(a.label||""))),
 ZZestTotal=lines=>(lines||[]).filter(l=>l&&l.on!==!1).reduce((a,l)=>a+ie(l.qty,1)*ie(l.unit),0),
 ZZautoLimit=c=>{let v=c&&c.autoApproveUnder;if(v==null||v==="")return null;let n=+v;return Number.isFinite(n)&&n>0?n:null},
 /* [{month:'2026-10', reports, pallets, approved, declined, open, items:[{s,x}]}] newest first, Damage only */
@@ -130,16 +133,21 @@ ZZweek=(doc,cid,now)=>{now=ZZa_nowMs(now);let from=ZZzonedIso(ZZweekKey(now),"00
   return{from,trucks:trucks.length,done:done.length,palletsIn:Sh.filter(s=>inR(s.receivedAt)).reduce((a,s)=>a+fe(s),0),palletsOut:Sh.filter(s=>inR(s.shippedAt)).reduce((a,s)=>a+fe(s),0),
     avgWaitMin:avg(waits),avgDoorMin:avg(doorT),promiseKeptPct:pr.length?Math.round(100*pr.filter(p=>p.kept).length/pr.length):null,
     damageReports:dmg.length,damageApproved:dmg.filter(x=>x.answer&&x.answer.status==="accepted").length,gearOut:ZZgearOut(doc,cid)}},
+/* the time a truck was first booked for, as "Mon, Oct 27, 10:00 AM": t.bookedFor (zzLog keeps it at the first time change),
+   else the "(was ...)" of the oldest "Time changed to ..." history line, else the current scheduledAt */
+ZZa_bookedFor=t=>{if(!t)return"";if(t.bookedFor&&isFinite(ZZa_ms(t.bookedFor)))return ZZa_when(t.bookedFor);
+  let h=(t.history||[]).map(x=>x&&/^Time changed to .+ \(was (.+)\)$/.exec(String(x.text||""))).find(Boolean);
+  if(h)return h[1]==="no time"?"":h[1];return t.scheduledAt?ZZa_when(t.scheduledAt):""},
 /* [{at, by, text, sid?}] oldest first. Safe for customers: never reads doc.activity. With sid, only that load's lines. */
 ZZtrail=(doc,tid,sid)=>{let T=((doc&&doc.trailers)||[]).find(t=>t.id===tid)||null,syn=[],ev=[],add=(arr,at2,by,text,s2)=>{if(!at2||!isFinite(ZZa_ms(at2)))return;let x={at:at2,by:by||"",text};if(s2)x.sid=s2;arr.push(x)};
   if(T&&!sid){let t=T,out=t.direction==="outbound";
-    t.createdAt&&add(syn,t.createdAt,t.bookedBy||(t.bookedVia==="client"?"Customer":t.bookedVia==="office"?"Office":""),`Booked${t.scheduledAt?" for "+ZZa_when(t.scheduledAt):""}`);
+    t.createdAt&&add(syn,t.createdAt,t.bookedBy||(t.bookedVia==="client"?"Customer":t.bookedVia==="office"?"Office":""),`Booked${(w0=>w0?" for "+w0:"")(ZZa_bookedFor(t))}`);
     t.confirmedAt&&add(syn,t.confirmedAt,t.confirmedBy,"Time confirmed");
     t.eta&&t.eta.updatedAt&&add(syn,t.eta.updatedAt,t.eta.by,`ETA ${ZZa_hm(t.eta.at)} (${ZZa_srcName[t.eta.source]||t.eta.source||""})`);
     t.arrivedAt&&add(syn,t.arrivedAt,t.driver,t.checkedInBy==="kiosk"?"Checked in at the kiosk":t.checkedInBy==="office"?"Checked in by the office":"Checked in");
     t.dockedAt&&add(syn,t.dockedAt,"",t.dock&&Gi.includes(t.dock)?`At door ${t.dock}`:"At a door");
     t.workStartedAt&&add(syn,t.workStartedAt,t.workStartedBy,out?"Loading started":"Unloading started");
-    t.workDoneAt&&add(syn,t.workDoneAt,t.workDoneBy,t.workStartedAt?`Done in ${ot(ZZa_ms(t.workDoneAt)-ZZa_ms(t.workStartedAt))}`:"Done");
+    t.workDoneAt&&add(syn,t.workDoneAt,t.workDoneBy,t.workStartedAt?`Done (${out?"loaded":"unloaded"} in ${ot(ZZa_ms(t.workDoneAt)-ZZa_ms(t.workStartedAt))})`:"Done");
     t.secure&&t.secure.signedAt&&add(syn,t.secure.signedAt,t.secure.signedBy,`Load secured: ${t.secure.confidence}/5${t.secure.seal?", seal "+t.secure.seal:""}`);
     t.departedAt&&add(syn,t.departedAt,"","Released, truck left");
     t.cancelledAt&&add(syn,t.cancelledAt,t.cancelledBy,"Cancelled");
@@ -171,10 +179,12 @@ ZZmsgs=(doc,now)=>{now=ZZa_nowMs(now);let out=[];try{let T=(doc&&doc.trailers)||
       body:ch==="email"?`Hi ${r.name||c.name},\n\n${txt.email||txt.sms}\n\nYou can see it live in your portal.\n\n— ${Uo}`:`${Uo}: ${txt.sms}`,
       ts,about:`truck ${(t&&t.truck)||"—"}`,deliverable:!!to,event:ev,customerId:c.id,trailerId:t?t.id:null,lang:"en"})}))};
   T.forEach(t=>{try{let c=cu(t.customerId),tk=t.truck||"—",out2=t.direction==="outbound",door=t.dock&&Gi.includes(t.dock)?t.dock:null;
-    if(c){let bts=t.confirmedAt||((c.dispatch||t.bookedVia==="office")&&t.createdAt);
+    if(c){let bts=t.confirmedAt||((c.dispatch||t.bookedVia==="office")&&t.createdAt),
+        /* only a real saved code (older trucks have none until the office makes one): same rule as the customer and office screens */
+        rc=/^\d{4}$/.test(String(t.code??""))?String(t.code):null;
       t.scheduledAt&&bts&&push("booked",t.id,c,t,bts,{subject:`Booking confirmed: truck ${tk}, ${ZZa_when(t.scheduledAt)}`,
-        sms:`Truck ${tk} is booked for ${ZZa_when(t.scheduledAt)} (dock time). Check-in code ${ZZcode(t)}.`,
-        email:`Truck ${tk} is booked at our dock for ${ZZa_when(t.scheduledAt)} (dock time).\n\nCheck-in code for the driver: ${ZZcode(t)}\nDriver link for ETA updates: ${ZZetaLink(t)}`});
+        sms:`Truck ${tk} is booked for ${ZZa_when(t.scheduledAt)} (dock time).${rc?` Check-in code ${rc}.`:""}`,
+        email:`Truck ${tk} is booked at our dock for ${ZZa_when(t.scheduledAt)} (dock time).${rc?`\n\nCheck-in code for the driver: ${rc}\nDriver link for ETA updates: ${ZZetaLink(t)}`:""}`});
       t.eta&&t.eta.at&&t.eta.updatedAt&&push("eta",t.id+":"+t.eta.updatedAt,c,t,t.eta.updatedAt,{subject:`ETA for truck ${tk}: ${ZZa_hm(t.eta.at)}`,sms:`Truck ${tk} ETA now ${ZZa_hm(t.eta.at)} (${ZZa_srcName[t.eta.source]||"update"}).`});
       t.arrivedAt&&push("arrived",t.id,c,t,t.arrivedAt,{subject:`Truck ${tk} checked in`,sms:`Truck ${tk} checked in at our dock at ${ZZa_hm(t.arrivedAt)}.`});
       if(t.arrivedAt){let wts=ZZa_ms(t.arrivedAt)+st.waitGoalMin*6e4,ws=t.workStartedAt?ZZa_ms(t.workStartedAt):Infinity;
@@ -221,7 +231,9 @@ ZZacts=({S,C,M,N,L,B,w})=>{
   let truck=(x,tid)=>x.trailers.find(k=>k.id===tid);
   return{
   /* 1. merge patch into the truck + a history line (time change, confirmation, driver link) */
-  zzLog:(tid,text,patch)=>S(x=>{let t=truck(x,tid);if(!t)return null;let{id:_i,history:_h,...p}=patch||{},by=B();
+  zzLog:(tid,text,patch)=>S(x=>{let t=truck(x,tid);if(!t)return null;let{id:_i,history:_h,bookedFor:_bf,...p}=patch||{},by=B();
+    /* the first time change keeps the original booked time (the trail's "Booked for ..." line) */
+    if(p.scheduledAt!==void 0&&t.scheduledAt&&!t.bookedFor&&p.scheduledAt!==t.scheduledAt)p.bookedFor=t.scheduledAt;
     N(x,tid,k=>({...p,history:ZZa_hist(k,by,text)}));return C(x,L(),"trailer",`Truck ${t.truck||"—"}: ${text}`)}),
   /* 2. ETA; ignored once the truck checked in, left or was cancelled */
   zzEta:(tid,o={})=>{let ms=ZZa_ms(o&&o.at);if(!isFinite(ms))return null;return S(x=>{let t=truck(x,tid);if(!t||t.arrivedAt||!ZZactive(t))return null;
@@ -276,7 +288,11 @@ ZZacts=({S,C,M,N,L,B,w})=>{
       return C(x,L(),"gear",`${dir==="back"?"Gear back from":"Gear out to"} ${cn}: ${q} ${ty}`)})},
   /* 11. kiosk (or office) check-in in one write; returns {dock, place, estMin, trailerId, truck, trailer, afterHours} | {already:true,...} | null */
   zzKioskIn:async(tid,o={})=>{o=o||{};let res=null;
-    await ZZsync.lease("doors",()=>S(x=>{let t=truck(x,tid);res=null;if(!t)return null;
+    /* S resolves null when the save failed or was refused (storage full, shared data offline or look-only):
+       then nothing was checked in, so resolve null (kiosk: "Please go to the office"; office: "did not save").
+       Only the first run of the change is the real one: after a failed save S runs it again on the screen's copy,
+       which would show a check-in that was never saved (and the kiosk would then say "already checked in"). */
+    let runs=0,saved=await ZZsync.lease("doors",()=>S(x=>{if(runs++)return null;let t=truck(x,tid);res=null;if(!t)return null;
       if(t.arrivedAt||!ZZactive(t)){res={already:!0,dock:t.dock||null,place:ZZplace(x,tid),trailerId:tid};return null}
       let busy=x.trailers.filter(k=>k.id!==tid&&k.dock&&k.dock!==Ee&&k.stage!=="departed"&&k.stage!=="cancelled").map(k=>k.dock),I=Gi.find(k=>!busy.includes(k))||Ee,
         T0=ye(Date.now()),office=o.by==="office",by=office?B():"Kiosk",pick=(v,old)=>{let s2=v==null?"":String(v).trim();return s2||old||""},
@@ -286,9 +302,11 @@ ZZacts=({S,C,M,N,L,B,w})=>{
       let t2=truck(x,tid),pl=I===Ee?ZZplace(x,tid):null;
       res={dock:I,place:pl,estMin:pl?ZZestWait(x,tid,Date.now()):null,trailerId:tid,truck:t2.truck||"—",trailer:t2.trailer||"—",afterHours:vm(T0)};
       return C(x,office?L():"Kiosk","checkin",`${t2.driver||"Driver"} \xB7 truck ${t2.truck||"—"} checked in to ${I}${office?" (by the office)":""}`)}));
-    return res},
-  /* 12. reorder loads inside THIS truck (pickups) */
-  zzReorder:(sid,tid,dir)=>S(x=>{let D=truck(x,tid);if(!D)return null;let I=ir(D,x.shipments).map(r=>r.s.id),a=I.indexOf(sid),d=dir==="up"?-1:dir==="down"?1:ie(dir)<0?-1:1,b=a+d;
+    return saved==null?null:res},
+  /* 12. reorder loads inside THIS truck (pickups). With cid (the customer portal): the load must be that customer's,
+     and it swaps with the next load of that same customer, so another company's loads keep their places. */
+  zzReorder:(sid,tid,dir,cid)=>S(x=>{let D=truck(x,tid);if(!D)return null;let I=ir(D,x.shipments).map(r=>r.s.id),a=I.indexOf(sid),d=dir==="up"?-1:dir==="down"?1:ie(dir)<0?-1:1,b=a+d;
+    if(cid){let own=id=>{let s=x.shipments.find(q=>q.id===id);return!!s&&(!s.customerId||s.customerId===cid)};if(a<0||!own(sid))return null;while(b>=0&&b<I.length&&!own(I[b]))b+=d}
     if(a<0||b<0||b>=I.length)return null;[I[a],I[b]]=[I[b],I[a]];I.forEach((id,q)=>M(x,id,{seq:q}));return x}),
   /* 13. dock settings (never admins or crewMembers); patch.rates merges into rates */
   zzSettings:(p={})=>{let{admins:_a,crewMembers:_c,rates:r,...rest}=p||{},hasR=!!r&&typeof r==="object"&&Object.keys(r).length>0;if(!Object.keys(rest).length&&!hasR)return null;
@@ -299,5 +317,8 @@ ZZacts=({S,C,M,N,L,B,w})=>{
       if(!add.length)return null;n=add.length;x.zzOutbox=[...add,...ob].slice(0,300);return C(x,L(),"outbox",`Queued ${ZZa_plural(n,"Friday summary")} for the week of ${week}`)});
     return n}
   }},
+/* the red save banner on the kiosk (role "driver"): a driver cannot fix storage or retry a staff change, so the
+   instruction becomes "Please see the office." (the reason stays, for staff); patch A08 */
+ZZa_kioskBanner=txt=>{let s=String(txt||""),r=s.replace(/\s*(Please try again|Shorten the long text[^.]*and try again|Delete old photos or use another device, and tell the office|Tell the owner: [^.]*)\.\s*$/,"");return r!==s?r+" Please see the office.":s},
 /* test probe: only rendered when the test harness sets window.__ZZTEST */
-ZZa_probe=({doc,actions,role})=>{(0,H.useEffect)(()=>{try{window.__zz={doc,actions,role,h:{ZZFLAGS,ZZPUBLIC_URL,ZZLANGS,ZZEVENTS,ZZALERTS,ZZGEAR,ZZSECSLOTS,ZZDMGKINDS,ZZS,ZZactive,ZZcode,ZZnewCode,ZZokCode,ZZbyCode,ZZetaLink,ZZsafeUrl,ZZzonedIso,ZZdockParts,ZZyardQ,ZZplace,ZZwaitMs,ZZtone,ZZtoneColor,ZZestWait,ZZpromise,ZZtruckSteps,ZZdayLoad,ZZcrewOnShift,ZZgearOut,ZZdmgLines,ZZestTotal,ZZautoLimit,ZZdmgMonths,ZZweekKey,ZZweek,ZZtrail,ZZrecips,ZZmsgs,pQ:(d,n)=>pQ(d,n),Ln:(d,c)=>Ln(d,c),sync:ZZsync,photos:{ls:k=>ls(k),ex:(k,v)=>ex(k,v)}}}}catch{}});return null},
+ZZa_probe=({doc,actions,role})=>{(0,H.useEffect)(()=>{try{window.__zz={doc,actions,role,h:{ZZFLAGS,ZZPUBLIC_URL,ZZLANGS,ZZEVENTS,ZZALERTS,ZZGEAR,ZZSECSLOTS,ZZDMGKINDS,ZZS,ZZactive,ZZcode,ZZnewCode,ZZokCode,ZZbyCode,ZZetaLink,ZZsafeUrl,ZZzonedIso,ZZdockParts,ZZyardQ,ZZplace,ZZwaitMs,ZZtone,ZZtoneColor,ZZestWait,ZZpromise,ZZtruckSteps,ZZdayLoad,ZZcrewOnShift,ZZgearOut,ZZdmgLines,ZZestTotal,ZZautoLimit,ZZdmgMonths,ZZweekKey,ZZweek,ZZtrail,ZZrecips,ZZmsgs,ZZrewrapBilled,ZZa_kioskBanner,ZZdriverText:typeof ZZdriverText==="function"?ZZdriverText:void 0,pQ:(d,n)=>pQ(d,n),Im:(s,r,n)=>Im(s,r,n),Ln:(d,c)=>Ln(d,c),sync:ZZsync,photos:{ls:k=>ls(k),ex:(k,v)=>ex(k,v)}}}}catch{}});return null},

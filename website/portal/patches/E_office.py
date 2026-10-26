@@ -126,14 +126,14 @@ PATCHES = [
      'TV "On the floor" / "Coming up": same fix, long company names truncate instead of pushing the page sideways at 390 px.'),
 
     ('E29',
-     r'className:"text-5xl font-black leading-none",style:{color:g?m.orange:m.dim},children:v',
-     r'className:"font-black leading-none",style:{color:g?m.orange:m.dim,fontSize:"clamp(2rem,9vw,3rem)"},children:v',
-     'TV door number: 3rem on a big screen as today, a little smaller on a phone so the door clock fits next to it.'),
+     r'className:"flex items-baseline justify-between",children:[(0,i.jsx)("div",{className:"text-5xl font-black leading-none",style:{color:g?m.orange:m.dim},children:v',
+     r'className:"flex items-baseline justify-between",style:{flexWrap:"wrap",columnGap:"0.5rem"},children:[(0,i.jsx)("div",{className:"font-black leading-none",style:{color:g?m.orange:m.dim,fontSize:"clamp(2rem,9vw,3rem)"},children:v',
+     'TV door number: 3rem on a big screen as today, a little smaller on a phone so the door clock fits next to it. The door and its clock never touch ("D31h 20m"): a long clock moves under the door number instead of running into it or out of the card.'),
 
     ('E30',
      r'className:"text-2xl font-black tabular-nums",style:{color:y?m.red:m.green},children:ot(A)',
-     r'className:"text-2xl font-black tabular-nums whitespace-nowrap",style:{color:y?m.red:m.green},children:ot(A)',
-     'TV door clock stays on one line ("1h 5m").'),
+     r'className:"text-2xl font-black tabular-nums whitespace-nowrap",style:{color:y?m.red:m.green,marginLeft:"auto"},children:ot(A)',
+     'TV door clock stays on one line ("1h 5m"), at the right edge (also when it moves under the door number).'),
 
     ('E07',
      r'y=A>2*Nt',
