@@ -4,13 +4,66 @@ Run:  python3 site-src/build.py
 Each page is a real URL (/reno/, /reno/cross-dock/, /sacramento/ ...) so Google can list it,
 and each Google Maps listing can point at its own location home page.
 """
-import json, os, re, shutil
+import html as html_lib, json, os, re, shutil, sys
 
+sys.dont_write_bytecode = True   # no __pycache__ folder in site-src
 ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, ROOT)
+import drivers_text as DT   # the /drivers/ page words in six languages
 OUT = os.path.join(os.path.dirname(ROOT), 'site')
 DOMAIN = 'https://24hrcrossdock.com'
 PORTAL = 'https://claude.ai/artifact/97haWKtJGFGXW8PjdM9XWv'
+# "Open an account" opens the portal's sign-up screen. Check on the staging link that #signup still works inside claude.ai.
+PORTAL_SIGNUP = PORTAL + '#signup'
 PHONE, TEL, EMAIL = '916-616-3481', 'tel:+19166163481', '24hrcrossdock@gmail.com'
+
+# The unload promise (Nick approved it). Same words as the portal's promise text. Keep the fine print next to it everywhere.
+PROMISE = 'Unloaded within 2 hours of check-in'
+PROMISE_FINE = 'During dock hours, Mon–Fri 6am–10pm.'
+WAIT_GOAL = 30   # minutes; the "waiting" alert fires after this (same as the portal's wait goal)
+# Kiosk languages: (code, name in that language, name in English)
+LANGS = [('en', 'English', 'English'), ('es', 'Español', 'Spanish'), ('ru', 'Русский', 'Russian'),
+         ('uk', 'Українська', 'Ukrainian'), ('pa', 'ਪੰਜਾਬੀ', 'Punjabi'), ('hi', 'हिन्दी', 'Hindi')]
+# Docks that have the check-in kiosk tablet. Take a dock out of this list if it has no tablet yet.
+KIOSK_DOCKS = ('reno', 'sac', 'pa')
+
+# What the website may promise. Never say a feature works before customers can really use it.
+#   'live' = shown as working today
+#   'soon' = shown with a "Coming soon" badge
+#   'off'  = not shown at all
+# Flip a switch here and rebuild when the portal feature ships.
+LIVE = {
+    'promise': 'live',      # unloaded within 2 hours of check-in, during dock hours (Nick approved)
+    'booking': 'live',      # book a truck for any day and time, not a preset slot
+    'loads': 'live',        # load details: PO, BOL, pallets, pieces, weight, stackable, hazmat, unload order
+    'damage': 'live',       # damage photos and a price to fix; nothing is charged until the customer approves
+    'securement': 'live',   # securement check on outbound loads: gear, tags, seal, 5 photos, rating, signature
+    'kiosk': 'live',        # driver check-in at the kiosk in 6 languages
+    'alerts': 'soon',       # real texts and emails: customer alerts and the door-number text to drivers (no texting service yet)
+    'friday': 'soon',       # Friday summary email
+    'livecard': 'soon',     # customers watching their trucks live in the portal (steps, wait clock, place in line)
+    'eta': 'soon',          # driver ETA link: drivers or customers update the ETA from their own phone
+    'autoapprove': 'soon',  # customer setting: damage fixes under $X go through on their own
+    'gear': 'soon',         # customers see our load bars and straps that are out with their trucks
+}
+SOON = '<span class="soon">Coming soon</span>'
+
+
+def feat(key, html, soon=None, off=''):
+    """Show a feature only as far as it really works (see LIVE).
+    'live': html.  'soon': `soon` if given, else html, with <!--badge--> turned into a "Coming soon" badge.  'off': `off`.
+    An unknown key fails the build on purpose, and so does a 'soon' feature shown without its badge."""
+    state = LIVE[key]
+    if state == 'live':
+        return html.replace('<!--badge-->', '')
+    if state == 'soon':
+        out = (html if soon is None else soon).replace('<!--badge-->', SOON)
+        if out.strip() and SOON not in out:
+            raise SystemExit('feat(%r): a "soon" feature is shown without its Coming soon badge: %s' % (key, out[:120]))
+        return out
+    if state == 'off':
+        return off
+    raise SystemExit('LIVE[%r] must be live, soon or off' % key)
 
 HOURS = 'Mon–Fri 6am–10pm'
 AFTER = 'nights and weekends by appointment, $100 fee for 10pm–6am'
@@ -50,8 +103,40 @@ HASH = {'#/': '/reno/', '#/fulfillment': '/reno/fulfillment/', '#/cross-dock': '
         '#/middletown': '/middletown/', '#/pallet-storage-reno': '/reno/pallet-storage/', '#/fba-prep-reno': '/reno/fba-prep/'}
 
 
+def tpl(html):
+    """Fill in the page fragments:
+    {PHONE} {TEL} {SMS} {EMAIL} {PORTAL} {PORTAL_SIGNUP} {PROMISE} {PROMISE_FINE} {HOURS} {AFTER} {WAIT_GOAL}
+    and feature blocks:  <!--feat KEY-->shown when live<!--if-soon-->shown when soon<!--if-off-->shown when off<!--/feat-->
+    (the if-soon and if-off parts are optional; without if-soon the live part is shown with its badge),
+    and plain switches:  <!--if KEY-->shown when live or soon<!--else-->shown when off<!--/if-->  (no badge; for step numbers)."""
+    for k, v in (('{PHONE}', PHONE), ('{TEL}', TEL), ('{SMS}', SMS), ('{EMAIL}', EMAIL), ('{PORTAL_SIGNUP}', PORTAL_SIGNUP),
+                 ('{PORTAL}', PORTAL), ('{PROMISE_FINE}', PROMISE_FINE), ('{PROMISE}', PROMISE), ('{HOURS}', HOURS),
+                 ('{AFTER}', AFTER), ('{WAIT_GOAL}', str(WAIT_GOAL))):
+        html = html.replace(k, v)
+
+    def one(m):
+        body, soon, off = m.group(2), None, ''
+        if '<!--if-off-->' in body:
+            body, off = body.split('<!--if-off-->', 1)
+        if '<!--if-soon-->' in body:
+            body, soon = body.split('<!--if-soon-->', 1)
+        return feat(m.group(1), body, soon, off)
+    block = re.compile(r'<!--feat (\w+)-->((?:(?!<!--feat ).)*?)<!--/feat-->', re.S)   # innermost first, so blocks can nest
+    while block.search(html):
+        html = block.sub(one, html)
+    # plain switch for small bits such as a step number:  <!--if KEY-->shown when live or soon<!--else-->shown when off<!--/if-->
+    def plain(m):
+        if LIVE[m.group(1)] not in ('live', 'soon', 'off'):
+            raise SystemExit('LIVE[%r] must be live, soon or off' % m.group(1))
+        return (m.group(3) or '') if LIVE[m.group(1)] == 'off' else m.group(2)
+    html = re.sub(r'<!--if (\w+)-->(.*?)(?:<!--else-->(.*?))?<!--/if-->', plain, html, flags=re.S)
+    if re.search(r'<!--(feat |/feat|if-soon|if-off|if |else|/if)', html) or re.search(r'\{[A-Z_]+\}', html):
+        raise SystemExit('Unmatched feature block or unknown {PLACEHOLDER} in a page fragment')
+    return html
+
+
 def frag(name):
-    return open(os.path.join(ROOT, 'pages', name)).read()
+    return tpl(open(os.path.join(ROOT, 'pages', name)).read())
 
 
 def fix(html, loc=None):
@@ -85,7 +170,7 @@ def forms(html, page, default_loc):
         src = re.search(r'data-src="([^"]*)"', attrs)
         src = src.group(1) if src else page
         name = 'quote-' + re.sub(r'[^a-z0-9]+', '-', src.lower()).strip('-')
-        attrs = re.sub(r'\s(id|data-src)="[^"]*"', '', attrs)
+        attrs = re.sub(r'\sdata-src="[^"]*"', '', attrs)   # keep id: /reno/'s "Request a quote" button links to #quote
         head = '\n      '.join(re.findall(r'<h2>.*?</h2>|<p class="fs">.*?</p>', body))
         svc = 'Long-term pallet storage' if 'storage' in src.lower() else 'Fulfillment / FBA prep (Reno)' if 'FBA' in src else 'Cross-dock'
         svcs = ''.join('<option%s>%s</option>' % (' selected' if v == svc else '', v) for v in SVC)
@@ -176,7 +261,9 @@ def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None
     qurl = '/quote/' + ('?loc=' + LOC[loc]['q'].replace(' ', '%20').replace(',', '%2C') if loc else '')
     cta = cta or ({'reno': 'Need space in Reno?', 'sac': 'Need a dock in Sacramento?', 'pa': 'Need a dock in Pennsylvania?'}.get(section, 'Need a dock?'))
     ld = ''.join('<script type="application/ld+json">%s</script>\n' % json.dumps(s, ensure_ascii=False) for s in list(schema) + ([crumbs(trail)] if trail else []))
-    ctah = '' if url.startswith('/quote/') or url.startswith('/thanks/') else '''<section class="cta">
+    # Punjabi and Hindi need their own fonts (Barlow has no Gurmukhi or Devanagari); only loaded on pages that use them
+    indic = '&family=Noto+Sans+Gurmukhi:wght@400;700&family=Noto+Sans+Devanagari:wght@400;700' if re.search(r'[\u0900-\u097f\u0a00-\u0a7f]', body) else ''
+    ctah = '' if url.startswith(('/quote/', '/thanks/', '/drivers/')) else '''<section class="cta">
   <div class="w">
     <div><h2>%s</h2><p>Call 24/7, or send four quick fields and we call you back within one hour.</p></div>
     <div class="btns"><a class="btn wht" href="%s">Call %s</a><a class="btn o" href="%s">Get a quote</a><a class="btn o" href="%s">Text us</a>%s</div>
@@ -195,12 +282,12 @@ def page(url, title, desc, body, section='main', schema=(), trail=None, cta=None
 <meta property="og:title" content="{title}"><meta property="og:description" content="{desc}"><meta property="og:url" content="{DOMAIN}{url}">
 <meta name="theme-color" content="#0B1B30">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700{indic}&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/site.css">
 {ld}{GA}</head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
-<div class="locbar"><div class="w">{bar}<a href="/locations/">{'Other locations' if loc else 'All locations'}</a></div></div>
+<div class="locbar"><div class="w">{bar}<p class="ll"><a href="/drivers/">Drivers</a><a href="/locations/">{'Other locations' if loc else 'All locations'}</a></p></div></div>
 <header>
   <div class="w bar">
     <a class="logo" href="{logo}"><i>24</i>HR Crossdock</a>
@@ -229,8 +316,8 @@ FOOTER = f'''<footer>
       <div><a class="logo" href="/"><i>24</i>HR Crossdock</a><p style="margin-top:14px">Cross-dock, transload and pallet storage in Reno–Sparks, NV, Sacramento, CA and Harrisburg, PA. Since 2015.</p></div>
       <div><h4>Reno–Sparks, NV</h4><p><a href="/reno/">Reno home</a></p><p><a href="/reno/pallet-storage/">Pallet storage</a></p><p><a href="/reno/cross-dock/">Cross-dock</a></p><p><a href="/reno/fulfillment/">Fulfillment</a></p><p><a href="/reno/fba-prep/">FBA prep</a></p><p><a href="/reno/transload/">Transload</a></p><p><a href="/reno/delivery/">Delivery</a></p></div>
       <div><h4>Our docks</h4><p><a href="/reno/">1095 Spice Islands Dr, Sparks, NV 89431</a></p><p><a href="/sacramento/">3036 Orange Grove Ave, North Highlands, CA 95660</a></p><p><a href="/middletown/">2811 Turnpike Industrial Dr, Middletown, PA 17057</a></p></div>
-      <div><h4>Clients</h4><p><a href="{PORTAL}">Client sign-in</a></p><p><a href="{PORTAL}">Book a truck</a></p><p><a href="{PORTAL}">See your inventory</a></p><p><a href="/get-started/">Get started</a></p></div>
-      <div><h4>Company</h4><p><a href="/about/">About us</a></p><p><a href="/services/">Services</a></p><p><a href="/client-portal/">Client portal</a></p><p><a href="/locations/">Locations</a></p><p><a href="/quote/">Get a quote</a></p></div>
+      <div><h4>Clients</h4><p><a href="{PORTAL}">Client sign-in</a></p><p><a href="{PORTAL_SIGNUP}">Open an account</a></p><p><a href="{PORTAL}">Book a truck</a></p><p><a href="/client-portal/">How the portal works</a></p><p><a href="/drivers/">Driver check-in</a></p><p><a href="/get-started/">Get started</a></p></div>
+      <div><h4>Company</h4><p><a href="/about/">About us</a></p><p><a href="/services/">Services</a></p><p><a href="/locations/">Locations</a></p><p><a href="/quote/">Get a quote</a></p></div>
       <div><h4>Contact</h4><p><a href="{TEL}">{PHONE}</a> (24/7)</p><p><a href="{SMS}">Text us</a></p><p><a href="mailto:{EMAIL}">{EMAIL}</a></p><p>Docks Mon–Fri 6am–10pm</p><p>Nights and weekends by appointment</p></div>
     </div>
     <p class="copy">© 2026 24 HR Crossdock. Since 2015. Fully insured. Sparks, NV · North Highlands, CA · Middletown, PA.</p>
@@ -254,11 +341,12 @@ def reno_home():
   <div class="w split">
     <div class="l">
       <h2>Talk to the Sparks dock</h2>
-      <p>One person who knows your freight. Tap the card for a direct line, email, directions and hours.</p>
+      <p>''' + mgr_intro('reno') + '''</p>
     </div>
     ''' + manager('reno') + '''
   </div>
-</section>'''
+</section>
+''' + driver_box('reno')
     b = b.replace('<h1>Reno 3PL warehousing, <span>done right.</span></h1>', '<h1>Reno cross-dock and warehousing, <span>done right.</span></h1>')
     b = b.replace('<p class="sub">Pallet storage, container unloading, fulfillment and delivery on I-80 in Sparks, Nevada.',
                   '<p class="sub">Cross-dock, long-term pallet storage, container unloading, fulfillment and delivery on our own trucks, on I-80 in Sparks, Nevada.')
@@ -268,18 +356,82 @@ def reno_home():
     return b
 
 
+def truck_card():
+    """Phone mockup of a truck card in the client portal. Always labelled Example (made-up truck, no real customer)."""
+    steps = [('Booked', 'done'), ('On the way', 'done'), ('Checked in', 'done'), ('Waited 18m', 'done'), ('At door D3', 'now'), ('Done', 'todo')]
+    dots = ''.join('<li class="%s"><i></i><span>%s</span></li>' % (s, n) for n, s in steps)
+    note = feat('livecard', '', soon='Live truck updates in your portal: <!--badge-->')
+    return f'''<figure class="mock tc">
+      <div class="phone" role="img" aria-label="Example of a truck card in the client portal. Not a real truck.">
+        <div class="ph-top"><i>24</i>Your trucks today<em class="ex">Example</em></div>
+        <div class="ph-card">
+          <div class="ph-row"><b>Truck 4521</b><span class="pill">Unloading</span></div>
+          <div class="ph-sub">Drop-off · 22 pallets · Sparks, NV</div>
+          <ol class="tsteps">{dots}</ol>
+          <div class="ph-row"><span>Checked in 9:42 AM</span><span class="ok">At door D3</span></div>
+          <div class="pbar" aria-hidden="true"><i style="width:47%"></i></div>
+          <div class="ph-sub">1h 04m left on our 2-hour promise</div>
+        </div>
+        <div class="ph-card">
+          <div class="ph-row"><b>Counted so far</b><span>14 of 22 pallets</span></div>
+          <div class="ph-photos"><span></span><span></span><span></span><em>6 photos</em></div>
+        </div>
+        <div class="ph-card">
+          <div class="ph-row"><b>Truck 4530</b><span class="warn">#2 in line</span></div>
+          <div class="ph-sub">Pickup · 18 pallets · checked in 10:05 AM</div>
+        </div>
+      </div>
+      <figcaption class="mock-cap"><b>Example</b><span>Not a real truck or customer. {note}</span></figcaption>
+    </figure>'''
+
+
+def lang_tiles(light=False, link=False):
+    """The six kiosk languages as tiles, each in its own script (link=True: each opens /drivers/ in that language)."""
+    tiles = ''.join(('<a href="/drivers/#{c}" lang="{c}">{n}<small lang="en">{e}</small></a>' if link else
+                     '<span lang="{c}">{n}<small lang="en">{e}</small></span>').format(c=c, n=n, e=e) for c, n, e in LANGS)
+    return '<div class="langs%s">%s</div>' % (' lt' if light else '', tiles)
+
+
+# Alert events and the starting choices for a new contact (same as the portal's defaults): (event, text, email)
+ALERT_EVENTS = [('Booking confirmed', 0, 1), ('ETA changed', 0, 0), ('Truck checked in', 1, 0),
+                ('Waiting over %d minutes' % WAIT_GOAL, 1, 0), ('Unloading or loading started', 0, 0), ('Damage found', 1, 1),
+                ('Done, with photos and counts', 0, 1), ('Loaded and secured', 0, 1), ('Friday summary', 0, 1)]
+
+
+def alerts_table():
+    yes, no = '<td class="y">✓<span class="vh"> on</span></td>', '<td class="n">–<span class="vh"> off</span></td>'
+    trs = ''.join('<tr><th scope="row">%s</th>%s%s</tr>' % (e, yes if t else no, yes if m else no) for e, t, m in ALERT_EVENTS)
+    return f'''<div class="tbl"><table class="svct al">
+      <caption>{'Starting choices for each new person. Change any of them.' if on('alerts') else 'The starting choices we plan for each new person. You will be able to change any of them.'}</caption>
+      <thead><tr><th scope="col">When</th><th scope="col">Text</th><th scope="col">Email</th></tr></thead>
+      <tbody>{trs}</tbody>
+    </table></div>'''
+
+
+def faq_ld(body):
+    """FAQPage schema built from the page's own visible questions, so the two always match. Badges are left out."""
+    m = re.search(r'<div class="faq">(.*?)</div>', body, re.S)
+    if not m:
+        return None
+    def txt(s):
+        s = s.replace(SOON, '')
+        return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', '', s)).replace('&amp;', '&').strip()
+    qa = re.findall(r'<details><summary>(.*?)</summary>(.*?)</details>', m.group(1), re.S)
+    return {'@context': 'https://schema.org', '@type': 'FAQPage',
+            'mainEntity': [{'@type': 'Question', 'name': txt(q), 'acceptedAnswer': {'@type': 'Answer', 'text': txt(a)}} for q, a in qa]}
+
+
 def client_portal():
+    """The client portal page (fragment pages/_old_technology.html; the old file name is kept)."""
     b = frag('_old_technology.html')
-    b = b.replace('<span class="crumb">Technology</span>', '<span class="crumb">Client portal</span>')
-    b = b.replace('Every client gets a login to our client portal.', 'Every client gets a login to our client portal.')
-    b = b.replace('>Client sign in<', '>Client sign in<').replace('>Talk to us about integration<', '>Get a quote<')
-    b = b.replace('a third-party delivery or a trailer rental.', 'a delivery or anything special.')
+    b = b.replace('<!--TRUCKCARD-->', feat('livecard', truck_card(), off=''))
+    b = b.replace('<!--LANGS-->', lang_tiles(link=True))
+    b = b.replace('<!--ALERTS-->', alerts_table())
     return b
 
 
 def cross_dock():
     b = frag('_old_cross-dock.html')
-    b = b.replace('<p>For cross-dock accounts only. Warehousing customers use their WMS login.</p>', '<p>For all customers: cross-dock, storage and fulfillment.</p>')
     b = b.replace('href="#portal-xd"', 'href="#portal"').replace('id="portal-xd"', 'id="portal"')
     return b
 
@@ -304,13 +456,19 @@ def facts(loc):
 </dl></div></section>"""
 
 
+def mgr_intro(loc):
+    """Line next to the manager card. "One person" only once a manager's name is filled in."""
+    who = 'One person who knows your freight.' if MANAGERS[loc]['name'] else 'The people who run this dock.'
+    return who + ' Tap the card for a direct line, email, directions and hours.'
+
+
 def manager(loc):
     L, M = LOC[loc], MANAGERS[loc]
-    name = M['name'] or 'Name and photo coming soon'
+    name = M['name'] or 'The %s dock team' % L['city']
     digits = re.sub(r'\D', '', M['phone'])[-10:]
     pic = '<img src="%s" alt="%s" loading="lazy">' % (M['photo'], M['name']) if M['photo'] else '<span aria-hidden="true">%s</span>' % (''.join(w[0] for w in M['name'].split()[:2]) if M['name'] else '24')
     return f"""<details class="mgr">
-  <summary>{pic}<div><small>Your {L['city']} contact</small><b>{name}</b><em>{M['title']}</em></div><i aria-hidden="true">+</i></summary>
+  <summary>{pic}<div><small>Your {L['city']} contact</small><b>{name}</b><em>{M['title'] if M['name'] else 'Direct line, email and directions'}</em></div><i aria-hidden="true">+</i></summary>
   <dl>
     <dt>Call</dt><dd><a href="tel:+1{digits}">{M['phone']}</a></dd>
     <dt>Email</dt><dd><a href="mailto:{M['email']}">{M['email']}</a></dd>
@@ -409,13 +567,140 @@ def location_page(loc):
   </div>
 </section>
 {storage(loc)}
+{driver_box(loc)}
 <section class="s a">
   <div class="w split">
     <div class="l">
       <h2>Talk to the {L['city']} dock</h2>
-      <p>One person who knows your freight. Tap the card for a direct line, email, directions and hours.</p>
+      <p>{mgr_intro(loc)}</p>
     </div>
     {manager(loc)}
+  </div>
+</section>"""
+
+
+def on(key):
+    """True when a feature is live (for wording that changes, rather than a feature shown with a badge)."""
+    return LIVE[key] == 'live'
+
+
+def esc(s):
+    return html_lib.escape(s, quote=False)
+
+
+def lang_names(sep=', ', last=' or '):
+    names = ['<span lang="%s">%s</span>' % (c, n) for c, n, e in LANGS]
+    return sep.join(names[:-1]) + last + names[-1]
+
+
+def driver_box(loc):
+    """Check-in facts for drivers on each location page (English; /drivers/ has all six languages)."""
+    L = LOC[loc]
+    kiosk = loc in KIOSK_DOCKS and on('kiosk')
+    after = AFTER[0].upper() + AFTER[1:]
+    if kiosk:
+        how = '<p>Drivers check in at our kiosk in %s. Have the 4-digit code from dispatch, or just find the company name.</p>' % lang_names()
+        check = '<dt>Check in</dt><dd>At the kiosk: the 4-digit code or the company name, then your name and cell, then a photo of the paperwork. The screen shows your door or your place in line.</dd>'
+        walk = '<dt>No booking?</dt><dd>Tap Walk-in at the kiosk. First time here? Have the carrier name, invoice email and MC number ready.</dd>'
+    else:
+        how = '<p>Drivers check in at the office with the paperwork.</p>'
+        if loc in KIOSK_DOCKS:
+            how += feat('kiosk', '', soon='<p>Kiosk check-in in %s. <!--badge--></p>' % lang_names())
+        check = '<dt>Check in</dt><dd>At the office, with your paperwork. We give you a door or your place in line.</dd>'
+        walk = '<dt>No booking?</dt><dd>Come to the office. First time here? Have the carrier name, invoice email and MC number ready.</dd>'
+    door = feat('alerts', '<dt>Door number</dt><dd>We text it to your cell after check-in.</dd>', soon='')
+    late = ('<dt>Running late?</dt><dd>Tap your new ETA on the link from your dispatcher, or call <a href="%s">%s</a>.</dd>' if on('eta') else
+            '<dt>Running late?</dt><dd>Call <a href="%s">%s</a>, 24/7.</dd>') % (TEL, PHONE)
+    return f"""<section class="s dbx">
+  <div class="w split">
+    <div class="l">
+      <span class="tag">For drivers</span>
+      <h2>Checking in at {L['city']}</h2>
+      {how}
+      {lang_tiles(light=True, link=True) if kiosk else ''}
+      <p class="dbtn"><a class="btn r" href="/drivers/">Driver check-in steps</a></p>
+    </div>
+    <dl class="dbox">
+      <dt>Address</dt><dd>{addr(loc)}<br><a href="{maps(loc)}" rel="noopener">Get directions</a></dd>
+      <dt>Dock hours</dt><dd>{HOURS}<br>{after}</dd>
+      {check}
+      {walk}
+      {door}
+      {late}
+      <dt>Questions</dt><dd><a href="{TEL}">{PHONE}</a>, answered 24/7</dd>
+    </dl>
+  </div>
+</section>"""
+
+
+def driver_lang(c):
+    """One language section of /drivers/. Kiosk words come from the prototype (drivers_text.FROM_KIOSK)."""
+    K = {k: esc(v) for k, v in DT.FROM_KIOSK[c].items()}
+    N = {k: esc(v[c]) for k, v in DT.NEW.items()}
+    name = dict((x, n) for x, n, e in LANGS)[c]
+    steps = [(K['langTitle'], ' · '.join('<span lang="%s">%s</span>' % (x, n) for x, n, e in LANGS)),
+             (K['codeQ'], K['codeSub'] + '<br>' + K['noCode']),
+             (K['truckQ'], ' · '.join([K['kindDrop'], K['kindPick'], K['kindBoth']])),
+             (K['detailsQ'], ' · '.join([K['yourName'], K['yourCell'], K['truckNo'], K['trailerNo']]) + ('<br>' + K['cellHint'] if on('alerts') else '')),
+             (K['scanBtn'], ' '.join([K['tip1'], K['tip2'], K['tip3']]) + '<br>' + K['scanSkip']),
+             (K['doneTitle'], K['stayTruck'] if on('alerts') else K['stayOnly'])]
+    ol = '<ol class="steps six">%s</ol>' % ''.join('<li><b>%d</b><h3>%s</h3><p>%s</p></li>' % (i + 1, t, p) for i, (t, p) in enumerate(steps))
+    kiosk = feat('kiosk', '<p class="dlead">%s</p>%s' % (N['intro'], ol),
+                 soon='<p class="dlead">%s</p><p class="dlead">%s <!--badge--></p>%s' % (N['office'], N['intro'], ol),
+                 off='<p class="dlead">%s</p>' % N['office'])
+    call = K['callDock'].replace('{phone}', '<a href="%s">%s</a>' % (TEL, PHONE))
+    eta = feat('eta', '<div class="dcard"><h3>%s</h3><p>%s %s · %s · %s · %s</p><p>%s %s</p></div>' % (
+        K['updateEta'], K['etaQ'], K['eta15'], K['eta30'], K['eta60'], K['eta120'], K['shareQ'] + ':', K['shareSub']), soon='')
+    docks = ''.join('<div><b lang="en">%s</b><p lang="en">%s</p>%s<p><a href="%s" rel="noopener">%s</a></p></div>' % (
+        LOC[k]['q'], addr(k), '' if k in KIOSK_DOCKS or not on('kiosk') else '<p>%s</p>' % N['office'], maps(k), N['directions']) for k in LOC)
+    return f"""<section class="s dl" id="{c}" data-l="{c}" lang="{c}">
+  <div class="w">
+    <span class="tag">{name}</span>
+    <h2>{K['kioskTitle']}</h2>
+    {kiosk}
+    <div class="dgrid">
+      <div class="dcard"><h3>{K['notBooked']}</h3><p>{K['walkSub']}</p><p>{N['firstTime']}</p></div>
+      <div class="dcard"><h3>{K['lateQ']}</h3><p>{call}</p><p>{K['help']}</p></div>
+      {eta}
+    </div>
+    <h3 class="dh">{K['where']}</h3>
+    <div class="ddocks">{docks}</div>
+    <p class="dhours"><b>{K['hours']}:</b> {N['hoursLine']}{'। ' if c in ('pa', 'hi') else '. '}{N['after']}</p>
+  </div>
+</section>"""
+
+
+def drivers():
+    picks = ''.join('<a href="#%s" lang="%s" data-l="%s">%s</a>' % (c, c, c, n) for c, n, e in LANGS)
+    return f"""<section class="hero sm drv">
+  <div class="w grid"><div>
+    <span class="crumb">For drivers</span>
+    <h1>Truck check-in. <span>In your language.</span></h1>
+    <p class="sub">Dispatchers: send your drivers this page. Drivers: tap your language.</p>
+    <nav class="langpick" aria-label="Language">{picks}</nav>
+  </div></div>
+</section>
+{''.join(driver_lang(c) for c, n, e in LANGS)}"""
+
+
+def portal_teaser():
+    """Home page: a short pitch for the client portal."""
+    ticks = ''.join([feat('booking', '<li>Book trucks any day and time<!--badge--></li>'),
+                     feat('loads', '<li>PO, BOL, pallets and weight for every load<!--badge--></li>'),
+                     feat('damage', '<li>Damage photos and a price to fix. Nothing is charged until you approve it<!--badge--></li>'),
+                     feat('securement', '<li>Outbound loads secured, photographed and signed<!--badge--></li>'),
+                     '<li>Inventory, bills and messages for all three docks</li>',
+                     feat('livecard', '<li>Every truck live: wait clock and place in line<!--badge--></li>')])
+    return f"""<section class="s pt">
+  <div class="w portal">
+    <div>
+      <span class="tag">Client portal</span>
+      <h2>Your freight, one login</h2>
+      <p class="lead">Every customer gets a login to our client portal, for all three docks.</p>
+      <ul class="ticks">{ticks}</ul>
+      <div class="ctas2"><a class="btn r" href="/client-portal/">See how it works</a><a class="btn o" href="{PORTAL}">Client sign in</a></div>
+    </div>
+    {feat('livecard', truck_card(), off='')}
   </div>
 </section>"""
 
@@ -454,7 +739,9 @@ def locations():
     <ul class="rows">
       <li><b>Same receiving</b><span>Seal checked, counted against the BOL, photographed at the door</span></li>
       <li><b>Same damage process</b><span>Photos and a cost to fix, and nothing is charged until you approve it</span></li>
-      <li><b>Same portal</b><span>Book trucks, see inventory and approve charges for every location</span></li>
+      <li><b>Same portal</b><span>Book trucks{' any day and time' if on('booking') else ''}, see inventory and approve damage fixes for every location</span></li>
+      {feat('promise', '<li><b>Same promise<!--badge--></b><span>%s, during dock hours</span></li>' % PROMISE)}
+      {feat('kiosk', '<li><b>Same check-in<!--badge--></b><span>Drivers check in at our kiosk in 6 languages</span></li>')}
       <li><b>Same hours</b><span>{HOURS} at every dock; {AFTER}</span></li>
       <li><b>One number</b><span>{PHONE}, answered 24/7 by the people running the docks</span></li>
     </ul>
@@ -512,11 +799,13 @@ NOTFOUND = '''<section class="hero sm"><div class="w grid"><div>
 
 def hub():
     b = frag('hub.html')
+    b = b.replace('<!--PORTAL-->', portal_teaser())
     d = os.path.join(ROOT, 'assets', 'logos')
     logos = sorted(f for f in os.listdir(d) if f.lower().endswith(('.png', '.svg', '.jpg', '.webp'))) if os.path.isdir(d) else []
     if logos:
         imgs = ''.join('<img src="/assets/logos/%s" alt="%s" loading="lazy">' % (f, os.path.splitext(f)[0].replace('-', ' ').title()) for f in logos)
         b = b.replace('<!--LOGOS-->', '<section class="logos"><div class="w"><p>Trusted by</p><div class="lg">%s</div></div></section>' % imgs)
+    b = b.replace('<!--LOGOS-->', '')
     quotes = ''.join('<figure><blockquote>“%s”</blockquote><figcaption><b>%s</b>%s</figcaption></figure>' % (q, n, c) for q, n, c in TESTIMONIALS)
     links = ''.join('<a href="https://www.google.com/maps/search/?api=1&amp;query=%s" rel="noopener"><b>%s dock</b><span>Read our Google reviews →</span></a>' % (
         ('24 HR Crossdock ' + L['street'].split(',')[0] + ' ' + L['city'] + ' ' + L['region']).replace(' ', '+').replace(',', ''), L['label'].split(',')[0]) for L in LOC.values())
@@ -528,6 +817,52 @@ def hub():
   </div>
 </section>""")
     return b
+
+
+def newtab(html):
+    """Every link to the portal (claude.ai) opens in a new tab, so the website stays open behind it."""
+    def one(m):
+        tag = m.group(0)
+        if 'target=' not in tag:
+            tag = tag[:-1] + ' target="_blank">'
+        if 'rel=' not in tag:
+            tag = tag[:-1] + ' rel="noopener">'
+        elif 'noopener' not in tag:
+            tag = re.sub(r'rel="([^"]*)"', r'rel="\1 noopener"', tag)
+        return tag
+    return re.sub(r'<a\s[^>]*href="https://claude\.ai/[^"]*"[^>]*>', one, html)
+
+
+# Words that say texts or emails really go out. Not allowed while LIVE['alerts'] is not 'live',
+# unless the same line or card carries the Coming soon badge.
+CLAIMS = re.compile(r"\b(we(?:'ll| will)? (?:text|e-?mail) (?:you|it|the|your|drivers?)|we text|texts? (?:you|your|the) (?:driver|door)|"
+                    r"texted|sent automatically|(?:sent|goes out|delivered) by (?:text|e-?mail)|alerts? (?:are|is|get) sent)|"
+                    # the kiosk lines on /drivers/ in the other five languages ("we send a text / SMS / message")
+                    r"\btexto\b|\bSMS\b|ਮੈਸੇਜ|मैसेज", re.I)
+
+
+def check(out, sitemap):
+    """Checks every built page. Returns a list of problems (the build fails if there are any)."""
+    problems = []
+    for url, html in out.items():
+        for a in re.findall(r'<a\s[^>]*href="https://claude\.ai/[^"]*"[^>]*>', html):
+            if 'target="_blank"' not in a or 'noopener' not in a:
+                problems.append('%s: portal link without target=_blank rel=noopener: %s' % (url, a))
+        if re.search(r'<!--(badge|feat |/feat|if-soon|if-off|TRUCKCARD|LANGS|ALERTS|PORTAL)', html):
+            problems.append('%s: a template marker was left in the page' % url)
+        if not on('alerts'):
+            vis = re.sub(r'<script\b.*?</script>', '', html, flags=re.S)
+            for blk in re.split(r'</(?:li|p|tr|dd|article|details|h[1-6]|figure|div)>', vis):
+                m = CLAIMS.search(re.sub(r'<[^>]+>', ' ', blk))
+                if m and SOON not in blk:
+                    problems.append('%s: says texts or emails are sent, but alerts are not live: "%s"' % (url, m.group(0)))
+            for ld in re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, flags=re.S):
+                m = CLAIMS.search(ld)
+                if m:
+                    problems.append('%s: schema says texts or emails are sent, but alerts are not live: "%s"' % (url, m.group(0)))
+    if '/drivers/</loc>' not in sitemap:
+        problems.append('/drivers/ is missing from the sitemap')
+    return problems
 
 
 def build():
@@ -561,8 +896,8 @@ def build():
         ('/reno/transload/', 'Container Unloading & Transload in Reno–Sparks, NV | 24 HR Crossdock',
          'Floor-loaded containers and trailers unloaded, palletized and wrapped in Sparks, NV. Stored or reloaded the same day.',
          frag('transload.html'), R, [biz(R, '/reno/')], [('/', 'Home'), ('/reno/', 'Reno–Sparks, NV'), ('/reno/transload/', 'Transload')]),
-        ('/reno/delivery/', 'Pallet Delivery in Reno, Sparks & Carson City | 24 HR Crossdock',
-         'Final-mile pallet delivery from Sparks to Reno, Fernley and Carson City with signed proof of delivery.',
+        ('/reno/delivery/', 'Pallet Delivery from Reno–Sparks, Our Own Trucks | 24 HR Crossdock',
+         'Pallet delivery on our own trucks from Sparks, NV: across Reno and Carson City, Northern California or long distance, with signed proof of delivery.',
          frag('delivery.html'), R, [biz(R, '/reno/')], [('/', 'Home'), ('/reno/', 'Reno–Sparks, NV'), ('/reno/delivery/', 'Delivery')]),
         ('/sacramento/', 'Cross-Dock in Sacramento – North Highlands, CA | 24 HR Crossdock',
          'Cross-dock and long-term pallet storage in North Highlands, CA for Sacramento and Northern California. Call 24/7: 916-616-3481.',
@@ -576,8 +911,9 @@ def build():
         ('/services/', 'Services: Cross-Dock, Pallet Storage, Transload & Rework | 24 HR Crossdock',
          'What each 24 HR Crossdock dock does: cross-dock, long-term pallet storage, transload, restack and rework, fulfillment and delivery.',
          services(), 'main', [ORG], [('/', 'Home'), ('/services/', 'Services')]),
-        ('/client-portal/', 'Client Portal | 24 HR Crossdock',
-         'Book trucks, see your inventory, approve damage charges and message the dock, for all three docks in one place.',
+        ('/client-portal/', 'Client Portal: Book Trucks, See Every Load | 24 HR Crossdock',
+         'Book trucks%s, add every load, see your inventory and approve damage fixes with photos, for all three docks.' % (' any day and time' if on('booking') else '')
+         + (' %s, during dock hours.' % PROMISE if on('promise') else ''),
          client_portal(), 'main', [ORG], [('/', 'Home'), ('/client-portal/', 'Client portal')]),
         ('/about/', 'About Us, Our Standards and Team | 24 HR Crossdock',
          'Moving freight since 2015. Our story and operating standards for receiving, storage, shipping and damage, at all three docks.',
@@ -588,22 +924,38 @@ def build():
         ('/quote/', 'Get a Quote | 24 HR Crossdock',
          'Request a quote for cross-dock, storage, transload, rework, fulfillment or delivery. We call you back within one hour.',
          frag('_old_quote.html'), 'main', [ORG], [('/', 'Home'), ('/quote/', 'Get a quote')]),
+        ('/drivers/', 'Driver Check-In: %s | 24 HR Crossdock' % ('Kiosk in 6 Languages' if on('kiosk') else 'Steps, Addresses and Hours'),
+         'Truck check-in at 24 HR Crossdock in English, Español, Русский, Українська, ਪੰਜਾਬੀ and हिन्दी. %s, dock addresses and hours.' % ('Kiosk steps' if on('kiosk') else 'Check-in steps'),
+         drivers(), 'main', [ORG], [('/', 'Home'), ('/drivers/', 'Drivers')]),
         ('/thanks/', 'Thank You | 24 HR Crossdock', 'Your request was received.', THANKS, 'main', [], None),
     ]
+    out = {}
     for url, title, desc, body, section, schema, trail in pages:
         loc = section if section in LOC else None
         body = fix(body, loc)
         body = forms(body, url, LOC[loc]['q'] if loc else 'Not sure')
-        html = page(url, title.replace('&', '&amp;'), desc.replace('&', '&amp;'), body, section, schema, trail)
+        faq = faq_ld(body)
+        html = newtab(page(url, title.replace('&', '&amp;'), desc.replace('&', '&amp;'), body, section, list(schema) + ([faq] if faq else []), trail))
         d = os.path.join(OUT, url.strip('/'))
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, 'index.html'), 'w').write(html)
-    open(os.path.join(OUT, '404.html'), 'w').write(page('/404/', 'Page Not Found | 24 HR Crossdock', 'Page not found.', NOTFOUND))
+        out[url] = html
+    out['/404.html'] = newtab(page('/404/', 'Page Not Found | 24 HR Crossdock', 'Page not found.', NOTFOUND))
+    open(os.path.join(OUT, '404.html'), 'w').write(out['/404.html'])
     sm = ''.join('  <url><loc>%s%s</loc></url>\n' % (DOMAIN, p[0]) for p in pages if p[0] != '/thanks/')
     open(os.path.join(OUT, 'sitemap.xml'), 'w').write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n%s</urlset>\n' % sm)
     open(os.path.join(OUT, 'robots.txt'), 'w').write('User-agent: *\nAllow: /\nDisallow: /thanks/\nSitemap: %s/sitemap.xml\n' % DOMAIN)
-    leftover = [u for u, *_ in pages if '#/' in open(os.path.join(OUT, u.strip('/'), 'index.html')).read()]
+    js = os.path.join(OUT, 'assets', 'site.js')
+    src = open(js).read()
+    open(js, 'w').write(src.replace('{EMAIL}', EMAIL))
+    leftover = [u for u, *_ in pages if '#/' in out[u]]
     print('built', len(pages), 'pages', 'LEFTOVER HASH LINKS:' if leftover else '', leftover or '')
+    problems = check(out, sm)
+    for p in problems:
+        print('PROBLEM:', p)
+    print('switches:', ', '.join('%s=%s' % kv for kv in LIVE.items()))
+    if leftover or problems:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

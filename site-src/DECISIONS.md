@@ -40,3 +40,21 @@
 - Go-live target: Nov 1, 2026. Google Ads: $2,500/mo in Reno. Analytics + call tracking: yes.
 - Directories: Thomasnet and Warehousing Exchange already signed up.
 - Business email on 24hrcrossdock.com: yes (Google Workspace).
+
+## Portal features on the website (Oct 26 2026)
+- The site describes the new dock features (2-hour promise, kiosk check-in, damage photos, securement check, alerts, Friday report, driver ETA link). Pages: `/client-portal/` (rebuilt), new `/drivers/` (6 languages), home, cross-dock, get-started, about, locations and a driver box on each dock page.
+- Rule: the site never promises what customers can't use yet. Each feature has a switch in `LIVE` in `build.py`: `'live'` (shown as working), `'soon'` (shown with a "Coming soon" badge) or `'off'` (hidden). Flip it and rebuild when the portal feature really works.
+- Starting switches:
+  - live: 2-hour unload promise (Nick approved), booking any day and time, load details, damage photos and approvals, securement check with photos, kiosk check-in in 6 languages.
+  - soon: anything that needs real texts or emails (customer alerts, the door-number text to drivers, the Friday email), customers watching their trucks live in the portal, the driver ETA link, auto-approve under $X, "our gear with you" in the portal.
+  - The build fails if a page says texts or emails go out while `alerts` is not live, or if a "soon" feature is shown without its badge.
+- The "live" switches assume the new portal release (kiosk, damage photos, securement check) is live for customers. If the website goes up before that release, set `kiosk` and `securement` to `'soon'` first.
+- 2-hour promise wording: "Unloaded within 2 hours of check-in", always with the fine print "During dock hours, Mon–Fri 6am–10pm." (`PROMISE`, `PROMISE_FINE`). Still open for Nick: any exceptions (floor-loaded containers, after-hours trucks)? If yes, add them to `PROMISE_FINE`.
+- Securement plan price stays off the website: "Call for a quote." (The $2,000 per 6 months price is only in the customer portal.)
+- "Open an account" goes to the portal's sign-up screen (`PORTAL#signup`). Check on the staging link that `#signup` survives inside claude.ai; if it doesn't, set `PORTAL_SIGNUP = PORTAL`.
+- Every portal link opens in a new tab (`target="_blank" rel="noopener"`), so the website stays open behind it.
+- Mockups (truck card, Friday report) are labelled "Example" and use made-up trucks and numbers. No invented reviews or quotes.
+- Driver page words: the kiosk lines are copied from the dock app prototype so drivers see the same words on the website and on the kiosk. A few lines were written new for the website (`NEW` in `drivers_text.py`). **Ukrainian, Punjabi and Hindi need a native speaker to check them** (and the new lines in Spanish and Russian too) before Nick relies on them.
+- Kiosk at each dock: `KIOSK_DOCKS` lists the docks with a check-in tablet (all three for now). Take a dock out if it has no tablet; its page then says "check in at the office".
+- Honesty fixes on older text: the Reno page no longer says reports are "sent automatically" or that the portal updates "in real time", and the cross-dock page now says "OS&D and damage reports the same day" instead of "in real time" (nothing is emailed automatically yet, and customers don't see live dock updates yet).
+- Nick asked for a short client portal page. It is longer now because it carries the new features, but every section is a few lines and the FAQ is collapsed.
