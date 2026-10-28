@@ -238,6 +238,39 @@ signedAt}`; signing again replaces it; history "Manifest signed" (no totals). `Z
 `{lines, total, planned, signature, signedBy, signedAt, all}`: staff every line, a customer only its own lines (null when
 it has none or there is no manifest).
 
+### The crew truck screen (stream D)
+
+Nick's truck screen `nJ` keeps its shell (header, title card with the door picker, chat, Work order, Fix, the wrap-up and
+done modals). The rest comes from `crew-source.js`:
+
+- **Top.** D62 puts `ZZd_JobTitle` across the top of the title card ("UNPACK · Consolidated trailer (inbound)"); D44 drops
+  "N loads · X pallets off"; D41 turns Nick's kind card into `ZZd_JobCard` (the task in plain words, the reload part, the
+  office's words, a badge chip per load). D63 and `ZZd_kind` put the job word on the truck cards and the Next job card.
+- **Steps.** D40: `Wt = ZZd_steps(...)`. UNPACK / UNLOAD: [seal] `before`, `off` (receive each load), `verify` (count card per
+  load) [, `reload`, `secure`, `manifest`], `wrap`. PACK: [seal] `pack`, `secure`, `manifest`, `wrap`. DELIVERY / PICKUP:
+  [seal] `find`, `count`, `insp`, `load`, `secure` (label "Strapped"), `bills`, `wrap`. A step can carry its own `label`
+  (`ZZSteps` reads `s.label || ZZd_LBL[k]`). No photo log step.
+- **Sections.** D42 replaces Nick's unload / reload / load / photo log sections with `ZZd_Flow`, which renders the steps
+  in `Wt` order with Nick's parts inside (`dA` next-off row and Receive, `tJ` count card, `aJ` off-list load, reload
+  buttons, `ZZPull`, Take off). Secure is `ZZSecure` (strap photos), the manifest `ZZd_Manifest`.
+- **Photos.** `ZZd_Cam` is the nonstop camera (one big button, any number up to `ZZphotoCap`, count, thumbnails, delete);
+  `ZZd_PhotoTools` adds the Damage button and, while its step is open, a floating Photo / Damage bar above the bottom bar.
+  Every write to one owner goes through `ZZd_mut` (one queue per owner) and fires the page event `zzd-photos`, so all boxes
+  showing that owner refresh. Counts: `unloadPhotoCount`, `afterPhotoCount`, `strapPhotoCount`, `bolPhotoCount` (patchTrailer),
+  `inspPhotoCount` (patchShipment with a photo touch), the warehouse photo is Nick's `row:<sid>` (`notePhotos(sid,n,'row')`).
+  Photos on the truck itself are credited per person in `trailer.zzPhotoBy:[{id, who, n}]` (leaderboard: 1 point each).
+- **Damage snaps.** The Damage button takes the photo first (`dmg:<id>`, slots wide / close / more), then `ZZd_SnapPick` asks
+  which load (badge buttons, "Not sure which load"; closing the sheet keeps it as "not sure"). `ZZd_SnapCard` (Sort-count-
+  verify, Pack, Reload, Load it up, and inside the count card through D53 `ZZd_LoadSnaps`) picks or changes the load, finishes
+  it (`ZZDmg` with `snap`: `zzDamageFinish`) or throws it away (`zzDamageDiscard` + clears the photos). `ZZd_needDmg` and
+  `ZZd_DmgList` skip drafts; Damaged + Save on a load with a snap finishes that snap. The photo sweep keeps
+  `trailer.dmgDrafts[].photoOwner` and snaps still being taken (`ZZd_snapOpen`).
+- **Wrap-up.** `ZZd_wrapStop` lists what blocks "Send to dispatch" (snaps waiting, not secured, no signed manifest, no
+  packing / loadout photo, no bills photo); D27 shows `ZZd_WrapBlock` (a box per block with a button to its step) and
+  disables Send while any. D30 summary rows come from `ZZd_wrapRows`. The bottom bar says "N steps to go" (D51).
+- **Small fields of the crew.** `trailer.foundAt` / `foundBy` (DELIVERY "Found them"), `trailer.zzPhotoBy`.
+- New crew words are in `ZZd_ES4` / `ZZd_RU4` (filled lazily by `ZZtr3`; existing words never change).
+
 ## Test
 
 ```bash

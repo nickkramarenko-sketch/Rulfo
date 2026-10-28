@@ -148,10 +148,14 @@ H.main('regression', async (h, t) => {
     let doc = await h.readDoc(p);
     let tr = doc.trailers.find(x => x.truck === '52');
     t.ok(tr.stage === 'working' && !!tr.workStartedAt && tr.workStartedBy === 'Roman', 'start: truck 52 is working, started by Roman');
-    await p.getByRole('button', { name: /^3 Unload, count/ }).click();
+    // Nick's Oct 28 review split "Unload, count" into Unload (receive) and "Sort, count, verify" (count); a build
+    // without stream D still has the old single step
+    const split = await p.getByRole('button', { name: 'Sort, count, verify', exact: true }).count() > 0;
+    await p.getByRole('button', { name: split ? /^3 Unload/ : /^3 Unload, count/ }).click();
     await p.waitForTimeout(250);
     await p.getByRole('button', { name: /^Receive/ }).first().click();
     await p.waitForTimeout(400);
+    if (split) { await p.getByRole('button', { name: 'Sort, count, verify', exact: true }).first().click(); await p.waitForTimeout(400); }
     await p.fill('input[type=number]', '7');
     await p.getByRole('button', { name: 'Good', exact: true }).click();
     await p.getByRole('button', { name: '05', exact: true }).click();

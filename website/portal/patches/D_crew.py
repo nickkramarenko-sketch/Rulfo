@@ -3,6 +3,8 @@
 # The minified code keeps escapes such as \xB7 and backslash-u-2014 as literal text. To write a literal
 # backslash-u escape here, write ~u (for example ~u2014); U() turns it into the real backslash text.
 # The components and helpers these patches call (ZZDmg, ZZSecure, ZZDoorLbl, ZZd_*) live in crew-source.js.
+# Nick's truck-flow review (Oct 28) replaced D19 / D20 / D21 / D24 / D25: the steps now come from ZZd_steps (D40) and
+# the sections between "Photo before" and "Wrap up" from ZZd_Flow (D42); D12 / D14 / D16 / D23 / D27 / D30 got new text.
 
 
 def U(s):
@@ -277,4 +279,10 @@ PATCHES = [
      U(r'''fix it in step ",Xe(b?"verify":"pack")'''),
      'Wrap-up: two loads in one lane are fixed in "Sort, count, verify" now.'),
 
+
+    ('D63',
+     U(r'''let Q=ZZkind(e,u);'''),
+     U(r'''let Q=ZZd_kind(a,e);'''),
+     'Truck card (xj) band: the job word (UNPACK, UNLOAD, PACK, DELIVERY, PICKUP) and its trailer / receiver, like the truck screen, '
+     'instead of "CONSOLIDATED TRAILER / PICKUP / FOR DELIVERY".'),
 ]
