@@ -1,20 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://24hrcrossdock.com/</loc></url>
+  <url><loc>https://24hrcrossdock.com/services/</loc></url>
+  <url><loc>https://24hrcrossdock.com/cross-docking/</loc></url>
+  <url><loc>https://24hrcrossdock.com/transloading/</loc></url>
+  <url><loc>https://24hrcrossdock.com/freight-consolidation/</loc></url>
+  <url><loc>https://24hrcrossdock.com/freight-rework/</loc></url>
+  <url><loc>https://24hrcrossdock.com/warehousing/</loc></url>
+  <url><loc>https://24hrcrossdock.com/pickups-deliveries/</loc></url>
   <url><loc>https://24hrcrossdock.com/reno/</loc></url>
+  <url><loc>https://24hrcrossdock.com/reno/cross-docking/</loc></url>
   <url><loc>https://24hrcrossdock.com/reno/pallet-storage/</loc></url>
-  <url><loc>https://24hrcrossdock.com/reno/cross-dock/</loc></url>
+  <url><loc>https://24hrcrossdock.com/reno/pickups-deliveries/</loc></url>
+  <url><loc>https://24hrcrossdock.com/reno/transloading/</loc></url>
   <url><loc>https://24hrcrossdock.com/reno/fulfillment/</loc></url>
   <url><loc>https://24hrcrossdock.com/reno/fba-prep/</loc></url>
-  <url><loc>https://24hrcrossdock.com/reno/transload/</loc></url>
-  <url><loc>https://24hrcrossdock.com/reno/delivery/</loc></url>
   <url><loc>https://24hrcrossdock.com/sacramento/</loc></url>
-  <url><loc>https://24hrcrossdock.com/middletown/</loc></url>
+  <url><loc>https://24hrcrossdock.com/sacramento/cross-docking/</loc></url>
+  <url><loc>https://24hrcrossdock.com/sacramento/transloading/</loc></url>
+  <url><loc>https://24hrcrossdock.com/sacramento/freight-consolidation/</loc></url>
+  <url><loc>https://24hrcrossdock.com/harrisburg/</loc></url>
+  <url><loc>https://24hrcrossdock.com/harrisburg/cross-docking/</loc></url>
+  <url><loc>https://24hrcrossdock.com/harrisburg/freight-rework/</loc></url>
+  <url><loc>https://24hrcrossdock.com/harrisburg/freight-consolidation/</loc></url>
   <url><loc>https://24hrcrossdock.com/locations/</loc></url>
-  <url><loc>https://24hrcrossdock.com/services/</loc></url>
-  <url><loc>https://24hrcrossdock.com/client-portal/</loc></url>
   <url><loc>https://24hrcrossdock.com/about/</loc></url>
   <url><loc>https://24hrcrossdock.com/get-started/</loc></url>
-  <url><loc>https://24hrcrossdock.com/quote/</loc></url>
+  <url><loc>https://24hrcrossdock.com/client-portal/</loc></url>
   <url><loc>https://24hrcrossdock.com/drivers/</loc></url>
+  <url><loc>https://24hrcrossdock.com/quote/</loc></url>
 </urlset>

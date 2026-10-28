@@ -1,4 +1,5 @@
 (function(){
+  window.siteJS=1;   // the head script shows .rv content anyway if this file never runs
   var hd=document.querySelector('header');
   var nav=document.getElementById('nav'),last=0;
   function toph(){hd.style.setProperty('--toph',(nav?nav.offsetTop:0)+'px')}
@@ -14,11 +15,33 @@
     var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}})},{rootMargin:'0px 0px -8% 0px'});
     [].forEach.call(document.querySelectorAll('.rv'),function(el){io.observe(el)});
   } else {[].forEach.call(document.querySelectorAll('.rv'),function(el){el.classList.add('in')})}
-  // ?loc= and ?svc= pre-fill the quote forms
+  // Hero video: only after the page has loaded, with motion allowed, on screens 700px and wider, and without Data Saver.
+  // Everyone else keeps the poster still. Paused while the tab is hidden or the hero is scrolled away.
+  var vids=document.querySelectorAll('video.hv[data-src]');
+  if(vids.length){
+    var cn=navigator.connection||{};
+    var ok=function(){return !rm&&window.innerWidth>=700&&!cn.saveData};
+    window.addEventListener('load',function(){
+      if(!ok())return;
+      [].forEach.call(vids,function(v){
+        v.src=v.getAttribute('data-src');v.muted=true;
+        var p=v.play();if(p&&p.catch)p.catch(function(){});
+        if('IntersectionObserver' in window)new IntersectionObserver(function(es){es.forEach(function(en){
+          if(document.hidden)return;if(en.isIntersecting){var q=v.play();if(q&&q.catch)q.catch(function(){})}else v.pause();
+        })}).observe(v);
+      });
+      document.addEventListener('visibilitychange',function(){
+        [].forEach.call(vids,function(v){if(!v.src)return;if(document.hidden)v.pause();else{var q=v.play();if(q&&q.catch)q.catch(function(){})}});
+      });
+    });
+  }
+  // ?loc= and ?svc= pre-fill the quote forms. Old values from links outside the site map to today's option names.
+  var AL=/*ALIAS*/{};
   var q=new URLSearchParams(location.search),lv=q.get('loc'),sv=q.get('svc');
   [].forEach.call(document.querySelectorAll('form select'),function(s){
-    var v=s.name==='Location'?lv:s.name==='Service'?sv:null;
-    if(v&&[].some.call(s.options,function(o){return o.text===v})){s.value=v}
+    var v=s.name==='Location'?lv:s.name==='Service'?sv:null;if(!v)return;
+    var map=s.name==='Location'?AL.loc:AL.svc;v=(map&&map[v.trim().toLowerCase()])||v;
+    [].some.call(s.options,function(o){if(o.text.toLowerCase()===v.toLowerCase()){s.value=o.value||o.text;return true}});
   });
   // Visit tracking (only when GA_ID is filled in build.py, which defines gtag): calls, texts, portal clicks and quote requests
   var ga=typeof window.gtag==='function'?window.gtag:null;

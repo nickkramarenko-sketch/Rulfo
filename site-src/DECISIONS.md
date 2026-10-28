@@ -3,23 +3,23 @@
 ## Big picture
 - #1 customer: freight brokers. Big and small accounts both. No minimums. No freight refused (dry only, no temp control).
 - Main action: CALL. Nick answers 916-616-3481, 24/7. Promise: quote reply within 1 hour.
-- Feel: big national operator. Headline pushes size and reach (3 docks, 66 doors, 30,000+ pallets/mo).
+- Feel: big national operator. Headline pushes reach and facts we are sure of (3 docks, 46 dock doors, 105,000 sq ft, since 2015). (Was 66 doors and 30,000+ pallets/mo; changed Oct 28 2026, see D1, D2.)
 - Why us: speed, flexibility, price. Prices: "call for quote".
-- Hours: Mon–Fri 6am–10pm; nights and weekends by appointment ($100 fee 10pm–6am). Phone line 24/7.
+- Hours: Mon–Fri 6am–10pm; nights and weekends by appointment; after-hours work carries a $100 fee (D6; weekend fee to confirm). Phone line 24/7.
 - In business since 2015. "Fully insured" (no amount). Certifications: none yet; Claude picks the order.
 
 ## Docks
-- Reno: main earner cross-dock. Flexible 3PL. Fulfillment/FBA stays Reno-only for now.
-- Sacramento: main earner cross-dock.
-- Middletown (menu: "Harrisburg PA"): main earner restacking / rework.
+- Reno–Sparks: cross-docking first; 3PL warehousing and pallet storage (1,000–3,000 pallets), pickups and deliveries within 100 miles, contract warehousing. 8 doors, 40,000 sq ft. Fulfillment/FBA stays Reno-only, secondary (D7).
+- Sacramento (North Highlands): cross-docking, freight consolidation, transloading, freight rework. 8 doors, 40,000 sq ft, 500–1,000 pallets, within 150 miles.
+- Harrisburg (Middletown; URL /harrisburg/): cross-docking, freight rework, freight consolidation. 30 doors, 25,000 sq ft, about 500 pallets, within 150 miles.
 - Long-term pallet storage: push hard at all three.
 - Growth plans (sq ft): PRIVATE, remove from site.
 - Managers: name + photo on each location page (still need names/photos).
 - One phone/email for all docks for now; split later.
 
 ## Services
-- Reno pages: keep storage, cross-dock, fulfillment, FBA, transload, delivery. DROP trailers.
-- Delivery: our own trucks, anywhere.
+- Reno pages: storage (/reno/pallet-storage/), cross-docking, pickups & deliveries, transloading, fulfillment, FBA prep. Trailers dropped.
+- Pickups and deliveries: our own trucks, at all three docks, within 150 / 100 / 150 miles (Sacramento / Reno / Harrisburg) (D5).
 - Containers: floor-loaded and palletized. Storage: floor and racked.
 - Extras: shrink wrap, labeling, restack/rework.
 
@@ -58,3 +58,18 @@
 - Kiosk at each dock: `KIOSK_DOCKS` lists the docks with a check-in tablet (all three for now). Take a dock out if it has no tablet; its page then says "check in at the office".
 - Honesty fixes on older text: the Reno page no longer says reports are "sent automatically" or that the portal updates "in real time", and the cross-dock page now says "OS&D and damage reports the same day" instead of "in real time" (nothing is emailed automatically yet, and customers don't see live dock updates yet).
 - Nick asked for a short client portal page. It is longer now because it carries the new features, but every section is a few lines and the FAQ is collapsed.
+
+## Premium upgrade (Oct 28 2026)
+Full plan, facts and page map: `PLAN-premium.md`. Nick can veto any of these.
+- D1. Dock doors: 46 total (Sacramento 8, Reno 8, Harrisburg 30; Harrisburg was 50). Square feet stay 40,000 / 40,000 / 25,000 = 105,000.
+- D2. "30,000+ pallets a month" is off the site until Nick confirms it is 24 HR Crossdock's own volume (the earlier note said NVK included).
+- D3. Harrisburg URL is `/harrisburg/` (was `/middletown/`, which now redirects). Pages say "Harrisburg, PA (Middletown)".
+- D4. Reno service URLs renamed: `/reno/cross-docking/`, `/reno/transloading/`, `/reno/pickups-deliveries/` (old ones redirect). `/reno/pallet-storage/` stays.
+- D5. Pickups and deliveries use Nick's radius (150 / 100 / 150 miles) instead of "anywhere". Still our own trucks and drivers.
+- D6. After hours: "Nights and weekends by appointment; after-hours work carries a $100 fee." Phone 24/7. (Confirm whether weekends carry the fee.)
+- D7. Fulfillment and FBA prep pages stay as secondary Reno services, out of the spotlight.
+- D8. No company photos or licensed stock yet: the site ships with empty media slots and a media plan (`MEDIA.md`); slots render nothing until a file is added. Location slots take Nick's own photos only.
+- D9. Navigation stays flat (Reno NV · Sacramento CA · Harrisburg PA · Services · Client Portal · About); `/services/` is the hub; the footer lists every service and dock page.
+- D10. Portal promises stay exactly as the `LIVE` switches allow: no new portal claims, no "real-time", no texts or emails while alerts are 'soon'.
+- D11. No certifications claimed. Reviews: links to the Google listings only, no quotes until Nick supplies real ones.
+- D12. Six company-wide service pages added: `/cross-docking/`, `/transloading/`, `/freight-consolidation/`, `/freight-rework/`, `/warehousing/`, `/pickups-deliveries/`.

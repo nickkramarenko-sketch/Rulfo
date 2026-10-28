@@ -212,8 +212,6 @@ MEDIA = {
                       shot='Wide, low shot down a clean, bright loading dock: trailers backed into a row of dock doors, a forklift carrying a wrapped pallet. No readable company names.'),
     'home-crossdock': dict(alt='Forklift carrying a wrapped pallet between trailers on a cross-dock floor', ours=False, for_='Home page, cross-docking section',
                            shot='A forklift moving a wrapped pallet from one trailer toward another across a clean dock floor, open dock doors behind.'),
-    'home-freight': dict(alt='Drums, crates and wrapped pallets staged on a warehouse floor', ours=False, for_='Home page, freight types',
-                         shot='Mixed freight staged neatly on a clean concrete floor: drums, wooden crates and wrapped pallets side by side.'),
     'home-warehouse': dict(alt='Pallet racking in a bright, organized warehouse aisle', ours=False, for_='Home page, warehousing and 3PL',
                            shot='Tall pallet racking down a bright, organized aisle with a clean concrete floor.'),
     'home-pickups': dict(alt='Truck backed into a dock door for loading', ours=False, for_='Home page, pickups and deliveries',
@@ -738,8 +736,7 @@ def cta(svc, loc=None):
 
 
 def reach(loc):
-    return ('<div class="facts3">%s</div><p class="fine">Drive times are approximate and depend on traffic.</p>'
-            % ''.join('<div><b>%s</b><span>%s</span></div>' % r for r in REACH[loc]))
+    return '<div class="facts3">%s</div>' % ''.join('<div><b>%s</b><span>%s</span></div>' % r for r in REACH[loc])   # the page adds its own fine print
 
 
 def svctable():
@@ -932,12 +929,9 @@ def footer():
         return _FOOTER[0]
     def col(k):
         L = LOC[k]
-        links = [(svc_url(k, s), SVCS[s]['short'] if s != 'warehousing' else '3PL warehousing &amp; storage' if k == 'reno' else 'Pallet storage')
-                 for s in [s for s, n, l in SPEC[k] if s != 'contract']]
-        links += [(u, n) for (kk, s), u in LOCSVC.items() if kk == k and u not in [x for x, y in links]
-                  for n in [{'transloading': 'Transloading', 'fulfillment': 'Fulfillment', 'warehousing': 'Pallet storage'}.get(s, SVCS[s]['short'])]]
-        if k == 'reno':
-            links.append(('/reno/fba-prep/', 'FBA prep'))
+        # this dock's own pages, in menu order (specialties first, as in REG)
+        links = [(p['url'], '3PL warehousing &amp; storage' if p['svc'] == 'warehousing' else p['crumb'].replace('&', '&amp;'))
+                 for p in REG if p['sec'] == k and p['svc']]
         lis = ''.join('<p><a href="%s">%s</a></p>' % (u, n) for u, n in links)
         return '<div><h4><a href="%s">%s</a></h4><p class="fad"><a href="%s">%s</a></p>%s</div>' % (L['home'], L['label'], L['home'], addr(k, ', '), lis)
     svcs = ''.join('<p><a href="%s">%s</a></p>' % (SVCS[s]['url'], SVCS[s]['name'].replace('&', '&amp;')) for s in CORE)
@@ -1550,7 +1544,10 @@ def build():
     open(os.path.join(OUT, 'robots.txt'), 'w').write('User-agent: *\nAllow: /\nDisallow: /thanks/\nSitemap: %s/sitemap.xml\n' % DOMAIN)
     js = os.path.join(OUT, 'assets', 'site.js')
     alias = json.dumps({'loc': LOC_ALIAS, 'svc': SVC_ALIAS}, ensure_ascii=False, separators=(',', ':'))
-    open(js, 'w', encoding='utf-8').write(open(js, encoding='utf-8').read().replace('{EMAIL}', EMAIL).replace('/*ALIAS*/{}', alias))
+    src = open(js, encoding='utf-8').read()
+    if '/*ALIAS*/{}' not in src:
+        raise SystemExit('assets/site.js lost its /*ALIAS*/{} marker (the ?loc=/?svc= alias map goes there)')
+    open(js, 'w', encoding='utf-8').write(src.replace('{EMAIL}', EMAIL).replace('/*ALIAS*/{}', alias))
     have, total, missing = media_plan()
     leftover = [u for u in out if '#/' in out[u]]
     print('built', len(REG), 'pages + 404', 'LEFTOVER HASH LINKS:' if leftover else '', leftover or '')

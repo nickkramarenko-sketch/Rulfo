@@ -10,13 +10,27 @@
   from = "/north-highlands/*"
   to = "/sacramento/"
   status = 301
+# Harrisburg dock pages moved from /middletown/ to /harrisburg/ (D3). Do not add a /harrisburg/* -> /middletown/ rule: it would loop.
 [[redirects]]
-  from = "/harrisburg/*"
-  to = "/middletown/"
+  from = "/middletown/*"
+  to = "/harrisburg/:splat"
   status = 301
 [[redirects]]
   from = "/sparks/*"
   to = "/reno/"
+  status = 301
+# Reno service pages renamed (D4)
+[[redirects]]
+  from = "/reno/cross-dock/*"
+  to = "/reno/cross-docking/"
+  status = 301
+[[redirects]]
+  from = "/reno/transload/*"
+  to = "/reno/transloading/"
+  status = 301
+[[redirects]]
+  from = "/reno/delivery/*"
+  to = "/reno/pickups-deliveries/"
   status = 301
 [[redirects]]
   from = "/technology/*"
