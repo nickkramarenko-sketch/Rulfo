@@ -145,6 +145,12 @@ H.main('b-flow', async (h, t) => {
     await p.waitForFunction(() => document.querySelectorAll('[data-zzb=book-ship] img').length === 1, null, { timeout: 5000 });
     await tallShot(h, p, 'flow-book-stops-390');
     await noSide(t, p, 'pickup form with stops and the shipper photo');
+    await p.setViewportSize(DESK);
+    await p.waitForTimeout(200);
+    await bp.scrollIntoViewIfNeeded();
+    await bp.screenshot({ path: require('path').join(h.SHOTS, h.prefix + '-flow-book-stops-1400.png') });
+    await p.setViewportSize(PHONE);
+    await p.waitForTimeout(200);
     await fs.getByRole('button', { name: 'Add to schedule' }).click();
     await p.waitForTimeout(900);
     const doc = await h.readDoc(p);

@@ -757,16 +757,16 @@ ZZd_reloadLine=(doc,t)=>{if(t.direction==="outbound")return"";let L=((doc&&doc.s
   return ZZd_f(L.length===1?"Then PACK 1 load back out → California · {p} pallets":"Then PACK {n} loads back out → California · {p} pallets",{n:L.length,p:L.reduce((a2,s)=>a2+fe(s),0)})},
 /* the big line in the title card: "UNPACK · Consolidated trailer (inbound)" */
 ZZd_JobTitle=({t,doc,job})=>{ZZtr3();let J=ZZJOBS[job]||ZZJOBS.unload;
-  return ZZh("div",{"data-zz":"jobtitle","data-job":job,style:{lineHeight:1.2,minWidth:0}},
-    ZZh("span",{className:"zzc",style:{fontSize:26,fontWeight:900,letterSpacing:".04em",color:ZZd_JOBCOL(job)}},R(J.word)),
-    ZZh("span",{style:{fontSize:16,fontWeight:800,color:m.text,overflowWrap:"anywhere"}},` · ${ZZd_jobLabel(doc,t,job)}`))},
+  return ZZh("div",{"data-zz":"jobtitle","data-job":job,style:{lineHeight:1.2,minWidth:0,marginBottom:12,paddingBottom:10,borderBottom:`1px solid ${m.line}`}},
+    ZZh("span",{className:"zzc",style:{fontSize:30,fontWeight:900,letterSpacing:".05em",color:ZZd_JOBCOL(job)}},R(J.word)),
+    ZZh("span",{style:{fontSize:19,fontWeight:800,color:m.text,overflowWrap:"anywhere"}},` · ${ZZd_jobLabel(doc,t,job)}`))},
 /* the job card under the title card: job, the task in plain words, the reload part, the office's words, the load badges */
 ZZd_JobCard=({t,doc,job,ZB})=>{ZZtr3();let c=ZZd_JOBCOL(job),J=ZZJOBS[job]||ZZJOBS.unload,inb=t.direction!=="outbound",SH=(doc&&doc.shipments)||[],
     L=inb?ZZd_bySeq(SH.filter(s=>s&&s.trailerInId===t.id)):ZZloadOrder(doc,t).map(o2=>o2.s).filter(s=>t.stage==="departed"||!s.shippedAt),rl=ZZd_reloadLine(doc,t),bd=ZB||{},
     where=s=>inb&&be(s)==="sac"?`→ ${s.dest||R("California")}`:s.row?ZZd_f("lane {x}",{x:s.row}):s.dest||R("floor");
   return ZZh("div",{"data-zz":"jobcard","data-job":job,style:{borderRadius:12,padding:"12px 14px",background:m.panel,border:`1px solid ${m.line}`,borderLeft:`8px solid ${c}`,display:"grid",gap:8,boxShadow:"0 4px 12px rgba(0,0,0,.08)",minWidth:0}},
     ZZh("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap"}},
-      ZZh("span",{className:"zzc",style:{fontSize:22,fontWeight:900,letterSpacing:".05em",color:c,minWidth:0,overflowWrap:"anywhere"}},`${R(J.word)} · ${ZZd_jobLabel(doc,t,job)}`),
+      ZZh("span",{className:"zzc",style:{fontSize:15,fontWeight:900,letterSpacing:".08em",color:c,minWidth:0}},`${R(J.word)} · ${R("what to do")}`),
       ZZh("span",{style:{fontSize:15,fontWeight:900,color:m.orange,whiteSpace:"nowrap"}},`${R("Door")} ${t.dock||"—"}`)),
     ZZh("div",{"data-zz":"jobtask",style:{fontSize:18,fontWeight:800,lineHeight:1.3}},ZZd_task(doc,t,job)),
     rl?ZZh("div",{"data-zz":"jobreload",style:{fontSize:16,fontWeight:800,lineHeight:1.3,color:m.blue}},rl):null,
