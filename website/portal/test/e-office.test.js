@@ -489,6 +489,155 @@ H.main('e-office', async (h, t) => {
     await p.context().close();
   }
 
+  /* ================= crew truck flow (Nick's review, Oct 28): office side ================= */
+  t.section('crew truck flow: loading job, load badges, load plan, shipper photo, manifest, crew photos, damage snaps');
+  {
+    const s2 = clone(seed);
+    const tpl = clone(s2.trailers.find(x => x.id === 'zzeW1'));
+    const TT = x => Object.assign(clone(tpl), { carrier: '', driver: 'Driver ' + x.truck, phone: '', direction: 'inbound', dock: null, scheduledAt: null, arrivedAt: null, dockedAt: null, workStartedAt: null,
+      workStartedBy: null, workDoneAt: null, workDoneBy: null, departedAt: null, notes: '', chat: [], sealIn: '', instructions: '', jobType: '', history: [] }, x, { trailer: 'T' + x.truck });
+    const LD = x => Object.assign({ customerId: 'cu_altex', trailerInId: null, trailerOutId: null, units: { std: 6, lg: 0, crate: 0 }, exceptions: [], adjustments: [], chat: [], touches: [], corrections: [], lane: 'reno', status: 'staged',
+      receivedAt: iso(NOW - DAY), receivedBy: 'Roman', dest: '', po: '', bol: '', loadNotes: '', commodity: '' }, x);
+    const ago = m => iso(NOW - m * MIN);
+    s2.trailers.push(
+      TT({ id: 'zzeIA', truck: 'IA', customerId: 'cu_altex', stage: 'departed', arrivedAt: iso(NOW - DAY - HOUR), workDoneAt: iso(NOW - DAY), departedAt: iso(NOW - DAY + HOUR) }),
+      TT({ id: 'zzeIB', truck: 'IB', customerId: 'cu_pine', stage: 'departed', arrivedAt: iso(NOW - DAY - HOUR), workDoneAt: iso(NOW - DAY), departedAt: iso(NOW - DAY + HOUR) }),
+      /* packing now at D5: Altex + Pine Ridge loads from two inbound trucks -> PACK (worked out) */
+      TT({ id: 'zzeP1', truck: 'P1', customerId: 'cu_altex', direction: 'outbound', stage: 'working', dock: 'D5', arrivedAt: ago(70), dockedAt: ago(60), workStartedAt: ago(55), workStartedBy: 'Roman',
+        afterPhotoCount: 4, dmgDrafts: [{ id: 'xT1', photoOwner: 'dmg:xT1', photoCount: 2, at: ago(30), by: 'Roman', note: 'wrap torn' }] }),
+      /* a delivery that left: signed manifest, new securing report, bills and inspect photos */
+      TT({ id: 'zzeD1', truck: 'D1X', customerId: 'cu_altex', direction: 'outbound', stage: 'departed', loadJob: 'delivery', arrivedAt: ago(300), dockedAt: ago(290), workStartedAt: ago(285), workDoneAt: ago(230), departedAt: ago(225),
+        afterPhotoCount: 3, strapPhotoCount: 2, bolPhotoCount: 1, shipperPhotoCount: 1,
+        secure: { gear: { plywood: { qty: 0, owner: 'ours' }, bars: { qty: 2, owner: 'ours' }, straps: { qty: 4, owner: 'driver' }, airbags: { qty: 0, owner: 'ours' } }, tags: [], seal: 'SL-900',
+          photos: null, photoOwner: 'strap:zzeD1', photoCount: 2, v: 2, confidence: 4, note: '', checkedRows: true, signature: 'Roman', signedBy: 'Roman', signedAt: ago(232) },
+        manifest: { lines: [
+          { id: 'ml1', sid: 'zzeS4', ref: 'DL-1', customerId: 'cu_altex', planned: 6, loaded: 6, stop: 1, pos: 'tail', note: '' },
+          { id: 'ml2', sid: 'zzeS5', ref: 'DL-2', customerId: 'cu_altex', planned: 6, loaded: 5, stop: 2, pos: 'nose', note: 'one left, broken' },
+          { id: 'ml3', sid: null, ref: 'Loose freight', customerId: null, planned: 0, loaded: 2, stop: null, pos: null, note: 'two cartons' }],
+          total: 13, signature: 'Roman', signedBy: 'Roman', signedAt: ago(231) } }));
+    s2.shipments.push(
+      LD({ id: 'zzeS1', ref: 'PK-1', trailerInId: 'zzeIA', trailerOutId: 'zzeP1', seq: 0, row: 'R03', loadedAt: ago(40) }),
+      LD({ id: 'zzeS2', ref: 'PK-2', customerId: 'cu_pine', trailerInId: 'zzeIB', trailerOutId: 'zzeP1', seq: 1, row: 'R04',
+        exceptions: [{ id: 'xP2', kind: 'Damage', draft: true, photoOwner: 'dmg:xP2', photoCount: 1, at: ago(20), openedBy: 'Roman', note: 'Damage photo, details to come', snapNote: '', resolved: false, trailerId: 'zzeP1' }] }),
+      LD({ id: 'zzeS3', ref: 'PK-3', trailerInId: 'zzeIA', trailerOutId: 'zzeP1', seq: 2, row: 'R05' }),
+      LD({ id: 'zzeS4', ref: 'DL-1', trailerInId: 'zzeIA', trailerOutId: 'zzeD1', seq: 0, loadedAt: ago(240), shippedAt: ago(225), inspPhotoCount: 1 }),
+      LD({ id: 'zzeS5', ref: 'DL-2', trailerInId: 'zzeIA', trailerOutId: 'zzeD1', seq: 1, loadedAt: ago(240), shippedAt: ago(225), inspPhotoCount: 1 }));
+    const p = await office(h, s2, NOW);
+    for (const [k, n] of [['dmg:xT1', 2], ['dmg:xP2', 1], ['strap:zzeD1', 2], ['insp:zzeS4', 1]])
+      await p.evaluate(([k, n, src]) => window.__zz.h.photos.ex(k, [...Array(n)].map((_, j) => ({ id: k + j, src, at: new Date().toISOString(), by: 'Roman' }))), [k, n, 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR42mP8z8AARMQBxlGFAD7XAQEZW5rUAAAAAElFTkSuQmCC']);
+    const sheet = p.locator('.fixed.inset-0').last();
+
+    /* Yard: damage snaps waiting for details */
+    await tab(p, 'Yard');
+    const sn = p.locator('[data-zz="snaps"]');
+    t.ok(await sn.count() === 1 && /Damage snaps waiting for details · 2/.test(await sn.innerText()) && /Truck P1 · load not picked yet, PK-2/.test(await sn.innerText()), 'Yard: "Damage snaps waiting for details · 2" with the truck and which loads');
+    const msgs = await p.evaluate(() => window.__zz.h.ZZmsgs(window.__zz.doc, Date.now()).filter(q => /xP2|xT1/.test(q.id)).length);
+    t.ok(msgs === 0, 'no customer alert is queued for a snap');
+    await sn.getByRole('button', { name: /Truck P1/ }).click();
+    await p.waitForTimeout(500);
+    let st = await sheet.innerText();
+    t.ok(await sheet.getByText('P1 / TP1').count() > 0, 'tapping it opens truck P1');
+
+    /* pills, job, snaps */
+    t.ok(/\bPACK\b/.test(st) && /2 damage snaps waiting/.test(st), 'pills: the loading job (PACK) and "2 damage snaps waiting"');
+    const sp = sheet.locator('[data-zz="snaps"]');
+    t.ok(await sp.locator('[data-snap]').count() === 2 && /Load not picked yet/.test(await sp.innerText()) && await sp.locator('[data-snap="xP2"] [data-badge="2"]').count() === 1 && /Pine Ridge Freight/.test(await sp.innerText()),
+      'truck sheet: both snaps, the load one with its badge ② and company, the other "Load not picked yet"');
+    t.ok(/no alert is queued until then/.test(st), 'says the customer sees nothing until the details are added');
+    t.eq(await sheet.locator('[data-snap="xT1"] img').count(), 2, 'the snap photos show');
+    const job = sheet.locator('[data-zz="job"]');
+    t.ok(/PACK/.test(await job.innerText()) && /Consolidated trailer/.test(await job.innerText()) && /worked out from the loads/.test(await job.innerText()), 'Loading job: PACK, consolidated trailer, worked out from the loads');
+    await sheet.getByRole('button', { name: 'Delivery', exact: true }).click();
+    await p.waitForTimeout(500);
+    let d = await h.readDoc(p);
+    t.ok(truckT(d, 'zzeP1').loadJob === 'delivery' && (truckT(d, 'zzeP1').history || []).some(x => x.text === 'Loading job: Delivery'), 'the office switches it to Delivery (zzLoadJob, history line)');
+    t.ok(/DELIVERY/.test(await job.innerText()), 'the sheet shows DELIVERY');
+    await sheet.getByRole('button', { name: 'Auto (PACK)' }).click();
+    await p.waitForTimeout(500);
+    d = await h.readDoc(p);
+    t.ok(truckT(d, 'zzeP1').loadJob === null, 'Auto puts it back to worked out (loadJob null)');
+
+    /* load badges in Nick's lists */
+    const nb = await sheet.locator('[data-badge]').evaluateAll(xs => [...new Set(xs.map(x => x.dataset.badge))].sort());
+    t.ok(nb.join() === '1,2,3', 'the 3 loads carry badges ① ② ③ in Nick\'s truck sheet lists (' + nb.join() + ')');
+
+    /* load plan */
+    const lp = sheet.getByRole('button', { name: 'Set stops (more than one stop)' });
+    await lp.click();
+    await p.waitForTimeout(200);
+    await sheet.getByRole('button', { name: 'More than one stop', exact: true }).click();
+    await p.waitForTimeout(200);
+    const pe = sheet.locator('[data-zz="plan-edit"]');
+    t.eq(await pe.locator('[data-plan] select').evaluateAll(xs => xs.map(x => x.value)), ['1', '2', '3'], 'More than one stop: stops 1, 2, 3 to start');
+    await pe.locator('[data-plan="zzeS3"] select').selectOption('2');
+    await p.waitForTimeout(100);
+    await h.check(p, 'flow-office-plan-edit-1400');
+    await sheet.getByRole('button', { name: 'Save load plan' }).click();
+    await p.waitForTimeout(500);
+    d = await h.readDoc(p);
+    const S = id => d.shipments.find(x => x.id === id);
+    t.ok(truckT(d, 'zzeP1').multiStop === true && S('zzeS1').stop === 1 && S('zzeS1').pos === 'tail' && S('zzeS2').stop === 2 && S('zzeS2').pos === 'nose' && S('zzeS3').stop === 2 && S('zzeS3').pos === 'nose',
+      'saved with zzLoadPlan: multi-stop, stop 1 tail, stop 2 nose (suggested)');
+    const pv = await sheet.locator('[data-zz="plan-view"]').innerText();
+    t.ok(/Stop 2 · NOSE — front of the trailer[\s\S]*Stop 1 · TAIL — by the doors/.test(pv) && /Pine Ridge Freight/.test(pv), 'the plan shows in loading order (nose first) with the other company named for the office');
+
+    /* shipper photo, crew photos, manifest not signed yet, staff trail */
+    await sheet.locator('[data-zz="ship"] input[type=file]').setInputFiles(h.UPLOAD_PNG);
+    await p.waitForTimeout(700);
+    d = await h.readDoc(p);
+    t.ok(truckT(d, 'zzeP1').shipperPhotoCount === 1, 'the office adds the shipper reference photo (ship:<truck id>, shipperPhotoCount 1)');
+    st = await sheet.innerText();
+    t.ok(/Crew photos · 4/.test(st) && /Packing and loading · 4/i.test(st), 'crew photos: 4 packing / loading photos');
+    t.ok(/Not signed yet\. The forklift driver fills it in at the end of packing\./.test(st), 'manifest: not signed yet');
+    const more = sheet.locator('[data-zz="trail"]').locator('xpath=..').getByRole('button', { name: /^Show all/ });
+    if (await more.count()) { await more.click(); await p.waitForTimeout(200); }
+    const trl = await sheet.locator('[data-zz="trail"]').innerText();
+    t.ok(/Damage photo taken on PK-2 \(details to come\)/.test(trl) && /Damage photo taken \(load not picked yet, details to come\)/.test(trl), 'staff trail shows both snaps, also on the other company\'s load (ZZtrail staff)');
+    /* close-ups at phone width: the snaps, the job, the load plan */
+    await p.setViewportSize(PHONE);
+    await p.waitForTimeout(300);
+    for (const [sel, name] of [['[data-zz="snaps"]', 'snaps'], ['[data-zz="job"]', 'job'], ['[data-zz="plan-view"]', 'plan']]) {
+      const el = sheet.locator(sel).first().locator('xpath=..');
+      await el.scrollIntoViewIfNeeded();
+      await el.screenshot({ path: require('path').join(h.SHOTS, h.prefix + '-flow-office-390-' + name + '.png') });
+    }
+    /* tall screenshots so the whole sheet shows */
+    for (const [w, name] of [[1400, 'flow-office-p1-1400'], [390, 'flow-office-p1-390']]) {
+      await p.setViewportSize({ width: w, height: 5200 });
+      await p.evaluate(() => document.querySelectorAll('.overflow-y-auto').forEach(el => { el.scrollTop = 0; }));
+      await p.waitForTimeout(300);
+      await h.check(p, name);
+    }
+    await p.setViewportSize(DESK);
+    await closeSheet(p);
+
+    /* the delivery that left: full manifest, new securing report, bills and inspect photos */
+    await p.context().close();
+    const q = await office(h, s2, NOW);
+    for (const [k, n] of [['strap:zzeD1', 2], ['insp:zzeS4', 1]])
+      await q.evaluate(([k, n, src]) => window.__zz.h.photos.ex(k, [...Array(n)].map((_, j) => ({ id: k + j, src, at: new Date().toISOString(), by: 'Roman' }))), [k, n, 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR42mP8z8AARMQBxlGFAD7XAQEZW5rUAAAAAElFTkSuQmCC']);
+    await tab(q, 'Yard');
+    await q.locator('[data-truck="zzeD1"]').click();
+    await q.waitForTimeout(500);
+    const sh2 = q.locator('.fixed.inset-0').last();
+    const mf = sh2.locator('[data-zz="manifest"]');
+    const mt = await mf.innerText();
+    t.ok(await mf.locator('[data-line]').count() === 3 && /DL-1/.test(mt) && /Loose freight/.test(mt) && /5 of 6 plt/.test(mt) && /one left, broken/.test(mt) && /Staff only/.test(mt), 'manifest: every line for the office (badges, loaded of planned, notes, the staff-only extra line)');
+    const s2t = await sh2.innerText();
+    t.ok(/Manifest · 13 pallets loaded/.test(s2t) && /signed by Roman/.test(s2t) && /Each customer sees only the lines of their own loads/.test(s2t), 'manifest total, signer, and the privacy note');
+    t.ok(/DELIVERY/.test(s2t) && /Securing and what's used · 2/i.test(s2t) && /Bills · 1/i.test(s2t) && /inspected before loading/i.test(s2t), 'job DELIVERY, securing photos (new report), bills and the per-load inspect photos');
+    t.ok(await sh2.locator('[data-zz="truck-more"] img').count() >= 3, 'the securing and inspect photos on this device show');
+    await q.setViewportSize(PHONE);
+    await q.waitForTimeout(300);
+    await mf.locator('xpath=..').scrollIntoViewIfNeeded();
+    await mf.locator('xpath=..').screenshot({ path: require('path').join(h.SHOTS, h.prefix + '-flow-office-390-manifest.png') });
+    await q.setViewportSize({ width: 1400, height: 4200 });
+    await q.evaluate(() => document.querySelectorAll('.overflow-y-auto').forEach(el => { el.scrollTop = 0; }));
+    await q.waitForTimeout(300);
+    await h.check(q, 'flow-office-d1-1400');
+    await q.context().close();
+  }
+
   /* ================= office booking ================= */
   t.section('office "Book a truck" records bookedVia office and is confirmed');
   {

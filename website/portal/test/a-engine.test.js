@@ -965,4 +965,281 @@ H.main('a-engine', async (h, t) => {
     t.ok(/^Worked out from the trucks and loads in your portal\. Texts and emails are not switched on yet\.$/.test(ct.foot) && ct.color !== 'rgb(255, 255, 255)', 'customer bell: an honest footnote (not "live from the dock"), readable');
     await c.context().close();
   }
+  /* ================= 13. crew truck flow: jobs, load badges, stops, damage snaps, manifest, securing photos, photo cap ================= */
+  t.section('crew truck flow: loading jobs, load badges, multi-stop plan, damage snaps (drafts), manifest, securing photos, photo cap');
+  {
+    const seed = clone(base);
+    const now = Date.now(), at = iso(now - 2 * HOUR);
+    const ld = (id, cid, tin, tout, o = {}) => Object.assign({ id, ref: id.toUpperCase(), customerId: cid, trailerInId: tin, trailerOutId: tout, origin: '', dest: 'Reno, NV', lane: 'reno',
+      units: { std: 4, lg: 0, crate: 0 }, weight: 0, commodity: '', status: 'staged', receivedAt: at, shippedAt: null, afterHours: false, rewrapPallets: 0, labor: [], row: 'R03', deliverBy: null,
+      service: null, bol: '', qc: { condition: '', counted: null, note: '' }, exceptions: [], adjustments: [], photoCount: 0, invoiceId: null, chat: [], po: '', loadNotes: '', touches: [] }, o);
+    const tr = (id, truck, dir, cid, o = {}) => Object.assign({ id, truck, trailer: 'T' + truck, carrier: 'Test', driver: 'Dee', phone: '', direction: dir, customerId: cid, needsMatch: false,
+      stage: 'working', dock: 'D5', arrivedAt: iso(now - 3 * HOUR), dockedAt: iso(now - 3 * HOUR), workStartedAt: iso(now - HOUR), chat: [], history: [] }, o);
+    seed.trailers.push(tr('fUp', 'UP1', 'inbound', 'cu_altex'), tr('fPu', 'PU1', 'inbound', 'cu_altex', { dock: 'D6' }),
+      tr('fPack', 'PK1', 'outbound', 'cu_altex', { dock: 'D7' }), tr('fDel', 'DL1', 'outbound', 'cu_altex', { stage: 'scheduled', dock: null, arrivedAt: null, dockedAt: null, workStartedAt: null }),
+      tr('fPick', 'PI1', 'outbound', 'cu_pine', { stage: 'scheduled', dock: null, arrivedAt: null, dockedAt: null, workStartedAt: null }),
+      tr('fJt1', 'JT1', 'outbound', 'cu_altex', { jobType: 'Consolidate & reload', stage: 'scheduled', dock: null, arrivedAt: null }),
+      tr('fJt2', 'JT2', 'outbound', 'cu_altex', { jobType: 'Reno delivery', stage: 'scheduled', dock: null, arrivedAt: null }));
+    seed.shipments.push(
+      ld('u1', 'cu_altex', 'fUp', null, { origin: 'Newark, NJ', seq: 0, qc: { condition: 'Damaged', counted: 4, note: '' }, exceptions: [{ id: 'plainU1', kind: 'Damage', note: 'damage noted \u2014 Roman at the door', at, openedBy: 'Roman', resolved: false }] }), ld('u2', 'cu_pine', 'fUp', null, { origin: 'Newark, NJ', seq: 1 }), ld('u3', 'cu_altex', 'fUp', null, { origin: 'Newark, NJ', seq: 2, lane: 'sac' }),
+      ld('p1', 'cu_altex', 'fPu', null, { origin: 'Sparks, NV', seq: 0 }),
+      ld('k1', 'cu_altex', 'fUp', 'fPack', { seq: 5 }), ld('k2', 'cu_altex', 'fPu', 'fPack', { seq: 1 }), ld('k3', 'cu_pine', 'fPu', 'fPack', { seq: 2 }),
+      ld('d1', 'cu_altex', 'fPu', 'fDel', { seq: 0 }), ld('d2', 'cu_altex', 'fPu', 'fDel', { seq: 1 }), ld('i1', 'cu_pine', 'fPu', 'fPick', { seq: 0 }),
+      ld('j1', 'cu_altex', 'fPu', 'fJt1', { seq: 0 }), ld('j2', 'cu_altex', 'fPu', 'fJt2', { seq: 0 }),
+      ld('far', 'cu_altex', 'fPick', null, { seq: 0 }));
+    seed.zzRequests = [...(seed.zzRequests || []), { id: 'rqDel', num: 'R-1', type: 'delivery', status: 'confirmed', customerId: 'cu_altex', loads: ['d2'], address: '1 Main St', createdAt: at }];
+    seed.customers = seed.customers.map(c => c.id === 'cu_altex' ? { ...c, autoApproveUnder: 1000 } : c);
+    const p = await h.openAs('crew', { viewport: PHONE, seed });
+    await ready(p);
+    await p.evaluate(() => {
+      window.__w = 0; const real = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) { if (k === 'cdweb:cd6:doc') window.__w++; return real.call(this, k, v); };
+    });
+    const writes = async (name, ...args) => { const b = await p.evaluate(() => window.__w); const r = await act(p, name, ...args); return { n: (await p.evaluate(() => window.__w)) - b, r }; };
+
+    // ---- loading jobs ----
+    let jobs = await calc(p, (h, doc) => ['fUp', 'fPu', 'fPack', 'fDel', 'fPick', 'fJt1', 'fJt2'].map(id => h.ZZloadJob(doc, id)));
+    t.eq(jobs, ['unpack', 'unload', 'pack', 'delivery', 'pickup', 'pack', 'delivery'],
+      'ZZloadJob: East Coast inbound = unpack, local pickup trailer = unload, outbound from 2+ trucks/customers = pack, delivery request = delivery, else pickup; job type Consolidate & reload = pack, Reno delivery = delivery');
+    let w1 = await writes('zzLoadJob', 'fPick', 'delivery');
+    let w0 = [await writes('zzLoadJob', 'fPick', 'delivery'), await writes('zzLoadJob', 'fPick', 'unpack'), await writes('zzLoadJob', 'fUp', 'pack'), await writes('zzLoadJob', 'nope', 'pack')];
+    jobs = await calc(p, (h, doc) => [h.ZZloadJob(doc, 'fPick'), doc.trailers.find(t => t.id === 'fPick').loadJob, doc.trailers.find(t => t.id === 'fPick').history.slice(-1)[0].text]);
+    t.ok(w1.n === 1 && w0.every(x => x.n === 0) && jobs[0] === 'delivery' && jobs[1] === 'delivery' && jobs[2] === 'Loading job: Delivery',
+      `zzLoadJob: the office choice wins (one write, history line); the same job again, a bad job, an inbound truck or no truck write nothing (${JSON.stringify(w0.map(x => x.n))})`);
+    w1 = await writes('zzLoadJob', 'fPick', null);
+    jobs = await calc(p, (h, doc) => [h.ZZloadJob(doc, 'fPick'), doc.trailers.find(t => t.id === 'fPick').loadJob]);
+    t.ok(w1.n === 1 && jobs[0] === 'pickup' && jobs[1] === null, 'zzLoadJob(tid, null) goes back to the worked-out job (loadJob null, never a missing key)');
+
+    // ---- load badges ----
+    let bd = await calc(p, (h, doc) => ({ up: h.ZZloadBadges(doc, 'fUp'), pk: h.ZZloadBadges(doc, doc.trailers.find(t => t.id === 'fPack')), alt: h.ZZloadBadges(doc, 'fUp', 'cu_altex'),
+      again: JSON.stringify(h.ZZloadBadges(doc, 'fUp')), pal: h.ZZBADGE, none: h.ZZloadBadges(doc, 'nope') }));
+    t.eq(['u1', 'u2', 'u3', 'k1'].map(id => [bd.up[id].n, bd.up[id].label, bd.up[id].dir]), [[1, '① U1', 'in'], [2, '② U2', 'in'], [3, '③ U3', 'in'], [4, '④ K1', 'in']],
+      'ZZloadBadges numbers the loads of a truck in seq order with a circled number and the PRO (① U1, ② U2 ...)');
+    t.eq(['k2', 'k3', 'k1'].map(id => bd.pk[id].n), [1, 2, 3], 'an outbound truck numbers its outgoing loads by seq (k2 seq 1, k3 seq 2, k1 seq 5)');
+    t.ok(bd.up.u1.color === bd.pal[0].color && bd.up.u2.color === bd.pal[1].color && bd.up.u1.color !== bd.up.u2.color && bd.up.u1.fg && bd.up.u1.name === 'Blue' && bd.up.u1.mark === '①',
+      'badge = {n, color, fg, label, mark, name}: ① blue, ② green ...');
+    t.ok(bd.again === JSON.stringify(bd.up) && JSON.stringify(bd.none) === '{}', 'badges are stable (same answer every time); an unknown truck has none');
+    t.eq(Object.values(bd.alt).map(b => [b.ref, b.n]), [['U1', 1], ['U3', 2], ['K1', 3]], 'with a customer id only that customer\'s loads are numbered (no hint of other companies\' loads)');
+    {
+      const lum = hx => { const c = [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+      const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      const rgb = hx => [1, 3, 5].map(i => parseInt(hx.slice(i, i + 2), 16));
+      const pages = ['#FFFFFF', '#F1F5F5', '#F4F8F8', '#151F2D', '#0E1621', '#1C2837', '#111821', '#080B0F', '#1A222D'];
+      const worstBg = Math.min(...bd.pal.flatMap(b => pages.map(g => cr(b.color, g))));
+      const worstFg = Math.min(...bd.pal.map(b => cr(b.color, b.fg)));
+      let minD = 1e9; bd.pal.forEach((a, i) => bd.pal.forEach((b, j) => { if (j > i) { const x = rgb(a.color), y = rgb(b.color); minD = Math.min(minD, Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])); } }));
+      t.ok(bd.pal.length >= 8 && new Set(bd.pal.map(b => b.color)).size === bd.pal.length && new Set(bd.pal.map(b => b.name)).size === bd.pal.length && minD > 55,
+        `${bd.pal.length} distinct badge colours with names (closest pair ${minD.toFixed(0)} apart)`);
+      t.ok(worstBg >= 2.8 && worstFg >= 3, `every badge reads on the brand, clean and hi-vis pages and panels (worst ${worstBg.toFixed(2)}:1) and its number on it (worst ${worstFg.toFixed(2)}:1)`);
+    }
+
+    // ---- multi-stop plan ----
+    const ps = await calc(p, h => [h.ZZposSuggest([1, 3, 2, 3]), h.ZZposSuggest([2, 2]), h.ZZposSuggest([null, 1, 2]), h.ZZposSuggest(3), h.ZZposSuggest(1), h.ZZposSuggest(0)]);
+    t.eq(ps, [['tail', 'nose', 'middle', 'nose'], [null, null], [null, 'tail', 'nose'], { 1: 'tail', 2: 'middle', 3: 'nose' }, { 1: null }, {}],
+      'ZZposSuggest: last stop -> nose, first stop -> tail, between -> middle; one stop -> no position');
+    w1 = await writes('zzLoadPlan', 'fDel', { multiStop: true, loads: [{ sid: 'd1', stop: 1, pos: 'tail' }, { sid: 'd2', stop: 2, pos: 'nose' }, { sid: 'u1', stop: 1, pos: 'nose' }] });
+    let pl = await calc(p, (h, doc) => { const g = id => doc.shipments.find(s => s.id === id); return { t: doc.trailers.find(t => t.id === 'fDel'), d1: [g('d1').stop, g('d1').pos], d2: [g('d2').stop, g('d2').pos], u1: [g('u1').stop, g('u1').pos],
+      order: h.ZZloadOrder(doc, 'fDel').map(r => [r.sid, r.pos, r.stop, r.badge.n]) }; });
+    t.ok(w1.n === 1 && pl.t.multiStop === true && pl.d1.join() === '1,tail' && pl.d2.join() === '2,nose' && pl.u1.join() === ',' && pl.t.history.slice(-1)[0].text === 'Load plan: more than one stop',
+      'zzLoadPlan saves multiStop and each load\'s stop and place in one write (a load not on that truck is left alone)');
+    t.eq(pl.order, [['d2', 'nose', 2, 2], ['d1', 'tail', 1, 1]], 'ZZloadOrder lists the loads in loading order: nose first, tail last (with badge numbers)');
+    w0 = [await writes('zzLoadPlan', 'fDel', { multiStop: true, loads: [{ sid: 'd1', stop: 1, pos: 'tail' }] }), await writes('zzLoadPlan', 'fDel', {}), await writes('zzLoadPlan', 'nope', { multiStop: true }),
+      await writes('zzLoadPlan', 'fDel', { loads: [{ sid: 'd1', stop: 3 }] }, 'cu_pine'), await writes('zzLoadPlan', 'fPick', { multiStop: true }, 'cu_altex')];
+    t.ok(w0.every(x => x.n === 0), `zzLoadPlan writes nothing when nothing changes, for no truck, or for another customer's load / truck (${JSON.stringify(w0.map(x => x.n))})`);
+    w1 = await writes('zzLoadPlan', 'fDel', { loads: [{ sid: 'd1', stop: 3, pos: 'bogus' }] }, 'cu_altex');
+    pl = await calc(p, (h, doc) => { const s = doc.shipments.find(s => s.id === 'd1'); return [s.stop, s.pos]; });
+    t.ok(w1.n === 1 && pl[0] === 3 && pl[1] === null, 'the customer (cid) can set its own load\'s stop; a bad position is saved as null');
+
+    // ---- damage snaps ----
+    let w = await writes('zzDamageSnap', 'fUp', 'u1', { id: 'snA', photoCount: 0 });
+    t.ok(w.n === 0, 'zzDamageSnap with no photo is refused (nothing written)');
+    const before = await h.readDoc(p);
+    w = await writes('zzDamageSnap', 'fUp', 'u1', { id: 'snA', photoCount: 1, note: 'ZZSNAPWORDS corner crushed' });
+    let doc = await h.readDoc(p);
+    let u1 = doc.shipments.find(s => s.id === 'u1'), xA = u1.exceptions.find(x => x.id === 'snA');
+    const snapAt = xA && xA.at;
+    t.ok(w.n === 1 && xA && xA.draft === true && xA.kind === 'Damage' && xA.photoOwner === 'dmg:snA' && xA.photoCount === 1 && xA.resolved === false && xA.openedBy === 'Roman' && xA.at && xA.trailerId === 'fUp' && /ZZSNAPWORDS/.test(xA.note),
+      'zzDamageSnap(tid, sid, ...) adds a draft Damage exception on the load (photo owner dmg:<id>, the truck it was taken on) in one write');
+    t.ok(!xA.answer && !xA.est && (u1.touches || []).length === (before.shipments.find(s => s.id === 'u1').touches || []).length && JSON.stringify(doc.trailers.find(x => x.id === 'fUp').history) === JSON.stringify(before.trailers.find(x => x.id === 'fUp').history),
+      'a snap is not a report yet: no auto-approve (even under the customer\'s $1000 limit), no estimate, no touch, no truck history line (the trail goes to customers)');
+    w = await writes('zzDamageSnap', 'fUp', null, { id: 'snT', photoCount: 2 });
+    const we = await writes('zzEstLines', 'u1', 'snA', [{ label: 'Rewrap pallet', qty: 1, unit: 15 }]);
+    t.ok(we.n === 0, 'zzEstLines refuses a snap (no price and no auto-approve before the details)');
+    w0 = [await writes('zzDamageSnap', 'fUp', 'u2', { id: 'snA', photoCount: 1 }), await writes('zzDamageSnap', 'fUp', 'far', { id: 'snX', photoCount: 1 }), await writes('zzDamageSnap', 'nope', null, { id: 'snY', photoCount: 1 })];
+    doc = await h.readDoc(p);
+    let ft = doc.trailers.find(x => x.id === 'fUp');
+    t.ok(w.n === 1 && ft.dmgDrafts.length === 1 && ft.dmgDrafts[0].id === 'snT' && ft.dmgDrafts[0].photoOwner === 'dmg:snT' && ft.dmgDrafts[0].photoCount === 2 && ft.dmgDrafts[0].by === 'Roman',
+      '"Not sure which load": the snap waits on the truck (trailer.dmgDrafts) in one write');
+    t.ok(w0.every(x => x.n === 0), 'a used id (second tap), a load on another truck or no truck write nothing');
+    let dr = await calc(p, (h, doc) => ({ up: h.ZZdmgDrafts(doc, 'fUp').map(d => [d.id, d.sid, d.where, d.photoOwner, d.tid]), all: h.ZZdmgDrafts(doc, null).map(d => d.id), other: h.ZZdmgDrafts(doc, 'fPu').length }));
+    t.eq(dr.up, [['snA', 'u1', 'load', 'dmg:snA', 'fUp'], ['snT', null, 'truck', 'dmg:snT', 'fUp']], 'ZZdmgDrafts(doc, tid) lists every unfinished snap of the truck (on loads and on the truck)');
+    t.ok(dr.all.includes('snA') && dr.all.includes('snT') && dr.other === 0, 'ZZdmgDrafts(doc, null) lists every truck\'s snaps (office); another truck has none');
+    let vis = await calc(p, (h, doc) => {
+      const m = h.ZZmsgs(doc, Date.now()).filter(x => /snA|snT/.test(x.id)), mo = JSON.stringify(h.ZZdmgMonths(doc, 'cu_altex').map(g => g.items.map(i => i.x.id))), cv = h.ZZcustView(doc, 'cu_altex');
+      return { msgs: m.length, months: /snA/.test(mo), trail: h.ZZtrail(doc, 'fUp').map(e => e.text).filter(x => /Damage photo/.test(x)), staff: h.ZZtrail(doc, 'fUp', null, { staff: true }).map(e => e.text).filter(x => /Damage photo/.test(x)),
+        week: h.ZZweek(doc, 'cu_altex', Date.now()).damageReports, cv: JSON.stringify(cv).includes('snA') || JSON.stringify(cv).includes('snT'), same: h.ZZcustView(doc, 'cu_altex') === cv,
+        clean: h.ZZnoDrafts(doc.shipments.find(s => s.id === 'u1')).exceptions.map(x => x.id).join(), plain: h.ZZnoDrafts(doc.shipments.find(s => s.id === 'u2')) === doc.shipments.find(s => s.id === 'u2') };
+    });
+    t.ok(vis.msgs === 0 && !vis.months && vis.trail.length === 0 && !vis.cv, 'drafts are invisible to customer helpers: no Outbox alert, not in damage by month, not in the trail, not in the customer view');
+    t.eq(vis.staff, ['Damage photo taken on U1 (details to come)', 'Damage photo taken (load not picked yet, details to come)'], 'staff trail (opts.staff) shows the snaps');
+    t.ok(vis.same && vis.clean === 'plainU1' && vis.plain, 'ZZcustView gives the same view object for the same doc; ZZnoDrafts strips drafts (same object when there are none)');
+
+    // assign: truck snap -> u2, then a load snap moved to the right load, and back to the truck
+    w = await writes('zzDamageAssign', 'fUp', 'snT', 'u2');
+    doc = await h.readDoc(p);
+    let x2 = doc.shipments.find(s => s.id === 'u2').exceptions.find(x => x.id === 'snT');
+    t.ok(w.n === 1 && !(doc.trailers.find(x => x.id === 'fUp').dmgDrafts || []).length && x2 && x2.draft === true && x2.photoOwner === 'dmg:snT' && x2.photoCount === 2 && x2.openedBy === 'Roman' && x2.trailerId === 'fUp',
+      'zzDamageAssign moves the truck snap onto the load (still a draft, same photos) in one write');
+    w = await writes('zzDamageAssign', 'fUp', 'snT', 'u3');
+    w1 = await writes('zzDamageAssign', 'fUp', 'snT', null);
+    doc = await h.readDoc(p);
+    t.ok(w.n === 1 && w1.n === 1 && !doc.shipments.find(s => s.id === 'u3').exceptions.some(x => x.id === 'snT') && doc.trailers.find(x => x.id === 'fUp').dmgDrafts.map(d => d.id).join() === 'snT',
+      'a snap on the wrong load can move to another load of the truck, or back to the truck (sid null)');
+    w0 = [await writes('zzDamageAssign', 'fUp', 'snT', 'far'), await writes('zzDamageAssign', 'fUp', 'nope', 'u1'), await writes('zzDamageAssign', 'fPu', 'snA', 'p1'), await writes('zzDamageAssign', 'fUp', 'snT', null)];
+    t.ok(w0.every(x => x.n === 0), `zzDamageAssign refuses a load on another truck, an unknown snap, another truck's snap, or a no-op (${JSON.stringify(w0.map(x => x.n))})`);
+    await act(p, 'zzDamageAssign', 'fUp', 'snT', 'u2');
+
+    // finish: <2 photos refused; the plain "Damaged" count exception (plainU1) is replaced; auto-approve applies now
+    w = await writes('zzDamageFinish', 'u1', 'snA', { pallets: 1, kinds: ['Crushed'], what: 'corner', photoCount: 1 });
+    t.ok(w.n === 0, 'zzDamageFinish with fewer than 2 photos is refused (nothing written)');
+    const lines = await calc(p, (h, doc) => h.ZZdmgLines(doc, doc.shipments.find(s => s.id === 'u1'), 1));
+    const tFinish = Date.now();
+    w = await writes('zzDamageFinish', 'u1', 'snA', { pallets: 1, kinds: ['Crushed', 'Torn wrap'], what: '', lines, photoCount: 3 });
+    doc = await h.readDoc(p);
+    u1 = doc.shipments.find(s => s.id === 'u1');
+    const dms = u1.exceptions.filter(x => x.kind === 'Damage');
+    xA = dms.find(x => x.id === 'snA');
+    t.ok(w.n === 1 && dms.length === 1 && xA.draft === false && xA.pallets === 1 && xA.kinds.join() === 'Crushed,Torn wrap' && xA.photoCount === 3 && xA.est.lines.length === 2 && xA.what === 'ZZSNAPWORDS corner crushed',
+      'zzDamageFinish turns the snap into a real report in one write (the crew\'s snap words become "what", the plain Damaged-count exception is replaced)');
+    t.ok(xA.at === snapAt && Date.parse(xA.at) < tFinish && xA.finishedAt && Date.parse(xA.finishedAt) >= tFinish - 1000 && xA.finishedBy === 'Roman' && u1.touches.some(tc => tc.what === 'damage'),
+      'the snap time stays in `at`; finishedAt / finishedBy say when the details came; a damage touch is added');
+    t.ok(xA.answer && xA.answer.auto === true && xA.est.applied === true && u1.adjustments.some(a => /^Damage: /.test(a.label)), 'the auto-approve rule applies at finish (Altex limit $1000), not at the snap');
+    vis = await calc(p, (h, doc) => ({ msgs: h.ZZmsgs(doc, Date.now()).filter(x => /^damage:snA:/.test(x.id)).map(x => x.ts), fin: Date.parse(doc.shipments.find(s => s.id === 'u1').exceptions.find(x => x.id === 'snA').finishedAt),
+      months: h.ZZdmgMonths(doc, 'cu_altex').reduce((a, g) => a + g.items.filter(i => i.x.id === 'snA').length, 0), trail: h.ZZtrail(doc, 'fUp').map(e => e.text).filter(x => /Damage/.test(x)), left: h.ZZdmgDrafts(doc, 'fUp').map(d => d.id) }));
+    t.ok(vis.msgs.length >= 1 && vis.msgs.every(ts => ts === vis.fin) && vis.months === 1, 'now the alert is queued (timed at finish) and the report counts in damage by month');
+    t.ok(vis.trail.includes('Damage photo taken on U1') && vis.trail.some(x => /^Damage reported on U1: 1 pallet \(Crushed, Torn wrap\)/.test(x)) && vis.left.join() === 'snT', 'the trail shows the photo time and the report; only the other snap is still waiting');
+    w0 = [await writes('zzDamageFinish', 'u1', 'snA', { photoCount: 3 }), await writes('zzDamageDiscard', 'fUp', 'u1', 'snA'), await writes('zzDamageDiscard', 'fUp', null, 'nope')];
+    t.ok(w0.every(x => x.n === 0), 'a finished report cannot be finished again or discarded; an unknown snap cannot be discarded');
+    w = await writes('zzDamageDiscard', 'fUp', 'u2', 'snT');
+    await act(p, 'zzDamageSnap', 'fUp', null, { id: 'snZ', photoCount: 1 });
+    w1 = await writes('zzDamageDiscard', 'fUp', null, 'snZ');
+    doc = await h.readDoc(p);
+    t.ok(w.n === 1 && w1.n === 1 && !doc.shipments.find(s => s.id === 'u2').exceptions.some(x => x.id === 'snT') && !doc.trailers.find(x => x.id === 'fUp').dmgDrafts.length,
+      'zzDamageDiscard throws away a snap on a load or on the truck in one write');
+
+    // ---- manifest ----
+    const goodMf = { signature: 'Roman K', lines: [{ sid: 'k1', loaded: 4, customerId: 'cu_pine', note: 'top row wrapped' }, { sid: 'k3', planned: 4, loaded: 3, stop: 2, pos: 'nose' }, { ref: 'LOOSE', loaded: 1, note: 'loose freight' }] };
+    w0 = [await writes('zzManifest', 'fPack', { signature: 'Roman', lines: [] }), await writes('zzManifest', 'fPack', { ...goodMf, signature: ' ' }),
+      await writes('zzManifest', 'fPack', { ...goodMf, lines: [{ sid: 'k1' }] }), await writes('zzManifest', 'nope', goodMf)];
+    t.ok(w0.every(x => x.n === 0), 'zzManifest refuses no lines, no signature, a line without pallets loaded, or no truck (nothing written)');
+    w = await writes('zzManifest', 'fPack', goodMf);
+    doc = await h.readDoc(p);
+    const mf = doc.trailers.find(x => x.id === 'fPack').manifest;
+    t.ok(w.n === 1 && mf.lines.length === 3 && mf.total === 8 && mf.signature === 'Roman K' && mf.signedBy === 'Roman' && mf.signedAt && mf.lines.every(l => l.id),
+      'zzManifest saves the lines, the total and the signature in one write');
+    t.eq(mf.lines.map(l => [l.sid, l.ref, l.customerId, l.planned, l.loaded, l.stop, l.pos]), [['k1', 'K1', 'cu_altex', 4, 4, null, null], ['k3', 'K3', 'cu_pine', 4, 3, 2, 'nose'], [null, 'LOOSE', null, 0, 1, null, null]],
+      'each line takes its PRO and customer from the load (never from the screen); planned defaults to the BOL pallets; an extra line has no load');
+    t.ok(doc.trailers.find(x => x.id === 'fPack').history.slice(-1)[0].text === 'Manifest signed', 'history says only "Manifest signed" (no totals: other companies\' pallets stay private)');
+    const mv = await calc(p, (h, doc) => ({ staff: h.ZZmanifestFor(doc, 'fPack', null), alt: h.ZZmanifestFor(doc, 'fPack', 'cu_altex'), pine: h.ZZmanifestFor(doc, doc.trailers.find(t => t.id === 'fPack'), 'cu_pine'),
+      high: h.ZZmanifestFor(doc, 'fPack', 'cu_high'), none: h.ZZmanifestFor(doc, 'fDel', null), view: (h.ZZcustView(doc, 'cu_altex').trailers.find(t => t.id === 'fPack').manifest || {}).lines.map(l => l.ref),
+      pub: h.ZZcustView(doc, null).trailers.find(t => t.id === 'fPack').manifest }));
+    t.ok(mv.staff.lines.length === 3 && mv.staff.total === 8 && mv.staff.all === true, 'ZZmanifestFor(doc, t, null): staff see every line');
+    t.ok(mv.alt.lines.map(l => l.ref).join() === 'K1' && mv.alt.total === 4 && mv.pine.lines.map(l => l.ref).join() === 'K3' && mv.pine.total === 3 && mv.high === null && mv.none === null,
+      'a customer only ever sees the lines of its own loads (and their total); a customer with none gets null');
+    t.ok(mv.view.join() === 'K1' && mv.pub === null, 'the customer view carries only that customer\'s manifest lines (the public track page: none)');
+
+    // ---- securing photos (new shape) and old 5-photo reports ----
+    const sec = { gear: { plywood: { qty: 5, owner: 'ours' }, bars: { qty: 2, owner: 'driver' }, straps: { qty: 4, owner: 'ours' }, airbags: { qty: 0, owner: 'ours' } }, tags: ['S-9'], seal: 'zz77', confidence: 5, note: '', checkedRows: true, signature: 'Roman K' };
+    w0 = [await writes('zzSecure', 'fPack', { ...sec, photoCount: 0 }), await writes('zzSecure', 'fPack', { ...sec })];
+    t.ok(w0.every(x => x.n === 0), 'zzSecure refuses with no securing photo (nothing written)');
+    w = await writes('zzSecure', 'fPack', { ...sec, photoCount: 2 });
+    doc = await h.readDoc(p);
+    let ts = doc.trailers.find(x => x.id === 'fPack');
+    t.ok(w.n === 1 && ts.secure.photoOwner === 'strap:fPack' && ts.secure.photoCount === 2 && ts.secure.photos === null && ts.strapPhotoCount === 2 && ts.sealOut === 'ZZ77' && ts.secure.gear.straps.owner === 'ours',
+      'zzSecure new shape: photos of the securing and what is used (strap:<tid>, 1 or more), photos:null, plus gear, seal and signature as before');
+    w = await writes('zzSecure', 'fPack', { ...sec, photos: { nose: 1, middle: 1, tail: 1, closeup: 1, seal: 1 } });
+    doc = await h.readDoc(p);
+    ts = doc.trailers.find(x => x.id === 'fPack');
+    t.ok(w.n === 1 && ts.secure.photos.tail === 1 && !ts.secure.photoOwner, 'an old 5-photo report is still accepted (and old saved reports keep displaying)');
+
+    // ---- one write each: every new action in one table ----
+    const plan = [['zzLoadJob', ['fJt1', 'pickup'], 1], ['zzLoadJob', ['fJt1', 'nonsense'], 0],
+      ['zzLoadPlan', ['fJt1', { multiStop: true }], 1], ['zzLoadPlan', ['fJt1', { multiStop: true }], 0],
+      ['zzDamageSnap', ['fPack', 'k2', { id: 'snP', photoCount: 1 }], 1], ['zzDamageSnap', ['fPack', 'k2', { id: 'snP', photoCount: 1 }], 0],
+      ['zzDamageAssign', ['fPack', 'snP', 'k3'], 1], ['zzDamageAssign', ['fPack', 'snP', 'k3'], 0],
+      ['zzDamageFinish', ['k3', 'snP', { photoCount: 2, pallets: 1 }], 1], ['zzDamageFinish', ['k3', 'snP', { photoCount: 2 }], 0],
+      ['zzDamageSnap', ['fPack', null, { id: 'snQ', photoCount: 1 }], 1], ['zzDamageDiscard', ['fPack', null, 'snQ'], 1], ['zzDamageDiscard', ['fPack', null, 'snQ'], 0],
+      ['zzManifest', ['fDel', { signature: 'R', lines: [{ sid: 'd1', loaded: 4 }] }], 1], ['zzManifest', ['fDel', { lines: [{ sid: 'd1', loaded: 4 }] }], 0]];
+    const got = [];
+    for (const [name, args, want] of plan) { const r = await writes(name, ...args); got.push(r.n === want ? 'ok' : name + '(' + JSON.stringify(args).slice(0, 50) + ') wrote ' + r.n + ', want ' + want); }
+    t.eq(got.filter(x => x !== 'ok'), [], 'every new action saves in exactly one write; refused calls write nothing (' + plan.length + ' calls)');
+    doc = await h.readDoc(p);
+    const k3 = doc.shipments.find(s => s.id === 'k3').exceptions.find(x => x.id === 'snP');
+    t.ok(k3 && k3.draft === false && !k3.answer, 'a finished report for a customer without a limit (Pine) waits for the customer');
+
+    // ---- photo cap: 30 for unload: / after:, 12 for everyone else; proof photos kept past 30 days ----
+    const caps = await calc(p, h => ['unload:t1', 'after:t1', 'row:s1', 'dmg:x', 'strap:t1', 'bol:t1', 'ship:t1', 'insp:s1', 'before:t1', 'paper:t1', ''].map(k => h.ZZphotoCap(k)));
+    t.eq(caps, [30, 30, 12, 12, 12, 12, 12, 12, 12, 12, 12], 'ZZphotoCap: 30 photos for nonstop unloading (unload:) and loading (after:) photos, Nick\'s 12 for every other owner');
+    const old = iso(now - 40 * DAY), fresh = iso(now);
+    const cap = await p.evaluate(async ([old, fresh]) => {
+      const ph = (n, at) => Array.from({ length: n }, (_, k) => ({ id: 'q' + k + Math.random().toString(36).slice(2, 6), src: 'data:image/png;base64,iVBORw0KGgo=', at }));
+      const P = window.__zz.h.photos, put = (k, v) => localStorage.setItem('cdweb:cd6:photos:' + k, JSON.stringify(v));
+      await P.ex('unload:tq', ph(35, fresh)); await P.ex('after:tq', ph(31, fresh)); await P.ex('row:sq', ph(20, fresh)); await P.ex('strap:tq', ph(14, fresh));
+      const n = k => JSON.parse(localStorage.getItem('cdweb:cd6:photos:' + k) || '[]').length;
+      const saved = [n('unload:tq'), n('after:tq'), n('row:sq'), n('strap:tq')];
+      ['unload', 'after', 'strap', 'bol', 'ship', 'insp', 'before', 'row'].forEach(o => put(o + ':old', [...ph(1, old), ...ph(1, fresh)]));
+      const kept = []; for (const o of ['unload', 'after', 'strap', 'bol', 'ship', 'insp', 'before', 'row']) kept.push((await P.ls(o + ':old')).length);
+      return { saved, kept };
+    }, [old, fresh]);
+    t.eq(cap.saved, [30, 30, 12, 12], 'a photo list keeps its last 30 (unload:, after:) or 12 (row:, strap: ...) photos');
+    t.eq(cap.kept, [2, 2, 2, 2, 2, 2, 1, 1], 'unload:, after:, strap:, bol:, ship: and insp: photos are kept past 30 days like dmg: / sec:; before: and row: still expire');
+    const js = fs.readFileSync(path.join(h.dist, 'app.js'), 'utf8');
+    t.ok(js.includes('if(r.length+g.length>ZZphotoCap(e)){u(`${ZZphotoCap(e)} photos max here') && js.includes('let v=t.slice(-ZZphotoCap(e));ZZa_photoRoom(e,v)'),
+      'the photo grid (Xn) and the photo save (ex) use ZZphotoCap (patches A49, A33)');
+    // a 13th+ photo saves only while the browser keeps room for the dock data
+    const room = await p.evaluate(async () => {
+      const big = 'x'.repeat(262144), sm = 'x'.repeat(16384); let a = 0, b = 0;
+      try { for (; a < 400; a++) localStorage.setItem('zzfill:' + a, big); } catch (e) {}
+      try { for (; b < 400; b++) localStorage.setItem('zzfillS:' + b, sm); } catch (e) {}
+      for (let k = 1; k <= 12 && b - k >= 0; k++) localStorage.removeItem('zzfillS:' + (b - k));   /* about 200k characters free */
+      const P = window.__zz.h.photos, ph = (n, tag) => Array.from({ length: n }, (_, k) => ({ id: tag + k, src: 'data:image/png;base64,' + 'A'.repeat(2000), at: new Date().toISOString() }));
+      const n = k => JSON.parse(localStorage.getItem('cdweb:cd6:photos:' + k) || '[]').length;
+      await P.ex('unload:room', ph(12, 'a')); const twelve = n('unload:room');
+      await P.ex('unload:room', ph(13, 'a')); const thirteen = n('unload:room');
+      await new Promise(r => setTimeout(r, 400));
+      const banner = (document.querySelector('[data-zz="banner"]') || {}).innerText || '';
+      await P.ex('unload:room', ph(11, 'a')); const shrink = n('unload:room');
+      await P.ex('row:room', ph(12, 'r')); const row = n('row:room');
+      for (let k = 0; k < 400; k++) { localStorage.removeItem('zzfill:' + k); localStorage.removeItem('zzfillS:' + k); }
+      localStorage.removeItem('cdweb:cd6:zzroom');
+      return { a, twelve, thirteen, banner, shrink, row, probe: localStorage.getItem('cdweb:cd6:zzroom') };
+    });
+    t.ok(room.a > 2 && room.twelve === 12 && room.thirteen === 12 && /this device is almost full/.test(room.banner),
+      `nearly full browser: the 13th unloading photo is NOT saved and the banner says the device is almost full (12 photos still save as before)`);
+    t.ok(room.shrink === 11 && room.row === 12 && room.probe === null, 'deleting photos always saves; other owners keep today\'s behaviour; the room test leaves nothing behind');
+    await p.context().close();
+
+    // ---- screens: the customer bell never lists a snap; the office bell does; customer screens never show it ----
+    const s2 = clone(base);
+    const alt = s2.shipments.find(s => s.customerId === 'cu_altex' && s.receivedAt && !s.shippedAt) || s2.shipments.find(s => s.customerId === 'cu_altex');
+    alt.exceptions = [...(alt.exceptions || []), { id: 'snUI', kind: 'Damage', draft: true, photoOwner: 'dmg:snUI', photoCount: 1, at: iso(now - 10 * MIN), openedBy: 'Roman', note: 'ZZSNAPWORDS photo, details to come', snapNote: 'ZZSNAPWORDS', resolved: false, trailerId: alt.trailerInId },
+      { id: 'realUI', kind: 'Short', at: iso(now - 9 * MIN), openedBy: 'Roman', note: 'ZZREALEXC counted 3 of 4', resolved: false }];
+    const c = await h.openAs('customer', { viewport: PHONE, seed: s2 });
+    await c.locator('button[aria-label^="Notifications"]').first().click();
+    await c.waitForTimeout(400);
+    let txt = await c.evaluate(() => document.body.innerText);
+    t.ok(/ZZREALEXC/.test(txt) && !/ZZSNAPWORDS/.test(txt), 'customer bell: a real exception is listed, a damage snap waiting for details is not');
+    await h.check(c, 'customer-bell-no-snap');
+    await c.keyboard.press('Escape').catch(() => {});
+    await c.context().close();
+    const o = await h.openAs('office', { viewport: DESK, seed: s2 });
+    await o.locator('button[aria-label^="Notifications"]').first().click();
+    await o.waitForTimeout(400);
+    txt = await o.evaluate(() => document.body.innerText);
+    t.ok(/ZZSNAPWORDS/.test(txt), 'office bell: staff see the snap waiting for details');
+    await o.context().close();
+    const jsx = js;
+    t.ok(jsx.includes('{s:a==="office"||a==="crew"?j:ZZnoDrafts(j),') && jsx.includes('(yJ,{doc:ZZcustView(e,null),') && jsx.includes('(ZZCP,{doc:ZZcustView(e,n),') && jsx.includes('e.exceptions.filter(h=>h&&!h.draft).map(h=>') && jsx.includes('filter(v=>!v.resolved&&!v.draft).length,0)||"none"'),
+      'customer shipment sheet, public track page, customer portal and printed papers leave drafts out (patches A44-A48)');
+  }
 });

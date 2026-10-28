@@ -60,8 +60,12 @@ ZZcrewStats=(e,since,names)=>{
       if(tc.what==="receive"){p.pallets+=fe(s);p.receives++}else if(tc.what==="load"){p.pallets+=fe(s);p.loads++}
       else if(tc.what==="count")p.counts++;else if(tc.what==="photo")p.photos++;else if(tc.what==="row")p.rows++;else if(tc.what==="fix")p.fixes++;else if(tc.what==="seal")p.seals++});
     /* addException stamps the role label ("Crew \xB7 Roman"); crew reports count for the person */
-    (s.exceptions||[]).forEach(x=>{if(!x||!x.openedBy||!ok(x.at))return;let w=String(x.openedBy).replace(/^Crew \xB7 /,""),p=S[w]||(names&&names.length?null:get(w));if(!p)return;p.reports++;p.reportList.push({s,x});p.last=Math.max(p.last,seen(x.at))})});
+    /* a damage snap (draft) counts as a report only once its details are filled in */
+    (s.exceptions||[]).forEach(x=>{if(!x||x.draft||!x.openedBy||!ok(x.at))return;let w=String(x.openedBy).replace(/^Crew \xB7 /,""),p=S[w]||(names&&names.length?null:get(w));if(!p)return;p.reports++;p.reportList.push({s,x});p.last=Math.max(p.last,seen(x.at))})});
   e.trailers.forEach(k=>{if(!k.workDoneBy||!ok(k.workDoneAt))return;let p=get(k.workDoneBy);p.trucks++;if(k.workStartedAt)p.truckMs+=new Date(k.workDoneAt)-new Date(k.workStartedAt);p.last=Math.max(p.last,seen(k.workDoneAt))});
+  /* photos on the truck itself (unloading, packing / loadout, strapped, bills) count like photos: per person on trailer.zzPhotoBy */
+  e.trailers.forEach(k=>{let at2=k.workStartedAt||k.arrivedAt;if(!Array.isArray(k.zzPhotoBy)||!ok(at2))return;
+    k.zzPhotoBy.forEach(x=>{if(!x||!x.who||!(ie(x.n)>0))return;let p=S[x.who]||(names&&names.length?null:get(x.who));if(!p)return;p.photos+=ie(x.n);p.last=Math.max(p.last,seen(at2))})});
   /* one securement per truck (the secure touch lands on every load of the truck, so count trucks, not touches) */
   e.trailers.forEach(k=>{let sc=k.secure;if(!sc||!sc.signedBy||!sc.signedAt||!ok(sc.signedAt))return;let p=S[sc.signedBy]||(names&&names.length?null:get(sc.signedBy));if(!p)return;p.secures++;p.last=Math.max(p.last,seen(sc.signedAt))});
   return Object.values(S).filter(p=>!names||!names.length||names.includes(p.name)).map(p=>({...p,points:p.pallets+p.trucks*10+p.counts*2+p.photos+p.reports*5+p.secures*5,avgMin:p.trucks?Math.round(p.truckMs/p.trucks/6e4):null})).sort((a2,b2)=>b2.points-a2.points||a2.name.localeCompare(b2.name));
@@ -72,7 +76,8 @@ ZZbadges=p=>[p.pallets>=100&&"100+ pallets",p.trucks>=5&&"5+ trucks",p.reports>0
 /* Step progress strip shown at the top of every truck job. */
 ZZSteps=({steps:W,cur:ua,go:P})=>{ZZtr2();
   ZZtr3();
-  let lbl={seal:"Paperwork",before:"Photo before",off:"Unload & count",reload:"Reload",secure:"Secure the load",photos:"Photo log",load:"Load",wrap:"Wrap up"},
+  /* a step can carry its own label (delivery: "Strapped"); else the label for its key */
+  let lbl=Object.fromEntries(W.map(s=>[s.k,s.label||ZZd_LBL[s.k]||s.k])),
     ix=Math.max(0,W.findIndex(s=>s.k===ua)),doneN=W.filter(s=>s.done).length;
   return ZZh("div",{style:{position:"sticky",top:58,zIndex:15,background:m.panel,border:`1px solid ${m.line}`,borderRadius:10,padding:"10px 12px",boxShadow:"0 4px 12px rgba(0,0,0,.08)"}},
     ZZh("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:8}},
@@ -204,7 +209,7 @@ ZZCrew=({doc:e,now:t,actions:a,onExit:r,openShipment:n})=>{
           ZZh("div",{style:{fontSize:14,color:m.mut,marginTop:2}},[ZZn(k.pallets,"pallets"),ZZn(k.trucks,"trucks"),ZZn(k.counts,"counts"),ZZn(k.photos,"photos"),k.reports?ZZn(k.reports,"damage reports"):"",k.secures?`${k.secures} ${R(k.secures===1?"load secured":"loads secured")}`:""].filter(Boolean).join(" \xB7 ")),
           bd.length?ZZh("div",{style:{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}},...bd.map(x2=>ZZh("span",{key:x2,style:{fontSize:12,fontWeight:700,padding:"2px 8px",borderRadius:10,border:`1px solid ${m.line}`,color:m.text}},x2))):null),
         ZZh("div",{style:{textAlign:"right"}},ZZh("div",{className:"zzc",style:{fontSize:30,fontWeight:800,lineHeight:1}},k.points),ZZh("div",{style:{fontSize:12,color:m.mut}},R("points"))))}),
-    ZZh("p",{key:"how",style:{fontSize:14,color:m.mut,marginTop:8}},R("How points work: 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo, 5 per damage report, 5 per load secured."))];
+    ZZh("p",{key:"how",style:{fontSize:14,color:m.mut,marginTop:8}},R("How points work: 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo (unloading and loading photos too), 5 per damage report (a damage photo counts once its details are in), 5 per load secured."))];
 
   /* ---- Chat ---- */
   let chatTab=()=>[
@@ -271,7 +276,7 @@ ZZCrewOffice=({doc:e,now:t,actions:a,openShipment:n})=>{
           ZZh("td",{className:"num",style:{color:k.reports?m.orange:void 0,fontWeight:k.reports?800:400}},k.reports),
           ZZh("td",{className:"num"},k.secures||0),
           ZZh("td",null,k.last?ge(new Date(k.last).toISOString()):"—")))))):ZZh("div",{className:"zz-empty",style:{padding:0}},"Add crew logins below to start tracking."),
-      ZZh("p",{className:"zz-sub",style:{marginTop:10}},"Points: 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo, 5 per damage report, 5 per load secured. Drivers see the same leaderboard on their phone.")),
+      ZZh("p",{className:"zz-sub",style:{marginTop:10}},"Points: 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo (unloading, packing and loading photos too), 5 per damage report (a damage photo counts once its details are in), 5 per load secured. Drivers see the same leaderboard on their phone.")),
     ZZh("section",{className:"zz-panel",style:{marginBottom:16}},ZZh("h2",{className:"zz-h2",style:{marginBottom:6}},`What they reported \xB7 ${perLbl[per]}`),
       reports.length?ZZh("div",{className:"zz-list"},...reports.map(({s,x,who})=>ZZh("button",{key:x.id,type:"button",className:"zz-row",onClick:()=>n(s)},
         ZZh("div",{className:"zz-when"},ZZh("b",null,at(x.at)),new Date(x.at).toLocaleDateString([],{month:"short",day:"numeric"})),
@@ -461,7 +466,10 @@ ZZd_waitOver=(doc,now)=>{let out=[];try{ZZtr3();let g=ZZS(doc).waitGoalMin;((doc
     out.push({id:`waitover:${t.id}`,ts:ZZd_ms(t.arrivedAt)+g*6e4,tid:t.id,text:ZZd_f(yd?"Truck {k} has waited {t} in the yard. The goal is {g} min. It needs a door.":"Truck {k} has waited {t} at {d}. The goal is {g} min. Start it.",{k:t.truck||"—",d:t.dock,t:ot(w0),g})})})}catch(x){console.error("ZZd_waitOver",x)}return out},
 /* loads in seq order (the same order as ir) */
 ZZd_bySeq=L=>L.map((s,j)=>({s,j})).sort((a2,b2)=>(a2.s.seq??a2.j)-(b2.s.seq??b2.j)).map(x=>x.s),
-ZZd_needDmg=s=>!((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner&&!x.resolved),
+/* true when the load has no finished photo damage report (a damage snap still waiting for details does not count) */
+ZZd_needDmg=s=>!((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner&&!x.resolved&&!x.draft),
+/* the first damage snap on a load (a draft waiting for its details), or null */
+ZZd_snapOf=s=>((s&&s.exceptions)||[]).find(x=>x&&x.kind==="Damage"&&x.draft&&!x.resolved)||null,
 /* rewrap priced in a photo report goes to the customer for approval; it is not billed again through rewrapPallets */
 ZZd_rewrap=(s,d,zi)=>{let inEst=zi&&zi.rewrapOn||((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner&&((x.est&&x.est.lines)||[]).some(l=>/rewrap/i.test((l&&l.label)||"")));return inEst?ie(s&&s.rewrapPallets):ie(d)},
 /* outbound count off: one Short or Over report with the crew's note (not twice for the same load). When the load already
@@ -538,8 +546,11 @@ ZZd_q={},
 ZZd_Shots=({owner,slots,onCount})=>{ZZtr3();
   let[list,setList]=(0,H.useState)([]),[busy,setBusy]=(0,H.useState)(""),[err,setErr]=(0,H.useState)(""),[view,setView]=(0,H.useState)(null),refs=(0,H.useRef)({}),live=(0,H.useRef)(!0),cb=(0,H.useRef)(onCount);cb.current=onCount;
   (0,H.useEffect)(()=>{live.current=!0;ls(owner).then(v=>{if(live.current){setList(v);cb.current&&cb.current(v.length)}});return()=>{live.current=!1}},[owner]);
-  let mut=fn=>(ZZd_q[owner]=(ZZd_q[owner]||Promise.resolve()).then(async()=>{let cur=await ls(owner);await ex(owner,fn(cur));let back=await ls(owner);if(live.current){setList(back);cb.current&&cb.current(back.length)}return back}).catch(x=>(console.error("ZZd_Shots",x),null))),
-    add=async(slot,fl)=>{let files=[...(fl||[])].slice(0,4);if(!files.length)return;if(list.length+files.length>xA){setErr(ZZd_f("{n} photos max here. Delete one first.",{n:xA}));return}
+  /* other boxes showing the same owner (a damage snap's photos) refresh this one through the zzd-photos event */
+  (0,H.useEffect)(()=>{let on=e=>{e&&e.detail===owner&&ls(owner).then(v=>{if(live.current){setList(v);cb.current&&cb.current(v.length)}})};window.addEventListener("zzd-photos",on);return()=>window.removeEventListener("zzd-photos",on)},[owner]);
+  let cap=ZZphotoCap(owner),
+    mut=fn=>ZZd_mut(owner,fn).then(back=>{if(back&&live.current){setList(back);cb.current&&cb.current(back.length)}return back}),
+    add=async(slot,fl)=>{let files=[...(fl||[])].slice(0,4);if(!files.length)return;if(list.length+files.length>cap){setErr(ZZd_f("{n} photos max here. Delete one first.",{n:cap}));return}
       setBusy(slot);setErr("");try{let srcs=await Promise.all(files.map(f2=>Bj(f2)));await mut(cur=>[...cur,...srcs.map(src=>({id:Ce(),src,at:ye(Date.now()),by:sr||void 0,slot}))])}catch(x){setErr(R("That image wouldn't load. Try another photo."))}setBusy("")},
     del=pid=>{setView(null);mut(cur=>cur.filter(p=>p.id!==pid))},
     keys=slots.map(sl=>sl.k),last=slots[slots.length-1],
@@ -576,30 +587,36 @@ ZZd_draft={},
    photos are not touched), no report on this device's saved data uses that id, it is not an open draft, and its newest
    photo is over a day old. A user action, never on load; the dock data itself is not written. */
 ZZd_sweep=doc=>{try{if(typeof ZZsync!=="undefined"&&ZZsync.mode!=="local")return 0;let pre="cdweb:cd6:photos:dmg:",used=new Set,n=0,day=864e5,
-    mark=d=>((d&&d.shipments)||[]).forEach(s2=>((s2&&s2.exceptions)||[]).forEach(x=>{x&&x.photoOwner&&used.add(String(x.photoOwner))}));
+    /* reports and damage snaps on loads, and snaps waiting on a truck ("Not sure which load") keep their photos */
+    mark=d=>{((d&&d.shipments)||[]).forEach(s2=>((s2&&s2.exceptions)||[]).forEach(x=>{x&&x.photoOwner&&used.add(String(x.photoOwner))}));
+      ((d&&d.trailers)||[]).forEach(k=>((k&&k.dmgDrafts)||[]).forEach(x=>{x&&used.add(String(x.photoOwner||"dmg:"+x.id))}))};
   let sd=null;try{sd=JSON.parse(localStorage.getItem("cdweb:cd6:doc")||"null")}catch{}if(!sd||!Array.isArray(sd.shipments))return 0;mark(sd);mark(doc);
-  Object.values(ZZd_draft).forEach(f=>{f&&f.id&&used.add("dmg:"+f.id)});
+  Object.values(ZZd_draft).forEach(f=>{f&&f.id&&used.add("dmg:"+f.id)});Object.keys(ZZd_snapOpen).forEach(id=>used.add("dmg:"+id));
   let keys=[];for(let k=0;k<localStorage.length;k++){let key=localStorage.key(k);key&&key.startsWith(pre)&&keys.push(key)}
   keys.forEach(key=>{let own=key.slice("cdweb:cd6:photos:".length);if(used.has(own))return;let L=null;try{L=JSON.parse(localStorage.getItem(key)||"[]")}catch{return}
     if(!Array.isArray(L))return;let last=Math.max(0,...L.map(q=>Date.parse(q&&q.at)||0));if(L.length&&!(last>0&&Date.now()-last>day))return;
     try{localStorage.removeItem(key);n++}catch{}});return n}catch(x){console.error("ZZd_sweep",x);return 0}},
-ZZDmg=({s,doc,actions:a,onClose,onSaved,pallets:p0})=>{ZZtr3();
-  let p1=Math.max(1,Math.round(ie(p0,1))||1),
-    [f,setF]=(0,H.useState)(()=>ZZd_draft[s.id]||{id:Ce(),pal:p1,kinds:[],what:"",lines:ZZdmgLines(doc,s,p1),rq:!1}),
+/* snap: a damage snap on this load (draft exception) to finish: its photos (photoOwner) and words come along, and saving
+   calls zzDamageFinish instead of zzReportDamage. Only then is it a report the customer sees. */
+ZZDmg=({s,doc,actions:a,onClose,onSaved,pallets:p0,snap})=>{ZZtr3();
+  let p1=Math.max(1,Math.round(ie(p0,1))||1),dk=snap?"fin:"+snap.id:s.id,
+    [f,setF]=(0,H.useState)(()=>ZZd_draft[dk]||{id:snap?snap.id:Ce(),pal:p1,kinds:[],what:snap&&snap.snapNote||"",lines:ZZdmgLines(doc,s,p1),rq:!1}),
     [n,setN]=(0,H.useState)(0),[busy,setBusy]=(0,H.useState)(!1),gone=(0,H.useRef)(!1);
-  (0,H.useEffect)(()=>{gone.current||(ZZd_draft[s.id]=f)},[f,s.id]);
+  (0,H.useEffect)(()=>{gone.current||(ZZd_draft[dk]=f)},[f,dk]);
   /* once per opening, after this draft is remembered: clear photos left by reports that were never saved */
   (0,H.useEffect)(()=>{let tm=setTimeout(()=>ZZd_sweep(doc),400);return()=>clearTimeout(tm)},[]);
-  let up=p=>setF(o=>({...o,...p})),owner="dmg:"+f.id,
+  let up=p=>setF(o=>({...o,...p})),owner=snap&&snap.photoOwner||"dmg:"+f.id,
     cust=((doc&&doc.customers)||[]).find(c=>c.id===s.customerId),lim=ZZautoLimit(cust),total=ZZestTotal(f.lines),goes=lim!=null&&total>0&&total<lim,
     miss=[!f.kinds.length&&R("the kind of damage"),n<2&&(n===1?R("1 more photo"):R("2 photos (wide shot and close-up)"))].filter(Boolean),
     setPal=v=>setF(o=>({...o,pal:v,lines:o.rq?o.lines:o.lines.map(l=>l.k==="rewrap"?{...l,qty:v}:l)})),
     setLine=(k,p)=>setF(o=>({...o,rq:o.rq||k==="rewrap"&&"qty"in p,lines:o.lines.map(l=>l.k===k?{...l,...p}:l)})),
     save=async()=>{if(miss.length||busy)return;setBusy(!0);let r=null;
-      try{r=await a.zzReportDamage(s.id,{id:f.id,pallets:f.pal,kinds:f.kinds,what:f.what.trim(),photoCount:n,lines:f.lines})}catch(x){console.error("zzReportDamage",x)}
-      setBusy(!1);if(r==null)return;gone.current=!0;ZZd_draft[s.id]=null;onSaved&&onSaved({id:f.id,rewrapOn:f.lines.some(l=>l.k==="rewrap"&&l.on!==!1&&ie(l.qty)>0)})};
-  return ZZh(Gt,{open:!0,onClose,title:`${R("Report damage")} · ${s.ref||""}`,wide:!0},
-    ZZh("div",{"data-zz":"dmg",style:{display:"grid",gap:20}},
+      try{r=snap?await a.zzDamageFinish(s.id,snap.id,{pallets:f.pal,kinds:f.kinds,what:f.what.trim(),photoCount:n,lines:f.lines}):await a.zzReportDamage(s.id,{id:f.id,pallets:f.pal,kinds:f.kinds,what:f.what.trim(),photoCount:n,lines:f.lines})}catch(x){console.error("zzReportDamage",x)}
+      setBusy(!1);if(r==null)return;gone.current=!0;ZZd_draft[dk]=null;onSaved&&onSaved({id:f.id,rewrapOn:f.lines.some(l=>l.k==="rewrap"&&l.on!==!1&&ie(l.qty)>0)})};
+  return ZZh(Gt,{open:!0,onClose,title:`${R(snap?"Finish damage report":"Report damage")} · ${s.ref||""}`,wide:!0},
+    ZZh("div",{"data-zz":"dmg","data-snap":snap?snap.id:void 0,style:{display:"grid",gap:20}},
+      snap?ZZh("div",{"data-zz":"dmgsnap",style:{borderRadius:10,padding:"10px 12px",background:m.raised,fontSize:15,fontWeight:700,lineHeight:1.35}},
+        ZZd_f("Damage photo taken {t} by {p}. Add what is wrong and the fix price. Only then does the customer see it.",{t:snap.at?at(snap.at):"",p:String(snap.openedBy||"—").replace(/^Crew \xB7 /,"")})):null,
       ZZh("div",{style:{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}},
         ZZh("div",{style:{flex:"1 1 170px",minWidth:0}},ZZh("div",{style:ZZd_H},R("How many pallets are damaged?")),ZZh("div",{style:ZZd_SUB},R("Count only the damaged ones."))),
         ZZh(ZZd_Step,{value:f.pal,min:1,max:99,onChange:setPal,label:R("pallets")})),
@@ -627,7 +644,7 @@ ZZDmg=({s,doc,actions:a,onClose,onSaved,pallets:p0})=>{ZZtr3();
         ZZh(ZZd_Missing,{miss}),
         ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:wr,disabled:!!miss.length||busy,onClick:save},busy?R("Saving…"):R("Save damage report")))))},
 /* a load's photo damage reports (count card, pull card) */
-ZZd_DmgList=({s,onAdd,addLabel,rw})=>{ZZtr3();let L=((s&&s.exceptions)||[]).filter(x=>x&&x.kind==="Damage"&&x.photoOwner),
+ZZd_DmgList=({s,onAdd,addLabel,rw})=>{ZZtr3();let L=((s&&s.exceptions)||[]).filter(x=>x&&x.kind==="Damage"&&x.photoOwner&&!x.draft),
     rwIn=rw&&L.some(x=>!x.resolved&&((x.est&&x.est.lines)||[]).some(l=>/rewrap/i.test((l&&l.label)||"")));
   return ZZh("div",{"data-zz":"dmglist",style:{display:"grid",gap:8,paddingTop:4}},
     ...L.map(x=>{let an=x.answer,st=an&&an.status==="accepted"?(an.auto?R("Auto-approved"):R("Customer approved")):an&&an.status==="declined"?R("Customer declined"):an&&an.status==="call"?R("Customer wants a call"):x.resolved?R("Resolved"):R("Waiting for the customer"),
@@ -642,8 +659,518 @@ ZZd_DmgList=({s,onAdd,addLabel,rw})=>{ZZtr3();let L=((s&&s.exceptions)||[]).filt
       ZZh(wr,{size:18}),addLabel||(L.length?R("Report more damage"):R("Report damage with photos"))):null,
     rwIn?ZZh("div",{"data-zz":"rwhint",style:{fontSize:14,fontWeight:700,color:m.mut,lineHeight:1.35}},R("Rewrap is already priced in the damage report. Don't count it again below.")):null)},
 ZZd_PullDmg=({s,doc,actions:a,open,setOpen})=>ZZh("div",null,
-  ZZh(ZZd_DmgList,{s,onAdd:()=>setOpen(!0),addLabel:((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner)?R("Report more damage"):R("Damage? Report it")}),
+  ZZh(ZZd_DmgList,{s,onAdd:()=>setOpen(!0),addLabel:((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&x.photoOwner&&!x.draft)?R("Report more damage"):R("Damage? Report it")}),
   open?ZZh(ZZDmg,{s,doc,actions:a,pallets:1,onClose:()=>setOpen(!1),onSaved:()=>setOpen(!1)}):null),
+
+/* ================= Crew truck jobs (Nick's review, Oct 28) =================
+   Five jobs (ZZloadJob): UNPACK a consolidated trailer and UNLOAD a pickup trailer (inbound); PACK a consolidated trailer,
+   DELIVERY and PICKUP (outbound). Each load wears its colour + number badge (ZZloadBadges) everywhere on the truck screen.
+   Photos go through one queue per owner (ZZd_mut) and a page event ("zzd-photos"), so every box showing an owner updates.
+   No photo log any more: the ticket photo, unloading photos, the warehouse photo per load and the packing / loadout photos
+   replace it. A damage snap is "photo now, details later": it stays a draft (never on customer screens) until finished. */
+ZZd_LBL={seal:"Paperwork",before:"Photo before",off:"Unload",verify:"Sort, count, verify",reload:"Reload",pack:"Pack",secure:"Secure the load",
+  manifest:"Manifest",find:"Find the load",count:"Count it",insp:"Inspect + photo",load:"Load it up",bills:"Bills",photos:"Photo log",wrap:"Wrap up"},
+ZZd_JOBCOL=j=>j==="unpack"||j==="pack"?m.violet:j==="unload"?m.amber:j==="delivery"?m.blue:m.teal,
+ZZd_snapOpen={},
+ZZd_bump=owner=>{try{window.dispatchEvent(new CustomEvent("zzd-photos",{detail:owner}))}catch{}},
+/* change one owner's photo list through its queue; resolves the list as stored afterwards (null when reading failed) */
+ZZd_mut=(owner,fn)=>(ZZd_q[owner]=(ZZd_q[owner]||Promise.resolve()).then(async()=>{let cur=await ls(owner);await ex(owner,fn(cur));let back=await ls(owner);ZZd_bump(owner);return back}).catch(x=>(console.error("ZZd_mut",x),null))),
+/* the photos of one owner, kept fresh when any box on the page changes them */
+ZZd_usePhotos=owner=>{let[list,setList]=(0,H.useState)([]);
+  (0,H.useEffect)(()=>{let live=!0,load=()=>ls(owner).then(v=>{live&&setList(v)}),on=e=>{e&&e.detail===owner&&load()};load();window.addEventListener("zzd-photos",on);
+    return()=>{live=!1;window.removeEventListener("zzd-photos",on)}},[owner]);
+  return list},
+/* add camera files to an owner (never past ZZphotoCap: ex() would drop the oldest); onCount(n, added) after a real save */
+ZZd_camAdd=async(owner,files,onCount,slotFor)=>{let f=[...(files||[])].slice(0,6);if(!f.length)return{};let cap=ZZphotoCap(owner),full=!1,before=0,srcs;
+  try{srcs=await Promise.all(f.map(x=>Bj(x)))}catch(x){return{err:R("That image wouldn't load. Try another photo.")}}
+  let back=await ZZd_mut(owner,cur=>{before=cur.length;if(cur.length+srcs.length>cap){full=!0;return cur}
+    return[...cur,...srcs.map((src,j)=>({id:Ce(),src,at:ye(Date.now()),by:sr||void 0,...(slotFor?{slot:slotFor(cur.length+j)}:{})}))]});
+  if(full)return{err:ZZd_f("{n} photos max here. Delete one first.",{n:cap}),n:back?back.length:before};
+  back&&onCount&&back.length!==before&&onCount(back.length,back.length-before);
+  return{n:back?back.length:before}},
+/* who took the photos on the truck itself (leaderboard): trailer.zzPhotoBy [{id, who, n}] */
+ZZd_credit=(k,dl)=>{let who=sr;if(!who||!dl)return{};let L=Array.isArray(k&&k.zzPhotoBy)?k.zzPhotoBy.filter(Boolean):[],o=L.find(x=>x.id===who);
+  return{zzPhotoBy:o?L.map(x=>x.id===who?{...x,n:Math.max(0,ie(x.n)+dl)}:x):[...L,{id:who,who,n:Math.max(0,dl)}]}},
+ZZd_link=c=>({minHeight:48,background:"none",border:0,padding:"4px 0",color:c||m.blue,fontSize:15,fontWeight:800,cursor:"pointer",textDecoration:"underline",textAlign:"left"}),
+ZZd_seg=on=>({minHeight:48,borderRadius:10,fontSize:15,fontWeight:800,cursor:"pointer",border:`2px solid ${on?m.orange:m.line}`,background:on?m.orange:m.panel,color:on?ZZd_onAcc:m.text,padding:"6px 8px"}),
+ZZd_inpCls="focus:outline-none focus:ring-2 focus:ring-[var(--accent)]",
+/* scroll a step into view after it opens (the step bodies carry data-zz="step-<key>") */
+ZZd_goStep=key=>setTimeout(()=>{try{let el=document.querySelector(`[data-zz=step-${key}]`)||document.querySelector(`[data-zz=${key}step]`);el&&el.scrollIntoView({behavior:"smooth",block:"center"})}catch{}},200),
+
+/* ---------- a full-screen photo with Delete / Close ---------- */
+ZZd_View=({p,onClose,onDel})=>ZZh("div",{role:"dialog","aria-label":R("Photo"),onClick:onClose,style:{position:"fixed",inset:0,zIndex:80,background:"rgba(0,0,0,.86)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16}},
+  ZZh("img",{src:p.src,alt:"",onClick:e=>e.stopPropagation(),style:{maxWidth:"100%",maxHeight:"70vh",borderRadius:10}}),
+  p.at||p.by?ZZh("div",{style:{color:"#fff",fontSize:14,marginTop:8}},[p.at?ge(p.at):"",p.by||""].filter(Boolean).join(" · ")):null,
+  ZZh("div",{onClick:e=>e.stopPropagation(),style:{display:"flex",gap:10,marginTop:14,width:"100%",maxWidth:420}},
+    onDel?ZZh("button",{type:"button",onClick:onDel,style:{flex:1,minHeight:52,borderRadius:12,border:0,background:m.red,color:ZZd_onAcc,fontSize:17,fontWeight:800,cursor:"pointer"}},R("Delete photo")):null,
+    ZZh("button",{type:"button",onClick:onClose,style:{flex:1,minHeight:52,borderRadius:12,border:0,background:"#fff",color:"#111",fontSize:17,fontWeight:800,cursor:"pointer"}},R("Close")))),
+/* a live strip of one owner's photos (newest first); del: the viewer can delete */
+ZZd_Thumbs=({owner,size,max,label,del,onCount})=>{let list=ZZd_usePhotos(owner),[view,setView]=(0,H.useState)(null),z=size||56;
+  if(!list.length)return null;
+  let rm=async pid=>{setView(null);let n0=list.length,back=await ZZd_mut(owner,cur=>cur.filter(p=>p.id!==pid));back&&onCount&&back.length!==n0&&onCount(back.length,back.length-n0)};
+  return ZZh("div",{"data-zz":"thumbs","data-owner":owner,style:{display:"flex",gap:6,overflowX:"auto",paddingBottom:2,alignItems:"center",minWidth:0}},
+    label?ZZh("span",{style:{fontSize:12,fontWeight:800,color:m.mut,flexShrink:0}},`${label} · ${list.length}`):null,
+    ...list.slice().reverse().slice(0,max||40).map(p=>ZZh("button",{key:p.id,type:"button",onClick:()=>setView(p),"aria-label":R("Open photo"),style:{width:z,height:z,flexShrink:0,borderRadius:8,overflow:"hidden",border:`1px solid ${m.line}`,padding:0,background:m.raised,cursor:"pointer"}},
+      ZZh("img",{src:p.src,alt:"",style:{width:"100%",height:"100%",objectFit:"cover",display:"block"}}))),
+    view?ZZh(ZZd_View,{p:view,onClose:()=>setView(null),onDel:del?()=>rm(view.id):null}):null)},
+/* ---------- the nonstop camera: one big button, any number of photos, the count, the last photos ---------- */
+ZZd_Cam=({owner,label,sub,onCount,need,color,compact})=>{ZZtr3();
+  let list=ZZd_usePhotos(owner),[busy,setBusy]=(0,H.useState)(!1),[err,setErr]=(0,H.useState)(""),ref=(0,H.useRef)(null),n=list.length,col=color||m.orange,miss=need&&!n,
+    add=async fl=>{setBusy(!0);setErr("");let r2=await ZZd_camAdd(owner,fl,onCount);setBusy(!1);r2&&r2.err&&setErr(r2.err)};
+  return ZZh("div",{"data-zz":"cam","data-owner":owner,style:{display:"grid",gap:8,minWidth:0}},
+    ZZh("button",{type:"button",onClick:()=>ref.current&&ref.current.click(),disabled:busy,"data-zz":"camadd",
+      style:{minHeight:compact?56:64,width:"100%",borderRadius:12,border:`2px solid ${miss?m.red:col}`,background:m.panel,color:m.text,display:"flex",alignItems:"center",gap:10,padding:"8px 12px",cursor:"pointer",fontSize:17,fontWeight:800,textAlign:"left",opacity:busy?.7:1}},
+      ZZh("span",{style:{width:40,height:40,borderRadius:20,display:"grid",placeItems:"center",background:col,color:ZZd_onAcc,flexShrink:0}},ZZh(su,{size:22})),
+      ZZh("span",{style:{flex:1,minWidth:0,lineHeight:1.2}},ZZh("span",{style:{display:"block"}},busy?R("Saving…"):label),
+        sub?ZZh("span",{style:{display:"block",fontSize:13,fontWeight:700,color:miss?m.red:m.mut,marginTop:2}},sub):null),
+      ZZh("span",{"data-zz":"camcount","aria-label":ZZd_f("{n} photos",{n}),style:{minWidth:40,height:34,padding:"0 10px",borderRadius:17,display:"grid",placeItems:"center",fontSize:17,fontWeight:900,flexShrink:0,
+        background:n?m.green:m.raised,color:n?ZZd_onAcc:m.text,border:`1px solid ${n?m.green:m.line}`}},n)),
+    ZZh(ZZd_Thumbs,{owner,size:56,max:compact?8:30,del:!0,onCount}),
+    ZZh("input",{ref,type:"file",accept:"image/*",capture:"environment",multiple:!0,"data-zz":"caminput",style:{display:"none"},onChange:e=>{let fl=e.target.files;add(fl);try{e.target.value=""}catch{}}}),
+    err?ZZh("div",{role:"alert",style:{fontSize:14,fontWeight:700,color:m.red}},err):null)},
+
+/* ---------- the colour + number badge of a load (never colour alone: the number and the PRO go with it) ---------- */
+ZZd_Badge=({b,n,sm,big,noRef,sub})=>{if(!b)return n!=null?ZZh("span",{style:{fontWeight:900}},`${R("Load")} ${n}`):null;
+  let z=big?44:sm?28:34;
+  return ZZh("span",{"data-zz":"badge","data-badge":b.n,"aria-label":`${R("Load")} ${b.n}${b.ref?" · "+b.ref:""}`,title:`${R("Load")} ${b.n} · ${R(b.name)}${b.ref?" · "+b.ref:""}`,
+      style:{display:"inline-flex",alignItems:"center",gap:6,minWidth:0,maxWidth:"100%",verticalAlign:"middle"}},
+    ZZh("span",{"aria-hidden":"true",style:{width:z,height:z,borderRadius:z/2,flexShrink:0,display:"inline-grid",placeItems:"center",background:b.color,color:b.fg,fontSize:Math.round(z*.52),fontWeight:900,lineHeight:1,fontVariantNumeric:"tabular-nums",boxShadow:`0 0 0 2px ${m.panel}`}},b.n),
+    noRef?null:ZZh("span",{"aria-hidden":"true",style:{fontWeight:900,fontSize:big?20:sm?15:17,fontVariantNumeric:"tabular-nums",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0,color:m.text}},b.ref||""),
+    sub?ZZh("span",{"aria-hidden":"true",style:{fontSize:13,fontWeight:700,color:m.mut,whiteSpace:"nowrap"}},sub):null)},
+/* "Stop 2 · NOSE — Front of the trailer, loads first" for a load (or a manifest line) with a stop / place */
+ZZd_posTxt=o2=>{let p=ZZPOS.find(x=>x.k===o2.pos);return[o2.stop?ZZd_f("Stop {n}",{n:o2.stop}):"",p?`${String(R(p.label)).toUpperCase()} — ${R(p.hint)}`:""].filter(Boolean).join(" · ")},
+
+/* ---------- what the job is, in plain words (top of the truck screen) ---------- */
+ZZd_outLoads=(doc,t)=>((doc&&doc.shipments)||[]).filter(s=>s&&s.trailerOutId===t.id&&(t.stage==="departed"||!s.shippedAt)),
+ZZd_receiver=(doc,t)=>{let L=ZZd_outLoads(doc,t),st=new Set(L.map(s=>s.stop).filter(v=>v!=null&&v!==""));if(t.multiStop&&st.size>1)return ZZd_f("{n} stops",{n:st.size});
+  let ids=new Set(L.map(s=>s.id)),rq=((doc&&doc.zzRequests)||[]).find(r2=>r2&&r2.type==="delivery"&&r2.status!=="cancelled"&&(r2.loads||[]).some(id=>ids.has(id))),to=(rq&&rq.address)||(L.find(s=>s.dest)||{}).dest;
+  return to?ZZd_f("to {x}",{x:to}):R("to the receiver")},
+ZZd_jobLabel=(doc,t,job)=>job==="delivery"?ZZd_receiver(doc,t):job==="pickup"?R("customer's carrier"):R((ZZJOBS[job]||ZZJOBS.unload).label),
+ZZd_task=(doc,t,job)=>{let inb=((doc&&doc.shipments)||[]).filter(s=>s&&s.trailerInId===t.id),out=ZZd_outLoads(doc,t),pl=L=>L.reduce((a2,s)=>a2+fe(s),0),one=L=>L.length===1;
+  if(job==="unpack")return ZZd_f(one(inb)?"1 load to break down — sort it to its own lane · {p} pallets total":"{n} loads to break down — sort each load to its own lane · {p} pallets total",{n:inb.length,p:pl(inb)});
+  if(job==="unload")return ZZd_f(one(inb)?"1 load to count and put away · {p} pallets":"{n} loads to count and put away · {p} pallets",{n:inb.length,p:pl(inb)});
+  if(!out.length)return R("Nothing is planned on this truck yet. The office says what goes.");
+  if(job==="pack")return ZZd_f(one(out)?"1 load to build · {p} pallets":"{n} loads to build · {p} pallets",{n:out.length,p:pl(out)});
+  if(job==="delivery")return ZZd_f(one(out)?"1 load to load out — load it the way the shipper did · {p} pallets":"{n} loads to load out — load them the way the shipper did · {p} pallets",{n:out.length,p:pl(out)});
+  return ZZd_f(one(out)?"1 load to load out for the customer's carrier · {p} pallets":"{n} loads to load out for the customer's carrier · {p} pallets",{n:out.length,p:pl(out)})},
+ZZd_reloadLine=(doc,t)=>{if(t.direction==="outbound")return"";let L=((doc&&doc.shipments)||[]).filter(s=>s&&s.trailerInId===t.id&&be(s)==="sac");if(!L.length)return"";
+  return ZZd_f(L.length===1?"Then PACK 1 load back out → California · {p} pallets":"Then PACK {n} loads back out → California · {p} pallets",{n:L.length,p:L.reduce((a2,s)=>a2+fe(s),0)})},
+/* the big line in the title card: "UNPACK · Consolidated trailer (inbound)" */
+ZZd_JobTitle=({t,doc,job})=>{ZZtr3();let J=ZZJOBS[job]||ZZJOBS.unload;
+  return ZZh("div",{"data-zz":"jobtitle","data-job":job,style:{lineHeight:1.2,minWidth:0}},
+    ZZh("span",{className:"zzc",style:{fontSize:26,fontWeight:900,letterSpacing:".04em",color:ZZd_JOBCOL(job)}},R(J.word)),
+    ZZh("span",{style:{fontSize:16,fontWeight:800,color:m.text,overflowWrap:"anywhere"}},` · ${ZZd_jobLabel(doc,t,job)}`))},
+/* the job card under the title card: job, the task in plain words, the reload part, the office's words, the load badges */
+ZZd_JobCard=({t,doc,job,ZB})=>{ZZtr3();let c=ZZd_JOBCOL(job),J=ZZJOBS[job]||ZZJOBS.unload,inb=t.direction!=="outbound",SH=(doc&&doc.shipments)||[],
+    L=inb?ZZd_bySeq(SH.filter(s=>s&&s.trailerInId===t.id)):ZZloadOrder(doc,t).map(o2=>o2.s).filter(s=>t.stage==="departed"||!s.shippedAt),rl=ZZd_reloadLine(doc,t),bd=ZB||{},
+    where=s=>inb&&be(s)==="sac"?`→ ${s.dest||R("California")}`:s.row?ZZd_f("lane {x}",{x:s.row}):s.dest||R("floor");
+  return ZZh("div",{"data-zz":"jobcard","data-job":job,style:{borderRadius:12,padding:"12px 14px",background:m.panel,border:`1px solid ${m.line}`,borderLeft:`8px solid ${c}`,display:"grid",gap:8,boxShadow:"0 4px 12px rgba(0,0,0,.08)",minWidth:0}},
+    ZZh("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,flexWrap:"wrap"}},
+      ZZh("span",{className:"zzc",style:{fontSize:22,fontWeight:900,letterSpacing:".05em",color:c,minWidth:0,overflowWrap:"anywhere"}},`${R(J.word)} · ${ZZd_jobLabel(doc,t,job)}`),
+      ZZh("span",{style:{fontSize:15,fontWeight:900,color:m.orange,whiteSpace:"nowrap"}},`${R("Door")} ${t.dock||"—"}`)),
+    ZZh("div",{"data-zz":"jobtask",style:{fontSize:18,fontWeight:800,lineHeight:1.3}},ZZd_task(doc,t,job)),
+    rl?ZZh("div",{"data-zz":"jobreload",style:{fontSize:16,fontWeight:800,lineHeight:1.3,color:m.blue}},rl):null,
+    String(t.instructions||"").trim()?ZZh("div",{style:{fontSize:15,lineHeight:1.35,borderRadius:8,padding:"8px 10px",background:m.raised}},`${R("From the office")}: ${String(t.instructions).trim()}`):null,
+    L.length?ZZh("div",{"data-zz":"jobloads",style:{display:"flex",gap:6,flexWrap:"wrap"}},...L.map(s=>ZZh("span",{key:s.id,style:{display:"inline-flex",alignItems:"center",gap:6,borderRadius:22,padding:"3px 10px 3px 3px",background:m.raised,border:`1px solid ${m.line}`,fontSize:14,fontWeight:700,maxWidth:"100%",minWidth:0}},
+      ZZh(ZZd_Badge,{b:bd[s.id],sm:!0}),ZZh("span",{style:{color:m.mut,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",minWidth:0}},`${fe(s)} plt · ${where(s)}`)))):null)},
+
+/* ---------- the steps of each job (the ZZSteps bar, the sections, wrap-up) ----------
+   UNPACK / UNLOAD: [seal] before, off (unload), verify (sort, count, verify) [, reload, secure, manifest], wrap
+   PACK: [seal] pack, secure, manifest, wrap
+   DELIVERY / PICKUP: [seal] find, count, insp, load, secure ("Strapped"), bills, wrap */
+ZZd_steps=v=>{let{l,b,ZJ,nb,he,bf,T,k,q,Y,F,x,Et,oe,zs,zn,ZD}=v,ap=ie(l.afterPhotoCount)>0,
+    S=(k2,d,lb)=>({k:k2,done:!!d,...(lb?{label:lb}:{})}),seal=nb?[S("seal",he)]:[],wrap=S("wrap",l.stage==="done"),
+    sec=lb=>zn?[S("secure",zs,lb)]:[],mf=S("manifest",!!(l.manifest&&l.manifest.signedAt)),nd=!(ZD||[]).length;
+  if(b){let off=T.length>0&&k.length===0;
+    return[...seal,S("before",bf),S("off",off),S("verify",off&&Et&&nd),...q.length||x.reload?[S("reload",oe&&ap),...sec(),mf]:[],wrap]}
+  if(ZJ==="pack")return[...seal,S("pack",Y.length>0&&!F.length&&ap&&nd),...sec(),mf,wrap];
+  let out=[...F,...Y],cnt=out.length>0&&out.every(s=>s.pullCountAt||s.loadedAt);
+  return[...seal,S("find",!!l.foundAt||cnt),S("count",cnt),S("insp",out.length>0&&out.every(s=>ie(s.inspPhotoCount)>0)),S("load",Y.length>0&&!F.length&&ap),...sec("Strapped"),S("bills",ie(l.bolPhotoCount)>0),wrap]},
+
+/* ---------- damage snap: photo now, which load, keep working ---------- */
+ZZd_SnapPick=({snap,loads,bd,onMore,onPick,onToss,busy})=>{ZZtr3();let[note,setNote]=(0,H.useState)(""),[sure,setSure]=(0,H.useState)(!1);
+  return ZZh(Gt,{open:!0,onClose:()=>onPick(null,note.trim()),title:R("Damage photo — which load?"),wide:!0},
+    ZZh("div",{"data-zz":"snappick",style:{display:"grid",gap:16}},
+      ZZh("div",{style:{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}},ZZh(ZZd_Thumbs,{owner:"dmg:"+snap.id,size:72}),
+        ZZh("button",{type:"button",onClick:onMore,disabled:busy,"data-zz":"snapmore",style:{width:72,height:72,borderRadius:10,border:`2px dashed ${m.line}`,background:m.raised,color:m.mut,display:"grid",placeItems:"center",fontSize:13,fontWeight:800,cursor:"pointer"}},
+          busy?R("Saving…"):ZZh("span",{style:{display:"grid",placeItems:"center",gap:2}},ZZh(su,{size:22}),R("Add")))),
+      ZZh("div",null,ZZh("div",{style:ZZd_H},R("Which load is it? Tap its number.")),ZZh("div",{style:ZZd_SUB},R("It saves when you tap. Keep working. Fill in the details later."))),
+      loads.length?ZZh("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}},...loads.map(s=>{let b=bd[s.id];
+        return ZZh("button",{key:s.id,type:"button","data-zz":"snapload","data-sid":s.id,onClick:()=>onPick(s.id,note.trim()),
+          style:{minHeight:64,borderRadius:12,border:`3px solid ${b?b.color:m.line}`,background:m.panel,color:m.text,display:"flex",alignItems:"center",gap:8,padding:"6px 10px",cursor:"pointer",textAlign:"left",minWidth:0}},
+          b?ZZh(ZZd_Badge,{b}):ZZh("b",null,s.ref||"—"),ZZh("span",{style:{fontSize:13,color:m.mut,marginLeft:"auto",whiteSpace:"nowrap"}},`${fe(s)} plt`))})):null,
+      ZZh("button",{type:"button","data-zz":"snapunsure",onClick:()=>onPick(null,note.trim()),style:{minHeight:56,borderRadius:12,border:`2px solid ${m.line}`,background:m.raised,color:m.text,fontSize:17,fontWeight:800,cursor:"pointer"}},R("Not sure which load")),
+      ZZh("label",{style:{display:"grid",gap:6}},ZZh("span",{style:{fontSize:15,fontWeight:800}},R("What do you see? (optional)")),
+        ZZh("input",{value:note,onChange:e=>setNote(e.target.value),placeholder:R("Example: corner crushed, wrap torn"),"data-zz":"snapnote",className:ZZd_inpCls,style:ZZd_inp})),
+      sure?ZZh("div",{style:{display:"grid",gap:8,border:`2px solid ${m.red}`,borderRadius:12,padding:12}},ZZh("b",{style:{color:m.red}},R("Delete this photo? Only if it is not damage.")),
+          ZZh("div",{style:{display:"flex",gap:8}},ZZh(Z,{kind:"danger",size:"lg",className:"flex-1",onClick:onToss},R("Yes, delete it")),ZZh(Z,{size:"lg",className:"flex-1",onClick:()=>setSure(!1)},R("Keep it"))))
+        :ZZh("button",{type:"button",onClick:()=>setSure(!0),"data-zz":"snaptoss",style:ZZd_link(m.red)},R("Not damage? Delete this photo"))))},
+/* the photo tools of a step: the nonstop camera, the big Damage button, and (while the step is open) a floating bar with
+   both, so they stay in reach while scrolling. fin: where the snap gets its details. */
+ZZd_PhotoTools=({t,actions:a,owner,label,sub,onCount,loads,bd,float,need,fin})=>{ZZtr3();
+  let[snap,setSnap]=(0,H.useState)(null),[msg,setMsg]=(0,H.useState)(""),[busy,setBusy]=(0,H.useState)(""),[err,setErr]=(0,H.useState)(""),sref=(0,H.useRef)(null),cref=(0,H.useRef)(null),list=ZZd_usePhotos(owner),
+    snapFiles=async fl=>{let f=[...(fl||[])];if(!f.length)return;setBusy("snap");setErr("");setMsg("");let id=snap&&snap.id||Ce();ZZd_snapOpen[id]=1;
+      let r2=await ZZd_camAdd("dmg:"+id,f,null,j=>j===0?"wide":j===1?"close":"more");setBusy("");if(r2.err)setErr(r2.err);if(r2.n)setSnap({id,n:r2.n})},
+    camFiles=async fl=>{setBusy("cam");setErr("");let r2=await ZZd_camAdd(owner,fl,onCount);setBusy("");r2&&r2.err&&setErr(r2.err)},
+    pick=async(sid,note)=>{if(!snap)return;let s0=snap;setSnap(null);let r2=null;try{r2=await a.zzDamageSnap(t.id,sid,{id:s0.id,photoCount:s0.n,note})}catch(x){console.error("zzDamageSnap",x)}
+      delete ZZd_snapOpen[s0.id];if(r2==null){setErr(R("The damage photo did NOT save. Try again."));setSnap(s0);return}
+      let b=sid&&bd[sid];setMsg(b?ZZd_f("Damage photo saved on load {n} ({r}). {w}",{n:b.n,r:b.ref,w:fin||""}):ZZd_f("Damage photo saved. Pick the load later. {w}",{w:fin||""}))},
+    toss=async()=>{if(!snap)return;let s0=snap;setSnap(null);delete ZZd_snapOpen[s0.id];await ZZd_mut("dmg:"+s0.id,()=>[]);setMsg(R("Damage photo deleted."))},
+    fb=(bg)=>({pointerEvents:"auto",minHeight:56,padding:"0 18px",borderRadius:28,border:0,background:bg,color:ZZd_onAcc,fontSize:17,fontWeight:900,display:"flex",alignItems:"center",gap:8,cursor:"pointer",boxShadow:"0 6px 18px rgba(0,0,0,.35)"});
+  return ZZh("div",{"data-zz":"phototools",style:{display:"grid",gap:10}},
+    ZZh(ZZd_Cam,{owner,label,sub,onCount,need}),
+    ZZh("button",{type:"button","data-zz":"snapbtn",onClick:()=>sref.current&&sref.current.click(),disabled:busy==="snap",
+      style:{minHeight:64,width:"100%",borderRadius:12,border:`2px solid ${m.red}`,background:m.panel,color:m.red,display:"flex",alignItems:"center",gap:10,padding:"8px 12px",cursor:"pointer",fontSize:17,fontWeight:900,textAlign:"left"}},
+      ZZh("span",{style:{width:40,height:40,borderRadius:20,display:"grid",placeItems:"center",background:m.red,color:ZZd_onAcc,flexShrink:0}},ZZh(wr,{size:22})),
+      ZZh("span",{style:{flex:1,minWidth:0,lineHeight:1.2}},ZZh("span",{style:{display:"block"}},busy==="snap"?R("Saving…"):R("Damage? Snap it before you touch it")),
+        ZZh("span",{style:{display:"block",fontSize:13,fontWeight:700,color:m.mut,marginTop:2}},R("Photo now, details later")))),
+    msg?ZZh("div",{role:"status","data-zz":"snapmsg",style:{fontSize:15,fontWeight:800,color:m.green,lineHeight:1.35}},`✓ ${msg}`):null,
+    err?ZZh("div",{role:"alert",style:{fontSize:14,fontWeight:700,color:m.red}},err):null,
+    ZZh("input",{ref:sref,type:"file",accept:"image/*",capture:"environment",multiple:!0,"data-zz":"snapinput",style:{display:"none"},onChange:e=>{let fl=e.target.files;snapFiles(fl);try{e.target.value=""}catch{}}}),
+    ZZh("input",{ref:cref,type:"file",accept:"image/*",capture:"environment",multiple:!0,"data-zz":"floatcaminput",style:{display:"none"},onChange:e=>{let fl=e.target.files;camFiles(fl);try{e.target.value=""}catch{}}}),
+    float&&!snap?ZZh("div",{"data-zz":"floatbar",style:{position:"fixed",left:0,right:0,bottom:82,zIndex:19,padding:"0 16px",pointerEvents:"none"}},
+      ZZh("div",{style:{maxWidth:768,margin:"0 auto",display:"flex",gap:8,justifyContent:"flex-end"}},
+        ZZh("button",{type:"button","data-zz":"floatcam",onClick:()=>cref.current&&cref.current.click(),disabled:busy==="cam","aria-label":`${label} · ${list.length}`,style:fb(m.orange)},ZZh(su,{size:22}),busy==="cam"?R("Saving…"):`${R("Photo")} · ${list.length}`),
+        ZZh("button",{type:"button","data-zz":"floatsnap",onClick:()=>sref.current&&sref.current.click(),disabled:busy==="snap",style:fb(m.red)},ZZh(wr,{size:22}),R("Damage")))):null,
+    snap?ZZh(ZZd_SnapPick,{snap,loads:loads||[],bd:bd||{},onMore:()=>sref.current&&sref.current.click(),onPick:pick,onToss:toss,busy:busy==="snap"}):null)},
+/* a damage snap waiting for its details: pick / change the load, finish it (ZZDmg with snap), or throw it away */
+ZZd_SnapCard=({d,t,doc,actions:a,bd})=>{ZZtr3();
+  let[mode,setMode]=(0,H.useState)(""),[fin,setFin]=(0,H.useState)(!1),bd2=bd||{},b=d.sid?bd2[d.sid]:null,SH=(doc&&doc.shipments)||[],
+    s=d.sid?SH.find(q=>q&&q.id===d.sid):null,x=s?(s.exceptions||[]).find(q=>q&&q.id===d.id):null,
+    loads=Object.values(bd2).sort((p,q2)=>p.n-q2.n).map(v=>SH.find(q=>q&&q.id===v.sid)).filter(Boolean),
+    move=async sid=>{setMode("");await a.zzDamageAssign(t.id,d.id,sid)},
+    toss=async()=>{setMode("");await a.zzDamageDiscard(t.id,d.sid,d.id);await ZZd_mut(d.photoOwner,()=>[])};
+  return ZZh("div",{"data-zz":"snapcard","data-id":d.id,"data-sid":d.sid||"",style:{border:`1px solid ${m.line}`,borderLeft:`5px solid ${m.red}`,borderRadius:12,padding:12,background:m.panel,display:"grid",gap:10,minWidth:0}},
+    ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+      b?ZZh(ZZd_Badge,{b}):ZZh("b",{style:{fontSize:16,color:m.amber}},R("Load not picked yet")),
+      ZZh("span",{style:{fontSize:13,color:m.mut}},[R("Damage photo, details to come"),d.at?at(d.at):"",String(d.by||"").replace(/^Crew \xB7 /,"")].filter(Boolean).join(" · "))),
+    d.note?ZZh("div",{style:{fontSize:15}},`“${d.note}”`):null,
+    ZZh(ZZd_Thumbs,{owner:d.photoOwner,size:64}),
+    d.where==="truck"||mode==="move"?ZZh("div",{style:{display:"grid",gap:8}},ZZh("div",{style:{fontSize:15,fontWeight:800}},R("Which load is it? Tap its number.")),
+      ZZh("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},...loads.filter(q=>q.id!==d.sid).map(q=>ZZh("button",{key:q.id,type:"button","data-zz":"assign","data-sid":q.id,onClick:()=>move(q.id),
+        style:{minHeight:52,borderRadius:12,border:`3px solid ${(bd2[q.id]||{}).color||m.line}`,background:m.panel,color:m.text,padding:"4px 12px 4px 4px",cursor:"pointer",display:"inline-flex",alignItems:"center",maxWidth:"100%"}},ZZh(ZZd_Badge,{b:bd2[q.id]})))),
+      mode==="move"?ZZh("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},ZZh(Z,{size:"md",onClick:()=>move(null)},R("Not sure which load")),ZZh(Z,{size:"md",kind:"ghost",onClick:()=>setMode("")},R("Cancel"))):null):null,
+    d.where==="load"&&mode!=="move"?ZZh("div",{style:{display:"grid",gap:4}},
+      ZZh(Z,{kind:"danger",size:"lg",className:"w-full",icon:wr,disabled:!x,onClick:()=>setFin(!0)},R("Finish this damage report")),
+      ZZh("button",{type:"button",onClick:()=>setMode("move"),style:ZZd_link()},R("Wrong load? Change it"))):null,
+    mode==="trash"?ZZh("div",{style:{display:"grid",gap:8,border:`2px solid ${m.red}`,borderRadius:12,padding:12}},ZZh("b",{style:{color:m.red}},R("Throw away this damage photo? Only if it is not damage.")),
+        ZZh("div",{style:{display:"flex",gap:8}},ZZh(Z,{kind:"danger",size:"lg",className:"flex-1","data-zz":"snapyes",onClick:toss},R("Yes, throw it away")),ZZh(Z,{size:"lg",className:"flex-1",onClick:()=>setMode("")},R("Keep it"))))
+      :ZZh("button",{type:"button","data-zz":"snapdiscard",onClick:()=>setMode("trash"),style:ZZd_link(m.red)},R("Not damage? Throw it away")),
+    fin&&s&&x?ZZh(ZZDmg,{s,doc,actions:a,snap:x,pallets:1,onClose:()=>setFin(!1),onSaved:()=>setFin(!1)}):null)},
+/* inside the count card: this load's damage snaps (patch D53) */
+ZZd_LoadSnaps=({s,doc,actions:a})=>{let ds=((s&&s.exceptions)||[]).filter(x=>x&&x.draft&&!x.resolved);if(!ds.length)return null;
+  let tid=ds[0].trailerId||s.trailerInId||s.trailerOutId,L=ZZdmgDrafts(doc,tid).filter(d=>d.sid===s.id),bd=ZZloadBadges(doc,tid);
+  return ZZh("div",{"data-zz":"loadsnaps",style:{display:"grid",gap:8,paddingTop:12}},...L.map(d=>ZZh(ZZd_SnapCard,{key:d.id,d,t:{id:tid},doc,actions:a,bd})))},
+/* the count card header: a red pill while a damage snap on this load waits for its details */
+ZZd_SnapPill=({s})=>{ZZtr3();let n=((s&&s.exceptions)||[]).filter(x=>x&&x.draft&&!x.resolved).length;
+  return n?ZZh("span",{"data-zz":"snappill",style:{fontSize:12,fontWeight:800,padding:"2px 8px",borderRadius:6,background:m.red,color:ZZd_onAcc,whiteSpace:"nowrap"}},n===1?R("Damage photo to finish"):ZZd_f("{n} damage photos to finish",{n})):null},
+/* count card step 4 (patch D57): the one photo per load, where it sits in the warehouse */
+ZZd_WhPhoto=({s,actions:a,row})=>{ZZtr3();
+  return ZZh("div",{"data-zz":"whphoto",style:{display:"grid",gap:6,paddingTop:8}},
+    ZZh("div",{style:{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}},
+      ZZh("span",{style:{fontSize:11,fontWeight:900,borderRadius:10,width:20,height:20,display:"inline-grid",placeItems:"center",background:m.raised,color:m.orange,flexShrink:0}},"4"),
+      ZZh("b",{style:{fontSize:15}},R("Photo of the load left in the warehouse")),
+      row?ZZh("span",{style:{fontSize:13,color:m.mut}},String(row).toUpperCase()):null),
+    ZZh(ZZd_Cam,{owner:dt.row(s.id),label:R("Photo where it sits"),sub:R("The whole load in its lane."),compact:!0,onCount:c=>a.notePhotos(s.id,c,"row")}))},
+
+/* ---------- loading: the plan in loading order, the shipper's reference photos, find / count / inspect / load rows ---------- */
+ZZd_Plan=({order,multi})=>{ZZtr3();if(!order||!order.length)return null;
+  return ZZh("div",{"data-zz":"plan",style:{...ZZd_card,display:"grid",gap:6}},
+    ZZh("div",{style:ZZd_H},multi?R("Load plan — nose first, tail last"):R("Load in this order")),
+    multi?ZZh("div",{style:ZZd_SUB},R("The customer picked the stop and the spot in the trailer for each load.")):null,
+    ...order.map((o2,j)=>ZZh("div",{key:o2.sid,"data-zz":"planrow","data-sid":o2.sid,style:{display:"flex",alignItems:"center",gap:8,minHeight:44,flexWrap:"wrap",borderTop:j?`1px solid ${m.line}`:0,paddingTop:j?6:0}},
+      ZZh("span",{style:{fontSize:14,fontWeight:900,color:m.mut,width:24,flexShrink:0}},`${j+1}.`),
+      ZZh(ZZd_Badge,{b:o2.badge,sm:!0,n:j+1}),
+      ZZh("span",{style:{flex:"1 1 160px",minWidth:0,fontSize:15,fontWeight:700}},multi?ZZd_posTxt(o2)||R("No spot picked yet"):`${fe(o2.s)} plt`),
+      o2.s.loadedAt||o2.s.reloadedAt?ZZh("span",{style:{fontSize:14,fontWeight:900,color:m.green,whiteSpace:"nowrap"}},`✓ ${R("on")}`):null)))},
+/* "Load it like the shipper did": the dispatcher's shipper photo (ship:<tid>) and our photos from the inbound truck these
+   loads came in on (before:<tid>, unload:<tid>) */
+ZZd_Ref=({t,doc,job,compact})=>{ZZtr3();
+  let TR=(doc&&doc.trailers)||[],ins=[...new Set(ZZd_outLoads(doc,t).map(s=>s.trailerInId).filter(v=>v&&v!==t.id))],
+    groups=[{owner:`ship:${t.id}`,cap:R("From the dispatcher: how it left the shipper")},...ins.flatMap(id=>{let k=TR.find(q=>q&&q.id===id),nm=(k&&k.truck)||"—";
+      return[{owner:`before:${id}`,cap:ZZd_f("When it came in on truck {k}, before unloading",{k:nm})},{owner:`unload:${id}`,cap:ZZd_f("Unloading truck {k}",{k:nm})}]})],
+    key=groups.map(g=>g.owner).join("|"),[got,setGot]=(0,H.useState)({}),[view,setView]=(0,H.useState)(null);
+  (0,H.useEffect)(()=>{let live=!0,load=()=>Promise.all(groups.map(g=>ls(g.owner).then(v=>[g.owner,v]).catch(()=>[g.owner,[]]))).then(r2=>{live&&setGot(Object.fromEntries(r2))}),
+      on=e=>{e&&groups.some(g=>g.owner===e.detail)&&load()};load();window.addEventListener("zzd-photos",on);return()=>{live=!1;window.removeEventListener("zzd-photos",on)}},[key]);
+  let full=groups.map(g=>({...g,list:got[g.owner]||[]})).filter(g=>g.list.length),n=full.reduce((a2,g)=>a2+g.list.length,0),hasShip=full.some(g=>g.owner.startsWith("ship:"));
+  if(!n){if(compact||job==="pickup")return null;
+    return ZZh("div",{"data-zz":"ref",style:{...ZZd_card,display:"grid",gap:4}},ZZh("div",{style:{...ZZd_H,fontSize:19}},R("Load it like the shipper did")),
+      ZZh("div",{style:{fontSize:15,color:m.amber,fontWeight:700}},R("No photo from the dispatcher yet. Ask the office for one, or load it neat and tight.")))}
+  return ZZh("div",{"data-zz":"ref",style:{...ZZd_card,display:"grid",gap:10,border:`2px solid ${m.blue}`}},
+    ZZh("div",null,ZZh("div",{style:{...ZZd_H,fontSize:compact?17:20}},R("Load it like the shipper did")),
+      ZZh("div",{style:ZZd_SUB},hasShip?R("Same order, same way, so the receiver has nothing to complain about."):R("No photo from the dispatcher. These are our photos from when it came in."))),
+    ...full.map(g=>ZZh("div",{key:g.owner,"data-zz":"refgroup","data-owner":g.owner,style:{display:"grid",gap:6,minWidth:0}},ZZh("div",{style:{fontSize:13,fontWeight:800,color:m.mut}},`${g.cap} · ${g.list.length}`),
+      ZZh("div",{style:{display:"flex",gap:8,overflowX:"auto",scrollSnapType:"x mandatory",paddingBottom:4}},...g.list.map(p=>ZZh("button",{key:p.id,type:"button",onClick:()=>setView(p),"aria-label":R("Open photo"),
+        style:{flex:compact?"0 0 96px":"0 0 min(86%, 420px)",height:compact?96:240,scrollSnapAlign:"start",borderRadius:10,overflow:"hidden",border:`1px solid ${m.line}`,padding:0,background:m.raised,cursor:"pointer"}},
+        ZZh("img",{src:p.src,alt:"",style:{width:"100%",height:"100%",objectFit:"cover",display:"block"}})))))),
+    view?ZZh(ZZd_View,{p:view,onClose:()=>setView(null)}):null)},
+ZZd_FindRow=({o2,multi})=>{let s=o2.s;
+  return ZZh("div",{"data-zz":"findrow","data-sid":s.id,style:{...ZZd_card,display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}},
+    ZZh("div",{style:{flex:"1 1 180px",minWidth:0,display:"grid",gap:4}},ZZh(ZZd_Badge,{b:o2.badge,sub:`${fe(s)} plt`}),
+      [s.commodity,s.dest?"→ "+s.dest:"",multi?ZZd_posTxt(o2):""].filter(Boolean).length?ZZh("div",{style:{fontSize:14,color:m.mut}},[s.commodity,s.dest?"→ "+s.dest:"",multi?ZZd_posTxt(o2):""].filter(Boolean).join(" · ")):null,
+      s.loadNotes?ZZh("div",{style:{fontSize:14,fontWeight:700,color:m.amber}},s.loadNotes):null,ZZh("div",null,ZZh(ZZd_LoadPills,{s}))),
+    ZZh("div",{style:{textAlign:"center",minWidth:84}},ZZh("div",{className:"zzc",style:{fontSize:30,fontWeight:900,color:s.row?m.orange:m.dim,lineHeight:1}},s.row||"—"),
+      ZZh("div",{style:{fontSize:12,fontWeight:700,color:m.mut}},s.row?R("lane"):R("no lane on file"))))},
+/* count against the paperwork (the same fields as Nick's pull card: pullCount / pullCountAt, a note and one Short / Over report when off) */
+ZZd_CountRow=({s,zb,actions:r})=>{ZZtr3();
+  let w=fe(s),[c,setC]=(0,H.useState)(()=>String(s.pullCount??w)),[note,setNote]=(0,H.useState)(""),n=ie(c),off=c!==""&&n!==w,
+    okd=s.pullCountAt!=null&&c!==""&&ie(s.pullCount)===n,ld=!!s.loadedAt,
+    conf=()=>{if(c===""||okd||off&&!note.trim())return;r.patchShipment(s.id,{pullCount:n,pullCountAt:ye(Date.now())});off&&ZZd_pullExc(s,r,n,w,note)},
+    btn=(t2,dv,al)=>ZZh("button",{type:"button","aria-label":al,onClick:()=>setC(String(Math.max(0,n+dv))),style:{width:60,height:60,borderRadius:12,fontSize:30,fontWeight:900,background:m.raised,border:`1px solid ${m.line}`,color:m.text,cursor:"pointer",flexShrink:0}},t2);
+  return ZZh("div",{"data-zz":"countrow","data-sid":s.id,style:{...ZZd_card,display:"grid",gap:10,borderLeft:`4px solid ${okd||ld?m.green:m.amber}`}},
+    ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},ZZh(ZZd_Badge,{b:zb}),ZZh("span",{style:{fontSize:14,color:m.mut}},`${R("BOL says")} ${w} · ${s.row?ZZd_f("lane {x}",{x:s.row}):R("no lane on file")}`)),
+    ld&&s.pullCountAt==null?ZZh("div",{style:{fontSize:15,fontWeight:800,color:m.green}},`✓ ${R("Already on the truck")}`)
+      :ZZh("div",{style:{display:"grid",gap:10}},
+        ZZh("div",{style:{display:"flex",alignItems:"center",gap:8}},btn("−",-1,R("One less")),
+          ZZh("input",{type:"number",inputMode:"numeric",value:c,"aria-label":R("Pallets counted"),onChange:e=>setC(e.target.value===""?"":String(Math.max(0,ie(e.target.value)))),className:ZZd_inpCls,
+            style:{...ZZd_inp,textAlign:"center",fontSize:30,fontWeight:900,minHeight:60,flex:1,minWidth:0,color:off?m.amber:m.green}}),
+          btn("+",1,R("One more"))),
+        off&&!okd?ZZh(ZZd_Note,{value:note,onChange:setNote,short:n<w,n:Math.abs(n-w),out:!0}):null,
+        ZZh(Z,{kind:okd?"good":"primary",size:"lg",className:"w-full",disabled:okd||c===""||off&&!note.trim(),onClick:conf},okd?R("Count confirmed ✓"):off?ZZd_f("Confirm {n} (not {w})",{n,w}):R("Count is correct"))))},
+/* inspect + one photo per load (insp:<sid>); damage goes straight into a full damage report */
+ZZd_InspRow=({s,zb,doc,actions:r})=>{ZZtr3();let[dm,setDm]=(0,H.useState)(!1),n=ie(s.inspPhotoCount),bad=((s&&s.exceptions)||[]).some(x=>x&&x.kind==="Damage"&&!x.draft&&!x.resolved);
+  return ZZh("div",{"data-zz":"insprow","data-sid":s.id,style:{...ZZd_card,display:"grid",gap:10,borderLeft:`4px solid ${bad?m.red:n?m.green:m.amber}`}},
+    ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},ZZh(ZZd_Badge,{b:zb,sub:`${fe(s)} plt`}),
+      ZZh("span",{"data-zz":"cond",style:{fontSize:14,fontWeight:800,color:bad?m.red:m.green}},bad?R("Damaged — report saved"):R("Good — no damage reported"))),
+    ZZh(ZZd_Cam,{owner:`insp:${s.id}`,label:zb?ZZd_f("Photo of load {n}",{n:zb.n}):R("Photo of this load"),sub:n?R("Add more if it helps."):R("1 photo needed"),need:!0,compact:!0,
+      onCount:(c,dl)=>r.patchShipment(s.id,q=>({inspPhotoCount:c,touches:dl>0?Fo(q,hA(),"photo"):q.touches||[]}))}),
+    ZZh(ZZd_PullDmg,{s,doc,actions:r,open:dm,setOpen:setDm}))},
+ZZd_LoadRow=({o2,t,actions:r,multi,onCount})=>{ZZtr3();let s=o2.s,ld=!!s.loadedAt,cn=s.pullCountAt!=null,meta=[s.row?ZZd_f("lane {x}",{x:s.row}):"",multi?ZZd_posTxt(o2):""].filter(Boolean).join(" · ");
+  return ZZh("div",{"data-zz":"loadrow","data-sid":s.id,style:{...ZZd_card,display:"grid",gap:8,borderLeft:`4px solid ${ld?m.green:m.blue}`}},
+    ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},ZZh(ZZd_Badge,{b:o2.badge,sub:`${fe(s)} plt`}),meta?ZZh("span",{style:{fontSize:14,fontWeight:700,color:m.mut}},meta):null),
+    s.loadNotes?ZZh("div",{style:{fontSize:14,fontWeight:700,color:m.amber}},s.loadNotes):null,
+    ld?ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},ZZh("span",{style:{flex:"1 1 160px",minWidth:0,fontSize:15,fontWeight:800,color:m.green}},`✓ ${R("On the truck")}${s.loadedBy?" · "+s.loadedBy:""}${s.loadedAt?" · "+at(s.loadedAt):""}`),
+        ZZh(Z,{size:"md",onClick:()=>r.unload(s.id)},R("Take off")))
+      :cn?ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Sa,onClick:()=>r.loadOnto(s.id,t.id)},R("Load it"))
+      :ZZh(Z,{size:"lg",className:"w-full",onClick:onCount},R("Count it first")))},
+
+/* ---------- the manifest: what went in, line by line, signed by the forklift driver ---------- */
+ZZd_mfDraft={},
+ZZd_Manifest=({t,doc,actions:a,n,open,onOpen,done,order,bd,drafts,onGo,back})=>{ZZtr3();
+  let mf=t.manifest&&t.manifest.signedAt?t.manifest:null,cs=(doc&&doc.customers)||[],cname=id=>ZZd_short((cs.find(c=>c.id===id)||{}).name||""),bd2=bd||{},
+    fresh=o2=>{let s=o2.s,old=mf&&(mf.lines||[]).find(l2=>l2&&l2.sid===s.id);
+      return{id:old?old.id:"m_"+s.id,sid:s.id,ref:s.ref||"",customerId:s.customerId||null,planned:fe(s),loaded:old?ie(old.loaded):s.pullCount!=null?ie(s.pullCount):fe(s),stop:old?old.stop:o2.stop,pos:old?old.pos:o2.pos,note:old?old.note||"":""}},
+    init=()=>({lines:[...order.map(fresh),...(mf?(mf.lines||[]).filter(l2=>l2&&!l2.sid).map(l2=>({...l2,extra:!0})):[])],sign:""}),
+    [f,setF]=(0,H.useState)(()=>ZZd_mfDraft[t.id]?{...ZZd_mfDraft[t.id],sign:""}:init()),[edit,setEdit]=(0,H.useState)(()=>!mf||!!ZZd_mfDraft[t.id]),[busy,setBusy]=(0,H.useState)(!1),
+    ids=new Set(order.map(o2=>o2.sid)),
+    rowsOf=o=>[...o.lines.filter(l2=>!l2.sid||ids.has(l2.sid)),...order.filter(o2=>!o.lines.some(l2=>l2.sid===o2.sid)).map(fresh)],
+    rows=rowsOf(f),up=p=>setF(o=>({...o,...p})),setLine=(id,p)=>setF(o=>({...o,lines:rowsOf(o).map(l2=>l2.id===id?{...l2,...p}:l2)})),
+    custs=[...new Set(order.map(o2=>o2.s.customerId).filter(Boolean))],
+    addLine=()=>setF(o=>({...o,lines:[...rowsOf(o),{id:Ce(),sid:null,ref:"",customerId:custs.length===1?custs[0]:null,planned:0,loaded:1,stop:null,pos:null,note:"",extra:!0}]})),
+    delLine=id=>setF(o=>({...o,lines:rowsOf(o).filter(l2=>l2.id!==id)})),
+    total=rows.reduce((a2,l2)=>a2+ie(l2.loaded),0),planned=rows.reduce((a2,l2)=>a2+ie(l2.planned),0),nd=(drafts||[]).length,
+    miss=[nd?(nd===1?R("finish the damage photo first"):ZZd_f("finish the {n} damage photos first",{n:nd})):"",!rows.length?R("at least one line"):"",
+      rows.some(l2=>!l2.sid&&!String(l2.ref||"").trim()&&!String(l2.note||"").trim())?R("what the extra line is"):"",!f.sign.trim()?R("your signature"):""].filter(Boolean),
+    save=async()=>{if(miss.length||busy)return;setBusy(!0);let r2=null;
+      try{r2=await a.zzManifest(t.id,{lines:rows.map(({extra,...l2})=>l2),signature:f.sign.trim()})}catch(x){console.error("zzManifest",x)}
+      setBusy(!1);if(r2==null)return;ZZd_mfDraft[t.id]=null;up({sign:""});setEdit(!1)};
+  /* a form someone changed is kept in memory (leaving the truck and coming back); the signature never is */
+  (0,H.useEffect)(()=>{if(!edit)return;let d={...f,sign:""};ZZd_mfDraft[t.id]=JSON.stringify(rowsOf(d))!==JSON.stringify(init().lines)?d:null},[f,edit,t.id]);
+  (0,H.useEffect)(()=>{mf&&!ZZd_mfDraft[t.id]&&(setEdit(!1),setF(init()))},[mf&&mf.signedAt]);
+  let hint=mf?ZZd_f("{n} pallets · signed by {p}",{n:ie(mf.total),p:mf.signedBy||"—"}):nd?R("Finish the damage photos first"):R("What went in, line by line, then sign"),
+    line=l2=>{let b=l2.sid?bd2[l2.sid]:null,df=ie(l2.loaded)-ie(l2.planned);
+      return ZZh("div",{key:l2.id,"data-zz":"mfline","data-sid":l2.sid||"",style:{...ZZd_card,display:"grid",gap:10,borderLeft:`5px solid ${b?b.color:m.mut}`}},
+        ZZh("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+          b?ZZh(ZZd_Badge,{b}):ZZh("b",{style:{fontSize:16}},l2.sid?l2.ref:R("Extra line")),
+          l2.customerId?ZZh("span",{style:{fontSize:14,color:m.mut}},cname(l2.customerId)):null,
+          l2.sid?ZZh("span",{style:{fontSize:14,fontWeight:700,color:m.mut,marginLeft:"auto"}},`${R("Planned")} ${ie(l2.planned)}`)
+            :ZZh("button",{type:"button",onClick:()=>delLine(l2.id),style:{marginLeft:"auto",minHeight:48,padding:"0 14px",borderRadius:10,border:`1px solid ${m.line}`,background:m.panel,color:m.red,fontWeight:800,cursor:"pointer"}},R("Remove"))),
+        !l2.sid?ZZh("input",{value:l2.ref||"",onChange:e=>setLine(l2.id,{ref:e.target.value}),placeholder:R("What is it? Example: loose freight, 2 boxes"),"aria-label":R("What is it?"),"data-zz":"mfref",className:ZZd_inpCls,style:ZZd_inp}):null,
+        !l2.sid&&custs.length>1?ZZh("div",{role:"group","aria-label":R("Whose is it?"),style:{display:"flex",gap:6,flexWrap:"wrap"}},...[...custs,null].map(c=>ZZh("button",{key:c||"none",type:"button","aria-pressed":l2.customerId===c,onClick:()=>setLine(l2.id,{customerId:c}),style:{...ZZd_seg(l2.customerId===c),flex:"1 1 120px"}},c?cname(c):R("Ours / not sure")))):null,
+        ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+          ZZh("div",{style:{flex:"1 1 140px",minWidth:0}},ZZh("b",{style:{fontSize:16}},R("Pallets loaded")),
+            df&&l2.sid?ZZh("div",{style:{fontSize:13,fontWeight:800,color:m.amber}},ZZd_f(df<0?"{n} short of the plan":"{n} over the plan",{n:Math.abs(df)})):null),
+          ZZh(ZZd_Step,{value:l2.loaded,min:0,max:999,onChange:v=>setLine(l2.id,{loaded:v}),label:R("pallets")})),
+        t.multiStop?ZZh("div",{style:{display:"grid",gap:8}},
+          ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},ZZh("b",{style:{fontSize:15,flex:"1 1 120px"}},R("Stop")),ZZh(ZZd_Step,{value:l2.stop||0,min:0,max:20,onChange:v=>setLine(l2.id,{stop:v||null}),label:R("Stop")})),
+          ZZh("div",{role:"group","aria-label":R("Where in the trailer"),style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:6}},...ZZPOS.map(p=>ZZh("button",{key:p.k,type:"button","aria-pressed":l2.pos===p.k,"data-pos":p.k,onClick:()=>setLine(l2.id,{pos:l2.pos===p.k?null:p.k}),style:ZZd_seg(l2.pos===p.k)},R(p.label))))):null,
+        ZZh("input",{value:l2.note||"",onChange:e=>setLine(l2.id,{note:e.target.value}),placeholder:R("Note (optional)"),"aria-label":R("Note (optional)"),className:ZZd_inpCls,style:ZZd_inp}))},
+    summary=()=>ZZh("div",{"data-zz":"mfdone",style:{display:"grid",gap:10}},
+      ZZh("div",{style:{fontSize:19,fontWeight:900,color:m.green}},`✓ ${ZZd_f("Manifest signed · {n} pallets",{n:ie(mf.total)})}`),
+      ZZh("div",{style:{fontSize:15}},`${R("Signed by")} ${mf.signedBy||mf.signature||"—"}${mf.signedAt?" · "+at(mf.signedAt):""}`),
+      ...(mf.lines||[]).map(l2=>{let b=l2.sid?bd2[l2.sid]:null;
+        return ZZh("div",{key:l2.id,"data-zz":"mfrow",style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",borderTop:`1px solid ${m.line}`,paddingTop:6}},
+          b?ZZh(ZZd_Badge,{b,sm:!0}):ZZh("b",null,l2.ref||R("Extra line")),
+          ZZh("span",{style:{fontSize:15,fontWeight:800,color:l2.sid&&ie(l2.loaded)!==ie(l2.planned)?m.amber:m.text}},ZZd_f("{a} of {b} plt",{a:ie(l2.loaded),b:ie(l2.planned)})),
+          l2.stop||l2.pos?ZZh("span",{style:{fontSize:13,color:m.mut}},ZZd_posTxt(l2)):null,
+          l2.note?ZZh("span",{style:{fontSize:13,color:m.mut,flexBasis:"100%"}},l2.note):null)}),
+      ZZh(Z,{kind:"ghost",size:"lg",className:"w-full",onClick:()=>{setF(init());setEdit(!0)}},R("Change it (sign again)"))),
+    form=()=>ZZh("div",{"data-zz":"mfform",style:{display:"grid",gap:14}},
+      nd?ZZh("div",{role:"alert","data-zz":"mfdmg",style:{borderRadius:10,padding:"10px 12px",border:`2px solid ${m.red}`,display:"grid",gap:8}},ZZh("b",{style:{color:m.red,fontSize:16}},R("Finish the damage photos before the manifest.")),
+        back?ZZh(Z,{kind:"primary",size:"lg",className:"w-full",onClick:()=>{onGo&&onGo(back);ZZd_goStep(back)}},R("Go to the damage photos")):null):null,
+      mf?ZZh("div",{style:{...ZZd_SUB,fontWeight:700}},ZZd_f("Signed before by {p}. Saving again replaces it, so sign again below.",{p:mf.signedBy||"—"})):null,
+      ZZh("div",{style:ZZd_SUB},R("One line per load. Put in the pallets that actually went in. Add a line for anything extra.")),
+      ...rows.map(line),
+      ZZh("button",{type:"button","data-zz":"mfadd",onClick:addLine,style:{minHeight:52,borderRadius:12,border:`2px dashed ${m.line}`,background:m.panel,color:m.text,fontSize:16,fontWeight:800,cursor:"pointer"}},`+ ${R("Add a line (loose freight, extra pallets)")}`),
+      ZZh("div",{"data-zz":"mftotal",style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,fontSize:20,fontWeight:900,borderTop:`2px solid ${m.line}`,paddingTop:10}},ZZh("span",null,R("Total loaded")),ZZh("span",null,ZZd_f("{a} of {b} plt",{a:total,b:planned}))),
+      ZZh("label",{style:{display:"grid",gap:6}},ZZh("span",{style:{fontSize:15,fontWeight:800}},R("Type your name to sign")),
+        ZZh("input",{value:f.sign,onChange:e=>up({sign:e.target.value}),placeholder:sr||R("Your name"),autoComplete:"off","data-zz":"mfsign",className:ZZd_inpCls,style:ZZd_inp})),
+      ZZh(ZZd_Missing,{miss,ok:R("Ready. Saving keeps the manifest with this truck.")}),
+      ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ct,disabled:!!miss.length||busy,onClick:save},busy?R("Saving…"):R("Save and sign the manifest")),
+      mf?ZZh(Z,{kind:"ghost",size:"md",className:"w-full",onClick:()=>{ZZd_mfDraft[t.id]=null;setF(init());setEdit(!1)}},R("Keep the saved manifest")):null);
+  return ZZh("div",{"data-zz":"manifeststep",style:{scrollMarginTop:150}},ZZh(hm,{n,title:R("Manifest"),done,open,onOpen,hint},ZZh("div",{style:{paddingTop:10}},mf&&!edit?summary():form())))},
+
+/* ---------- wrap-up: what still blocks "Send to dispatch", and the summary rows ---------- */
+ZZd_wrapStop=({l,Wt,ZD,zn,zs})=>{let has=k=>(Wt||[]).some(s=>s.k===k),o=[],pk=has("pack")?"pack":has("load")?"load":has("reload")?"reload":null;
+  (ZD||[]).length&&o.push({k:"dmg",go:has("verify")?"verify":pk,n:ZD.length});
+  zn&&!zs&&o.push({k:"secure",go:"secure"});
+  has("manifest")&&!(l.manifest&&l.manifest.signedAt)&&o.push({k:"manifest",go:"manifest"});
+  pk&&!ie(l.afterPhotoCount)&&o.push({k:"photos",go:pk});
+  has("bills")&&!ie(l.bolPhotoCount)&&o.push({k:"bills",go:"bills"});
+  return o},
+ZZd_WrapBlock=({l,Wt,ZD,zn,zs,ZJ,onGo})=>{ZZtr3();let L=ZZd_wrapStop({l,Wt,ZD,zn,zs}),dl=ZJ==="delivery"||ZJ==="pickup";if(!L.length)return null;
+  let txt={dmg:b=>[b.n===1?R("Finish or throw away the damage photo"):ZZd_f("Finish or throw away {n} damage photos",{n:b.n}),R("A damage photo needs its details, or goes in the trash, before the truck is sent.")],
+      manifest:()=>[R("Sign the manifest first"),R("Pallets per load, then your name.")],
+      photos:()=>[dl?R("Take at least 1 loadout photo"):R("Take at least 1 packing photo"),R("Photos of the load in the trailer.")],
+      bills:()=>[R("Take a photo of the bills"),R("Every page of the bills of lading.")]},
+    go=k=>{onGo&&onGo(k);ZZd_goStep(k)};
+  return ZZh("div",{"data-zz":"wrapblock",style:{display:"grid",gap:8}},
+    L.some(b=>b.k==="secure")?ZZh(ZZd_SecureFirst,{t:l,job:ZJ,onGo:()=>onGo&&onGo("secure")}):null,
+    ...L.filter(b=>b.k!=="secure").map(b=>{let[h,s2]=txt[b.k](b);
+      return ZZh("div",{key:b.k,role:"alert","data-zz":"wrapstop-"+b.k,style:{borderRadius:10,padding:"10px 12px",border:`2px solid ${m.red}`,background:"rgba(192,57,43,.08)",display:"grid",gap:6}},
+        ZZh("div",{style:{fontSize:17,fontWeight:900,color:m.red}},h),ZZh("div",{style:{fontSize:15,color:m.text}},s2),
+        b.go?ZZh(Z,{kind:"primary",size:"lg",className:"w-full",onClick:()=>go(b.go)},ZZd_f("Go to {s}",{s:R(ZZd_LBL[b.go]||b.go)})):null)}))},
+/* the bottom bar under "Wrap up & send": how many steps are still open */
+ZZd_left=W=>{let n=(W||[]).filter(s=>s.k!=="wrap"&&!s.done).length;return n===1?R("1 step to go"):ZZd_f("{n} steps to go",{n})},
+ZZd_wrapRows=({l,t,b,ZJ,T,Wt,zn,zs,ZD})=>{ZZtr3();let has=k=>(Wt||[]).some(s=>s.k===k),rows=[],ap=ie(l.afterPhotoCount),dl=ZJ==="delivery"||ZJ==="pickup",
+    stay=(T||[]).filter(s=>be(s)!=="sac"&&s.receivedAt),wh=stay.filter(s=>ie(s.rowPhotoCount)>0).length,out=ZZd_outLoads(t,l),mf=l.manifest&&l.manifest.signedAt?l.manifest:null;
+  b&&rows.push([R("Unloading photos"),String(ie(l.unloadPhotoCount)),m.text]);
+  b&&stay.length&&rows.push([R("Warehouse photos"),`${wh} / ${stay.length}`,wh<stay.length?m.amber:m.text]);
+  (has("pack")||has("reload")||has("load"))&&rows.push([dl?R("Loadout photos"):R("Packing photos"),ap?String(ap):R("none yet"),ap?m.text:m.red]);
+  has("insp")&&rows.push([R("Inspect photos"),`${out.filter(s=>ie(s.inspPhotoCount)>0).length} / ${out.length}`,out.every(s=>ie(s.inspPhotoCount)>0)?m.text:m.amber]);
+  zn&&rows.push([dl?R("Strapped"):R("Secured"),zs?`${ie(l.secure&&l.secure.confidence)}/5`:l.secure&&l.secure.signedAt?R("Not safe"):R("not yet"),zs?m.text:m.red]);
+  has("manifest")&&rows.push([R("Manifest"),mf?ZZd_f("{n} plt · signed",{n:ie(mf.total)}):R("not yet"),mf?m.text:m.red]);
+  has("bills")&&rows.push([R("Bills"),ie(l.bolPhotoCount)?ZZd_f("{n} photos",{n:ie(l.bolPhotoCount)}):R("none yet"),ie(l.bolPhotoCount)?m.text:m.red]);
+  (ZD||[]).length&&rows.push([R("Damage photos to finish"),String(ZD.length),m.red]);
+  return rows},
+
+/* ---------- the steps between "Photo before" and "Wrap up" (patch D42 puts this where Nick's unload / reload / load /
+   photo log sections were). Nick's own parts stay inside: the next-off row (dA), Receive, the count card (tJ), "something
+   came off that's not on this list" (aJ), the reload buttons, the pull card (ZZPull), Take off. ---------- */
+ZZd_Flow=({l,t,now,r,o,b,T,k,_,q,Y,F,$,x,I,P,Xe,Nc,Oc,Wt,zs,ZB,ZJ,ZD})=>{ZZtr3();
+  let[addOff,setAddOff]=(0,H.useState)(!1),[floor,setFloor]=(0,H.useState)(!1),
+    st=key=>Wt.find(s2=>s2.k===key),has=key=>!!st(key),
+    hp=key=>({n:Xe(key),done:!!(st(key)||{}).done,open:Nc(key),onOpen:()=>Oc(key)}),
+    order=ZZloadOrder(t,l).filter(o2=>l.stage==="departed"||!o2.s.shippedAt),out=order.map(o2=>o2.s),ap=ie(l.afterPhotoCount),
+    snaps=ZD||[],bd=ZB||{},nb2=s=>bd[s.id]||null,lnum=s=>(I.find(U=>U.s.id===s.id)||{}).n,
+    cnt=key=>(n2,dl)=>r.patchTrailer(l.id,k2=>({[key]:n2,...ZZd_credit(k2,dl)})),
+    note=(c,txt)=>ZZh("div",{style:{borderRadius:8,padding:"8px 12px",fontSize:15,fontWeight:700,lineHeight:1.35,background:c==="blue"?"rgba(78,161,255,0.12)":"rgba(255,176,32,0.12)",color:c==="blue"?m.blue:m.amber}},txt),
+    lbl=txt=>ZZh("div",{style:{fontSize:13,fontWeight:800,color:m.mut,paddingTop:2}},txt),
+    snapList=()=>snaps.length?ZZh("div",{"data-zz":"snaps",style:{display:"grid",gap:8}},
+      ZZh("div",{style:{...ZZd_H,color:m.red}},snaps.length===1?R("1 damage photo waiting for details"):ZZd_f("{n} damage photos waiting for details",{n:snaps.length})),
+      ...snaps.map(d=>ZZh(ZZd_SnapCard,{key:d.id,d,t:l,doc:t,actions:r,bd}))):null,
+    tools=(key,label,sub,loads,fin)=>ZZh(ZZd_PhotoTools,{t:l,actions:r,owner:(key==="off"?"unload:":"after:")+l.id,label,sub,onCount:cnt(key==="off"?"unloadPhotoCount":"afterPhotoCount"),loads,bd,float:Nc(key),need:key!=="off"&&!ap,fin}),
+    pull=(s,hot)=>ZZh(ZZPull,{key:s.id,s,r,tid:l.id,hot,doc:t,zb:hot?nb2(s):null}),
+    floorList=()=>[lbl(R("Pull from the floor")),
+      $.length?ZZh("div",{style:{display:"grid",gap:8}},...$.map(s=>pull(s,!1))):ZZh("div",{style:{fontSize:14,color:m.dim}},R("Nothing on the floor is ready for this truck."))],
+    loadedRow=(s,photo)=>ZZh(dA,{key:s.id,n:lnum(s),s,zb:nb2(s),
+      sub:photo?ZZh("div",{className:"mt-1.5"},ZZh("div",{className:"text-xs font-bold"},R("Photo · loaded")),ZZh(Xn,{ownerId:dt.loaded(s.id),canAdd:!0,onCountChange:c=>r.notePhotos(s.id,c,"loaded")})):null,
+      action:ZZh(Z,{size:"sm",onClick:()=>r.unload(s.id)},R("Take off"))}),
+    Nm=k[0],sec={},put=e=>{sec[e.key]=e},floatOn=["off","reload","pack","load"].some(key=>has(key)&&Nc(key));
+
+  /* UNLOAD: receive each load as it comes off; nonstop unloading photos; damage snaps before anyone touches it */
+  if(has("off"))put(ZZh(hm,{key:"off",...hp("off"),title:ZJ==="unpack"?R("Unload — take it all off"):R("Unload"),
+      hint:T.length?`${_.length} ${R("of")} ${T.length} ${R("loads off")} · ${ZZd_f("{n} photos",{n:ie(l.unloadPhotoCount)})}`:R("Nothing listed on this trailer yet.")},
+    ZZh("div",{"data-zz":"step-off",style:{display:"grid",gap:12,paddingTop:10}},
+      tools("off",R("Unloading photos"),R("Take as many as you want, the whole time. No minimum."),T,R("Fill in the details at Sort, count, verify.")),
+      note("amber",R("One load per lane. Every load gets its own lane — no sharing.")),
+      Nm?ZZh("div",{style:{display:"grid",gap:6}},ZZh("div",{style:{fontSize:13,fontWeight:800,color:m.orange}},R("Next off the truck")),
+          ZZh(dA,{n:lnum(Nm),s:Nm,zb:nb2(Nm),action:ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ze,onClick:()=>r.receive(Nm.id)},`${R("Receive")} · ${R("it's off, count it next")}`)}),
+          k.length>1?ZZh("div",{style:{fontSize:14,color:m.mut,display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}},`${R("Then")}:`,...k.slice(1).map(U=>ZZh("span",{key:U.id,style:{display:"inline-flex",alignItems:"center",gap:4}},ZZh(ZZd_Badge,{b:nb2(U),sm:!0,n:lnum(U)}),`· ${fe(U)} plt`))):null)
+        :T.length?ZZh("div",{style:{display:"grid",gap:8}},ZZh("div",{style:{fontSize:16,fontWeight:800,color:m.green}},R("Everything is off the truck.")),
+          has("verify")?ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ze,onClick:()=>{P("verify");ZZd_goStep("verify")}},R("Next: sort, count, verify")):null):null,
+      _.length?ZZh("div",{"data-zz":"offlist",style:{display:"grid",gap:6}},lbl(R("Off the truck — count them in the next step")),
+        ..._.map(U=>ZZh("div",{key:U.id,style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",fontSize:15}},ZZh(ZZd_Badge,{b:nb2(U),sm:!0,n:lnum(U)}),
+          ZZh("span",{style:{color:m.mut}},`${fe(U)} plt · ${R("off")} ${U.receivedAt?at(U.receivedAt):""}${U.receivedBy?" · "+U.receivedBy:""}`)))):null,
+      ZZh("div",{style:{paddingTop:6,borderTop:`1px solid ${m.line}`}},addOff?ZZh(aJ,{t:l,onCancel:()=>setAddOff(!1),onSave:U=>{r.addLoadOffTruck(l.id,U),setAddOff(!1)}})
+        :ZZh(Z,{size:"sm",icon:wa,onClick:()=>setAddOff(!0)},R("Something came off that's not on this list"))),
+      snaps.length?ZZh("div",{style:{fontSize:15,fontWeight:800,color:m.red}},snaps.length===1?R("1 damage photo waiting for details. Finish it at Sort, count, verify."):ZZd_f("{n} damage photos waiting for details. Finish them at Sort, count, verify.",{n:snaps.length})):null)));
+
+  /* SORT, COUNT, VERIFY: per load count (+ note when off), condition, lane, one photo where it sits; damage snaps get their details */
+  if(has("verify")){let rcv=new Set(_.map(U=>U.id)),tsn=snaps.filter(d=>d.where==="truck"),lsn=snaps.filter(d=>d.where==="load"&&!rcv.has(d.sid)),
+      first=_.find(U=>!(U.qc&&U.qc.condition)),cntd=_.filter(U=>U.qc&&U.qc.condition&&U.qc.counted!=null).length;
+    put(ZZh(hm,{key:"verify",...hp("verify"),title:R("Sort, count, verify"),
+        hint:_.length?`${cntd} ${R("of")} ${T.length} ${R("counted")}${snaps.length?" · "+ZZd_f("{n} damage to finish",{n:snaps.length}):""}`:R("Unload first, then count each load here.")},
+      ZZh("div",{"data-zz":"step-verify",style:{display:"grid",gap:12,paddingTop:10}},
+        note("amber",R("For each load: count it, check it, put it in its own lane, and take one photo of where it sits.")),
+        tsn.length?ZZh("div",{"data-zz":"snaps-truck",style:{display:"grid",gap:8}},ZZh("div",{style:{...ZZd_H,color:m.red}},R("Damage photos — which load?")),
+          ...tsn.map(d=>ZZh(ZZd_SnapCard,{key:d.id,d,t:l,doc:t,actions:r,bd}))):null,
+        ...lsn.map(d=>ZZh(ZZd_SnapCard,{key:d.id,d,t:l,doc:t,actions:r,bd})),
+        _.length?null:ZZh("div",{style:{fontSize:15,color:m.mut}},R("Nothing is off the truck yet.")),
+        ..._.map(U=>ZZh(tJ,{key:U.id,s:U,doc:t,actions:r,now,openShipment:o,zb:nb2(U),startOpen:!!(first&&first.id===U.id)||snaps.some(d=>d.sid===U.id)})),
+        k.length?ZZh("div",{style:{fontSize:14,color:m.amber,fontWeight:800}},k.length===1?R("1 load is still on the truck. Unload it first."):ZZd_f("{n} loads are still on the truck. Unload them first.",{n:k.length})):null)))}
+
+  /* RELOAD (an inbound truck's loads that go back out): packed like a consolidated trailer */
+  if(has("reload")){let sac=order.filter(o2=>o2.s.trailerInId===l.id&&be(o2.s)==="sac"),dn=sac.filter(o2=>o2.s.reloadedAt).length;
+    put(ZZh(hm,{key:"reload",...hp("reload"),title:`${R("Reload")} — ${R("pack it back out")} → ${R("California")}`,hint:`${dn} ${R("of")} ${sac.length} ${R("back on")} · ${x.reload} plt · ${ZZd_f("{n} photos",{n:ap})}`},
+      ZZh("div",{"data-zz":"step-reload",style:{display:"grid",gap:12,paddingTop:10}},
+        tools("reload",R("Packing photos"),ap?R("Keep taking them the whole time."):R("Take packing photos the whole time. At least 1."),sac.map(o2=>o2.s),R("Finish it in this step, before the manifest.")),
+        ZZh(ZZd_Plan,{order:sac,multi:!!l.multiStop}),
+        ZZh("div",{style:{fontSize:14,color:m.mut}},R("In the order listed. Read how each one wants to be loaded.")),
+        ...sac.map(({s:U})=>ZZh(dA,{key:U.id,n:lnum(U),s:U,zb:nb2(U),
+          sub:U.reloadedAt?ZZh("div",{className:"mt-1 space-y-1.5"},ZZh("div",{className:"text-xs",style:{color:m.green}},`${R("On the truck")} · ${U.reloadedBy||""} ${at(U.reloadedAt)}`),
+              ZZh("div",{className:"text-xs font-bold"},R("Photo · loaded")),ZZh(Xn,{ownerId:dt.loaded(U.id),canAdd:!0,onCountChange:c=>r.notePhotos(U.id,c,"loaded")}))
+            :U.receivedAt?null:ZZh("div",{className:"text-xs mt-1",style:{color:m.amber}},R("Not off the truck yet")),
+          action:U.receivedAt?(U.reloadedAt?ZZh(Z,{size:"sm",onClick:()=>r.markReloaded(U.id,!1)},R("Take back off")):ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ca,onClick:()=>r.markReloaded(U.id,!0)},R("It's back on the truck"))):null})),
+        snapList())))}
+
+  /* PACK a consolidated trailer: packing photos the whole time, the plan, Nick's pull / confirm per load, damage snaps */
+  if(has("pack")){let fo=order.filter(o2=>!o2.s.loadedAt).map(o2=>o2.s),lo=order.filter(o2=>o2.s.loadedAt).map(o2=>o2.s);
+    put(ZZh(hm,{key:"pack",...hp("pack"),title:R("Pack — build the load"),hint:`${lo.length} ${R("of")} ${out.length} ${R("loads on")} · ${ZZd_f("{n} photos",{n:ap})}`},
+      ZZh("div",{"data-zz":"step-pack",style:{display:"grid",gap:12,paddingTop:10}},
+        tools("pack",R("Packing photos"),ap?R("Keep taking them the whole time."):R("Take packing photos the whole time. At least 1."),out,R("Finish it in this step, before the manifest.")),
+        note("blue",R("Build it tight, like Tetris. Find each load, count it, then load it. See damage? Snap it before you touch it.")),
+        ZZh(ZZd_Plan,{order,multi:!!l.multiStop}),
+        fo.length?ZZh("div",{style:{fontSize:13,fontWeight:800,color:m.blue}},`${R("Dispatcher wants these on · pull first")} · ${fo.length}`):null,
+        ...fo.map(s=>pull(s,!0)),
+        lo.length?lbl(R("On the truck")):null,
+        ...lo.map(s=>loadedRow(s,!0)),
+        ...floorList(),
+        snapList())))}
+
+  if(has("secure"))put(ZZh(ZZSecure,{key:"secure",t:l,doc:t,actions:r,...hp("secure"),done:zs,onNext:()=>P(null),job:ZJ}));
+  if(has("manifest"))put(ZZh(ZZd_Manifest,{key:"manifest",t:l,doc:t,actions:r,...hp("manifest"),order,bd,drafts:snaps,onGo:P,back:has("pack")?"pack":has("verify")&&snaps.some(d=>d.where==="truck"||!out.some(s=>s.id===d.sid))?"verify":"reload"}));
+
+  /* DELIVERY / PICKUP: find it, count it, inspect + photo, load it up, strapped, bills */
+  if(has("find"))put(ZZh(hm,{key:"find",...hp("find"),title:R("Find the load"),hint:l.foundAt?`${R("Found")} · ${l.foundBy||""}`:ZZd_f(out.length===1?"1 load · {p} pallets":"{n} loads · {p} pallets",{n:out.length,p:out.reduce((a2,s)=>a2+fe(s),0)})},
+    ZZh("div",{"data-zz":"step-find",style:{display:"grid",gap:12,paddingTop:10}},
+      ZZh(ZZd_Ref,{t:l,doc:t,job:ZJ}),
+      out.length?ZZh("div",{style:{display:"grid",gap:8}},ZZh("div",{style:ZZd_H},R("Where each load is")),...order.map(o2=>ZZh(ZZd_FindRow,{key:o2.sid,o2,multi:!!l.multiStop})))
+        :ZZh("div",{style:{fontSize:15,color:m.mut}},R("Nothing is planned on this truck yet. Add the loads from the floor below, or ask the office.")),
+      $.length?ZZh("div",{style:{display:"grid",gap:8}},
+        ZZh("button",{type:"button","aria-expanded":floor,onClick:()=>setFloor(!floor),style:{...ZZd_chip(!1),width:"100%"}},`${floor?"▾":"▸"} ${ZZd_f("More on the floor for this customer · {n}",{n:$.length})}`),
+        ...(floor?$.map(U=>ZZh("div",{key:U.id,style:{...ZZd_card,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+          ZZh("div",{style:{flex:"1 1 180px",minWidth:0}},ZZh("b",null,`${U.ref} · ${fe(U)} plt`),ZZh("div",{style:{fontSize:13,color:m.mut}},U.row?ZZd_f("lane {x}",{x:U.row}):R("no lane on file"))),
+          ZZh(Z,{size:"md",onClick:()=>r.planOnto(U.id,l.id)},R("Add to this truck")))):[])):null,
+      ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ze,disabled:!out.length,onClick:()=>{l.foundAt||r.patchTrailer(l.id,{foundAt:ye(Date.now()),foundBy:hA()});P("count");ZZd_goStep("count")}},R("Found them — count next")))));
+  if(has("count")){let cn=out.filter(s=>s.pullCountAt||s.loadedAt).length;
+    put(ZZh(hm,{key:"count",...hp("count"),title:R("Count it"),hint:`${cn} ${R("of")} ${out.length} ${R("counted")}`},
+      ZZh("div",{"data-zz":"step-count",style:{display:"grid",gap:10,paddingTop:10}},
+        ZZh("div",{style:{fontSize:15,color:m.mut}},R("Count every pallet against the paperwork. If it doesn't match, say why.")),
+        ...order.map(o2=>ZZh(ZZd_CountRow,{key:o2.sid,s:o2.s,zb:o2.badge,actions:r})),
+        out.length&&cn===out.length?ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ze,onClick:()=>{P("insp");ZZd_goStep("insp")}},R("Counts done — inspect next")):null)))}
+  if(has("insp")){let ni=out.filter(s=>ie(s.inspPhotoCount)>0).length;
+    put(ZZh(hm,{key:"insp",...hp("insp"),title:R("Inspect + photo"),hint:`${ni} ${R("of")} ${out.length} ${R("photographed")}`},
+      ZZh("div",{"data-zz":"step-insp",style:{display:"grid",gap:10,paddingTop:10}},
+        ZZh("div",{style:{fontSize:15,color:m.mut}},R("Look at every pallet before it goes on. One photo per load. Damage? Report it now.")),
+        ...order.map(o2=>ZZh(ZZd_InspRow,{key:o2.sid,s:o2.s,zb:o2.badge,doc:t,actions:r})),
+        out.length&&ni===out.length?ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ze,onClick:()=>{P("load");ZZd_goStep("load")}},R("All checked — load it up")):null)))}
+  if(has("load")){let fo=order.filter(o2=>!o2.s.loadedAt),lo=order.filter(o2=>o2.s.loadedAt);
+    put(ZZh(hm,{key:"load",...hp("load"),title:R("Load it up"),hint:`${lo.length} ${R("of")} ${out.length} ${R("loads on")} · ${ZZd_f("{n} photos",{n:ap})}`},
+      ZZh("div",{"data-zz":"step-load",style:{display:"grid",gap:12,paddingTop:10}},
+        tools("load",R("Loadout photos"),ap?R("Keep taking them the whole time."):R("Take loadout photos the whole time. At least 1."),out,R("Finish it in this step, before you wrap up.")),
+        ZZh(ZZd_Ref,{t:l,doc:t,job:ZJ,compact:!0}),
+        ZZh(ZZd_Plan,{order,multi:!!l.multiStop}),
+        ...fo.map(o2=>ZZh(ZZd_LoadRow,{key:o2.sid,o2,t:l,actions:r,multi:!!l.multiStop,onCount:()=>{P("count");ZZd_goStep("count")}})),
+        lo.length?lbl(R("On the truck")):null,
+        ...lo.map(o2=>ZZh(ZZd_LoadRow,{key:o2.sid,o2,t:l,actions:r,multi:!!l.multiStop})),
+        snapList())))}
+  if(has("bills"))put(ZZh(hm,{key:"bills",...hp("bills"),title:R("Bills"),hint:ie(l.bolPhotoCount)?ZZd_f("{n} photos",{n:ie(l.bolPhotoCount)}):R("Photo of the bills")},
+    ZZh("div",{"data-zz":"step-bills",style:{display:"grid",gap:12,paddingTop:10}},
+      ZZh("div",{style:{fontSize:15,color:m.mut}},R("Take a photo of the bills of lading — every page, after the driver signs.")),
+      ZZh(ZZd_Cam,{owner:`bol:${l.id}`,label:R("Photo of the bills"),sub:ie(l.bolPhotoCount)?R("Add more if there are more pages."):R("At least 1 photo."),need:!0,onCount:cnt("bolPhotoCount")}),
+      ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:Ze,disabled:!ie(l.bolPhotoCount),onClick:()=>P("wrap")},R("Bills done — wrap up")))));
+  return ZZh(i.Fragment,null,...Wt.map(s2=>sec[s2.k]).filter(Boolean),floatOn?ZZh("div",{key:"sp","aria-hidden":"true",style:{height:72}}):null)},
 
 /* ---------- ZZSecure: the "Secure the load" step (outbound, and inbound with a reload) ---------- */
 ZZd_CONF=["","Not safe","Needs work","OK","Solid","Rock solid"],
@@ -652,8 +1179,12 @@ ZZd_confColor=c=>c<=1?m.red:c<=3?m.amber:m.green,
 /* the half-filled form per truck stays in memory (gear, tags, seal, rating, note), so leaving the truck and coming back keeps it;
    the check box and the signature are never kept */
 ZZd_secDraft={},
-ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
-  let s0=t.secure&&t.secure.signedAt?t.secure:null,
+/* job: delivery / pickup say "Strapped" (photo of it strapped and what's used); pack says "Secure the load". Photos of how
+   it is secured go to strap:<tid>, any number, at least 1 (the 5 fixed photo slots are gone: it's Tetris, every load is
+   different). Old reports with the 5 named photos still show. */
+ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext,job})=>{ZZtr3();
+  let dl=job==="delivery"||job==="pickup",TT=dl?R("Strapped"):R("Secure the load"),own="strap:"+t.id,strap=ZZd_usePhotos(own),sn=strap.length,
+    s0=t.secure&&t.secure.signedAt?t.secure:null,
     init=()=>{let g={};ZZGEAR.forEach(x=>{let v=((s0&&s0.gear)||{})[x.k]||{};g[x.k]={qty:Math.max(0,Math.round(ie(v.qty))),owner:v.owner==="driver"?"driver":"ours"}});
       return{gear:g,tags:[...((s0&&s0.tags)||[])],seal:(s0&&s0.seal)||t.sealOut||"",conf:s0?ie(s0.confidence):0,note:(s0&&s0.note)||"",checked:!1,sign:""}},
     [f,setF]=(0,H.useState)(()=>ZZd_secDraft[t.id]?{...ZZd_secDraft[t.id],checked:!1,sign:""}:init()),[tg,setTg]=(0,H.useState)(""),[edit,setEdit]=(0,H.useState)(()=>!s0||!!ZZd_secDraft[t.id]),[busy,setBusy]=(0,H.useState)(!1);
@@ -662,16 +1193,14 @@ ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
   /* secured on another phone (shared data) while this one shows an untouched form: show the saved report */
   (0,H.useEffect)(()=>{s0&&!ZZd_secDraft[t.id]&&(setEdit(!1),setF(init()))},[s0&&s0.signedAt]);
   let up=p=>setF(o=>({...o,...p})),setGear=(k,p)=>setF(o=>({...o,gear:{...o.gear,[k]:{...o.gear[k],...p}}})),
-    ph={...((s0&&s0.photos)||{}),...(t.secPhotos||{})},cnt=k=>ie(ph[k]),
-    mp=ZZSECSLOTS.filter(sl=>!(cnt(sl.k)>0)).map(sl=>R(sl.label).toLowerCase()),
-    miss=[mp.length?(mp.length===5?R("all 5 photos"):ZZd_f(mp.length===1?"the {x} photo":"{n} photos ({x})",{n:mp.length,x:mp.join(", ")})):"",
+    miss=[sn<1?(dl?R("a photo of it strapped"):R("a photo of how it's secured")):"",
       !f.conf?R("how solid it is (1 to 5)"):"",f.conf&&f.conf<=3&&!f.note.trim()?R("what would make it safer"):"",!f.checked?R("the check box"):"",!f.sign.trim()?R("your signature"):""].filter(Boolean),
     addTag=()=>{let v=tg.trim().toUpperCase();if(!v)return;f.tags.includes(v)||up({tags:[...f.tags,v]});setTg("")},
-    save=async()=>{if(miss.length||busy)return;setBusy(!0);let photos={};ZZSECSLOTS.forEach(sl=>{photos[sl.k]=cnt(sl.k)});let r=null;
-      try{r=await a.zzSecure(t.id,{gear:f.gear,tags:f.tags,seal:f.seal.trim(),photos,confidence:f.conf,note:f.note.trim(),checkedRows:f.checked,signature:f.sign.trim()})}catch(x){console.error("zzSecure",x)}
+    save=async()=>{if(miss.length||busy)return;setBusy(!0);let r=null;
+      try{r=await a.zzSecure(t.id,{gear:f.gear,tags:f.tags,seal:f.seal.trim(),photoCount:sn,confidence:f.conf,note:f.note.trim(),checkedRows:f.checked,signature:f.sign.trim()})}catch(x){console.error("zzSecure",x)}
       setBusy(!1);if(r==null)return;ZZd_secDraft[t.id]=null;up({checked:!1,sign:""});setEdit(!1);f.conf>1&&onNext&&onNext()},
     sc=s0?ie(s0.confidence):0,
-    hint=s0?(sc<=1?R("Rated not safe. Fix it and secure it again."):`${R("Secured")} ${sc}/5 · ${R(ZZd_CONF[sc]||"")}${s0.seal?` · ${R("seal")} ${s0.seal}`:""} · ${s0.signedBy||""}`):R("Gear, tags, seal, 5 photos, how solid, then sign"),
+    hint=s0?(sc<=1?R("Rated not safe. Fix it and secure it again."):`${R("Secured")} ${sc}/5 · ${R(ZZd_CONF[sc]||"")}${s0.seal?` · ${R("seal")} ${s0.seal}`:""} · ${s0.signedBy||""}`):dl?R("What's used, a photo of it strapped, seal, how solid, then sign"):R("Gear, tags, photos of how it's secured, seal, how solid, then sign"),
     num=(k,txt)=>ZZh("div",{style:{display:"flex",alignItems:"center",gap:8,...ZZd_H,fontSize:18}},ZZh("span",{style:{width:28,height:28,borderRadius:14,display:"grid",placeItems:"center",fontSize:14,fontWeight:900,background:m.raised,color:m.orange,flexShrink:0}},k),txt),
     seg=on=>({minHeight:52,borderRadius:10,fontSize:16,fontWeight:800,cursor:"pointer",border:`2px solid ${on?m.orange:m.line}`,background:on?m.orange:m.panel,color:on?ZZd_onAcc:m.text,padding:"6px 8px"}),
     redBox={borderRadius:10,padding:"10px 12px",border:`2px solid ${m.red}`,background:"rgba(192,57,43,.08)",color:m.text,display:"grid",gap:4};
@@ -682,11 +1211,13 @@ ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
     ZZh("div",{style:{fontSize:15,color:m.mut}},ZZGEAR.filter(g=>ie(((s0.gear||{})[g.k]||{}).qty)>0).map(g=>`${R(g.label)} ${s0.gear[g.k].qty} (${R(s0.gear[g.k].owner==="driver"?"driver's":"ours")})`).join(" · ")||R("No gear used")),
     (s0.tags||[]).length?ZZh("div",{style:{display:"flex",gap:6,flexWrap:"wrap"}},...s0.tags.map(x=>ZZh("span",{key:x,style:{fontSize:13,fontWeight:800,padding:"3px 9px",borderRadius:8,border:`1px solid ${m.line}`,background:m.raised}},x))):null,
     s0.note?ZZh("div",{style:{fontSize:15}},`${R("Note")}: ${s0.note}`):null,
-    ZZh("div",{style:{display:"flex",gap:10,flexWrap:"wrap"}},...ZZSECSLOTS.map(sl=>ZZh(lr,{key:sl.k,ownerId:`sec:${t.id}:${sl.k}`,size:44,label:R(sl.label)}))),
+    /* new reports keep their photos under strap:<tid> (photoOwner); older reports have the 5 named photos */
+    s0.photoOwner?ZZh(lr,{ownerId:s0.photoOwner,size:44,label:dl?R("Strapped"):R("Secured")}):ZZh("div",{style:{display:"flex",gap:10,flexWrap:"wrap"}},...ZZSECSLOTS.map(sl=>ZZh(lr,{key:sl.k,ownerId:`sec:${t.id}:${sl.k}`,size:44,label:R(sl.label)}))),
+    s0.photoOwner?ZZh(lr,{ownerId:`sec:${t.id}:seal`,size:44,label:R("Seal")}):null,
     ZZh(Z,{kind:sc<=1?"primary":"ghost",size:"lg",className:"w-full",onClick:()=>{setF(init());setEdit(!0)}},sc<=1?R("Secure it again"):R("Change it (sign again)")));
   let form=()=>ZZh("div",{"data-zz":"secureform",style:{display:"grid",gap:22}},
     s0?ZZh("div",{style:{...ZZd_SUB,fontWeight:700}},ZZd_f("Secured before by {p}. Saving again replaces it, so sign again below.",{p:s0.signedBy||"—"})):null,
-    ZZh("div",{style:{display:"grid",gap:8}},num(1,R("Gear used")),ZZh("div",{style:ZZd_SUB},R("Tap + for each piece. Then say whose it is.")),
+    ZZh("div",{style:{display:"grid",gap:8}},num(1,dl?R("What's used"):R("Gear used")),ZZh("div",{style:ZZd_SUB},R("Tap + for each piece. Then say whose it is.")),
       ...ZZGEAR.map(g=>{let v=f.gear[g.k];return ZZh("div",{key:g.k,"data-gear":g.k,style:ZZd_card},
         ZZh("div",{style:{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
           ZZh("div",{style:{flex:"1 1 140px",minWidth:0}},ZZh("b",{style:{fontSize:17}},R(g.label)),ZZh("div",{style:{fontSize:13,color:m.mut}},R(g.hint))),
@@ -699,17 +1230,17 @@ ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
         ZZh("button",{type:"button",onClick:addTag,"data-zz":"tagadd",style:{...seg(!1),minWidth:88}},R("Add"))),
       f.tags.length?ZZh("div",{style:{display:"flex",gap:8,flexWrap:"wrap"}},...f.tags.map(x=>ZZh("button",{key:x,type:"button","aria-label":`${R("Remove tag")} ${x}`,onClick:()=>up({tags:f.tags.filter(y=>y!==x)}),
         style:{minHeight:44,padding:"4px 12px",borderRadius:10,fontSize:16,fontWeight:800,border:`2px solid ${m.orange}`,background:m.panel,color:m.text,cursor:"pointer"}},`${x}  ×`))):null),
-    ZZh("label",{style:{display:"grid",gap:8}},num(3,R("Seal number")),
-      ZZh("input",{value:f.seal,onChange:e=>up({seal:e.target.value}),placeholder:"SL-00000",autoCapitalize:"characters","aria-label":R("Seal number"),
-        className:"focus:outline-none focus:ring-2 focus:ring-[var(--accent)]",style:{...ZZd_inp,fontSize:22,fontWeight:900,textTransform:"uppercase"}})),
-    ZZh("div",{style:{display:"grid",gap:8}},ZZh("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flexWrap:"wrap"}},num(4,R("Photos")),
-        ZZh("span",{"data-zz":"seccount",style:{fontSize:15,fontWeight:800,color:mp.length?m.red:m.green}},ZZd_f("{n} of 5",{n:5-mp.length}))),
-      ZZh("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:8}},
-        ...ZZSECSLOTS.map(sl=>{let c=cnt(sl.k);return ZZh("div",{key:sl.k,"data-slot":sl.k,style:{...ZZd_card,border:`2px solid ${c>0?m.green:m.line}`}},
-          ZZh("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:8,marginBottom:6}},
-            ZZh("div",{style:{minWidth:0}},ZZh("b",{style:{fontSize:16}},R(sl.label)),ZZh("div",{style:{fontSize:13,color:m.mut}},R(sl.hint))),
-            ZZh("span",{style:{fontSize:14,fontWeight:800,color:c>0?m.green:m.red,whiteSpace:"nowrap"}},c>0?`✓ ${c}`:R("needed"))),
-          ZZh(Xn,{ownerId:`sec:${t.id}:${sl.k}`,canAdd:!0,onCountChange:c2=>a.patchTrailer(t.id,k=>({secPhotos:{...(k.secPhotos||{}),[sl.k]:ie(c2)}}))}))}))),
+    ZZh("div",{"data-zz":"secphotos",style:{display:"grid",gap:8}},num(3,dl?R("Photo of it strapped"):R("Photos of how it's secured and what's used")),
+      ZZh("div",{style:ZZd_SUB},R("Straps, load bars, plywood, airbags: show what holds the load. Take as many as you want.")),
+      ZZh(ZZd_Cam,{owner:own,label:dl?R("Photo of it strapped"):R("Securing photo"),sub:sn?R("Keep going if it helps."):R("At least 1 photo."),need:!0,
+        onCount:(c,d2)=>a.patchTrailer(t.id,k=>({strapPhotoCount:c,...ZZd_credit(k,d2)}))}),
+      ZZh(ZZd_Thumbs,{owner:"after:"+t.id,size:44,label:dl?R("Loadout photos"):R("Packing photos")})),
+    ZZh("div",{style:{display:"grid",gap:8}},
+      ZZh("label",{style:{display:"grid",gap:8}},num(4,R("Seal number")),
+        ZZh("input",{value:f.seal,onChange:e=>up({seal:e.target.value}),placeholder:"SL-00000",autoCapitalize:"characters","aria-label":R("Seal number"),
+          className:"focus:outline-none focus:ring-2 focus:ring-[var(--accent)]",style:{...ZZd_inp,fontSize:22,fontWeight:900,textTransform:"uppercase"}})),
+      ZZh("div",{style:{fontSize:14,fontWeight:800,color:m.mut}},R("Seal photo (optional)")),
+      ZZh(Xn,{ownerId:`sec:${t.id}:seal`,canAdd:!0,onCountChange:c2=>a.patchTrailer(t.id,k=>({secPhotos:{...(k.secPhotos||{}),seal:ie(c2)}}))})),
     ZZh("div",{style:{display:"grid",gap:8}},num(5,R("How solid is it?")),
       ...[1,2,3,4,5].map(c=>{let on=f.conf===c,col=ZZd_confColor(c);return ZZh("button",{key:c,type:"button","aria-pressed":on,"data-conf":c,onClick:()=>up({conf:c}),
         style:{display:"flex",alignItems:"center",gap:12,width:"100%",minHeight:58,textAlign:"left",padding:"8px 12px",borderRadius:12,cursor:"pointer",border:`2px solid ${on?col:m.line}`,background:on?col+"1F":m.panel,color:m.text}},
@@ -729,13 +1260,13 @@ ZZSecure=({t,doc,actions:a,n,open,onOpen,done,onNext})=>{ZZtr3();
     ZZh("div",{style:{display:"grid",gap:8}},ZZh(ZZd_Missing,{miss,ok:R("Ready. Saving keeps the report and photos with this truck.")}),
       ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:bi,disabled:!!miss.length||busy,onClick:save},busy?R("Saving…"):R("Save and sign")),
       s0?ZZh(Z,{kind:"ghost",size:"md",className:"w-full",onClick:()=>{ZZd_secDraft[t.id]=null;setF(init());setEdit(!1)}},R("Keep the saved report")):null));
-  return ZZh("div",{"data-zz":"securestep",style:{scrollMarginTop:150}},ZZh(hm,{n,title:R("Secure the load"),done,open,onOpen,hint},ZZh("div",{style:{paddingTop:10}},s0&&!edit?summary():form())))},
+  return ZZh("div",{"data-zz":"securestep",style:{scrollMarginTop:150}},ZZh(hm,{n,title:TT,done,open,onOpen,hint},ZZh("div",{style:{paddingTop:10}},s0&&!edit?summary():form())))},
 /* wrap-up: the line that blocks "Send to dispatch" until the load is secured */
-ZZd_SecureFirst=({t,onGo})=>{ZZtr3();let bad=!!(t&&t.secure&&t.secure.signedAt);
+ZZd_SecureFirst=({t,onGo,job})=>{ZZtr3();let bad=!!(t&&t.secure&&t.secure.signedAt),dl=job==="delivery"||job==="pickup";
   return ZZh("div",{role:"alert","data-zz":"securefirst",style:{borderRadius:10,padding:"10px 12px",border:`2px solid ${m.red}`,background:"rgba(192,57,43,.08)",display:"grid",gap:8}},
-    ZZh("div",{style:{fontSize:17,fontWeight:900,color:m.red}},R("Secure the load first")),
-    ZZh("div",{style:{fontSize:15,color:m.text}},bad?R("It was rated not safe. Fix the load and secure it again before it leaves."):R("Gear, seal, 5 photos, how solid, and your signature. Then you can send it.")),
-    ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:bi,onClick:()=>{onGo&&onGo();setTimeout(()=>{try{let el=document.querySelector("[data-zz=securestep]");el&&el.scrollIntoView({behavior:"smooth",block:"start"})}catch{}},150)}},R("Go to Secure the load")))},
+    ZZh("div",{style:{fontSize:17,fontWeight:900,color:m.red}},dl?R("Strap it and sign first"):R("Secure the load first")),
+    ZZh("div",{style:{fontSize:15,color:m.text}},bad?R("It was rated not safe. Fix the load and secure it again before it leaves."):R("What's used, a photo of how it's secured, how solid, and your signature. Then you can send it.")),
+    ZZh(Z,{kind:"primary",size:"lg",className:"w-full",icon:bi,onClick:()=>{onGo&&onGo();setTimeout(()=>{try{let el=document.querySelector("[data-zz=securestep]");el&&el.scrollIntoView({behavior:"smooth",block:"start"})}catch{}},150)}},dl?R("Go to Strapped"):R("Go to Secure the load")))},
 
 /* ---------- Gear tab (5th crew tab) ---------- */
 ZZd_Gear=({doc:e,actions:a})=>{ZZtr3();

@@ -99,6 +99,7 @@ ZZYard=({doc:e,now:t,openTrailer:v})=>{
     longest=waitingNow.reduce((b,x)=>!b||ZZwaitMs(x,t)>ZZwaitMs(b,t)?x:b,null),lMs=longest?ZZwaitMs(longest,t):null,lTone=ZZtone(lMs,e),
     pr=done.map(x=>ZZpromise(e,x,t)).filter(p=>p.kept!=null),kept=pr.filter(p=>p.kept).length,pct=pr.length?Math.round(100*kept/pr.length):null,
     byDoor={};doors.forEach(x=>{(byDoor[x.dock]||=[]).push(x)});
+  let snaps=ZZdmgDrafts(e,null),snapG=[...new Set(snaps.map(d=>d.tid))].map(id=>[T.find(x=>x.id===id),snaps.filter(d=>d.tid===id)]).filter(g=>g[0]);
   let dbl=Object.entries(byDoor).filter(([,L])=>L.length>1),dblSet=new Set(dbl.flatMap(([,L])=>L.map(x=>x.id))),
     working=doors.filter(x=>x.stage==="working").length,ready=doors.filter(x=>x.stage==="done").length,
     tiles=[
@@ -149,7 +150,7 @@ ZZYard=({doc:e,now:t,openTrailer:v})=>{
         p.elapsedMin!=null?ZZo_h("div",{className:"text-xs font-semibold",style:{color:late?m.red:warnP?m.amber:m.mut}},
           x.workDoneAt?`Took ${ot(p.doneMin*6e4)} from check-in (${p.kept?"within":"over"} ${ZZo_promShort(lim)})`:`${ot(p.elapsedMin*6e4)} since check-in \xB7 ${late?"past the promise":`promise ${ZZo_promShort(lim)}`}`):null,
         dblSet.has(x.id)||sec?ZZo_h("div",{className:"flex gap-1.5 flex-wrap mt-1"},dblSet.has(x.id)?ZZo_h(ve,{label:"Same door twice",color:m.red}):null,sec):null)},
-    doneCard=x=>{let p=ZZpromise(e,x,t),wm=x.workStartedAt?ZZwaitMs(x,t):null,dm=SH.filter(s=>s.trailerInId===x.id||s.trailerOutId===x.id).reduce((a,s)=>a+(s.exceptions||[]).filter(q=>q&&q.kind==="Damage").length,0);
+    doneCard=x=>{let p=ZZpromise(e,x,t),wm=x.workStartedAt?ZZwaitMs(x,t):null,dm=SH.filter(s=>s.trailerInId===x.id||s.trailerOutId===x.id).reduce((a,s)=>a+(s.exceptions||[]).filter(q=>q&&q.kind==="Damage"&&!q.draft).length,0);
       return ZZo_h(ZZo_Card,{key:x.id,tid:x.id,rail:p.kept===!1?m.red:m.green,onClick:()=>open(x),label:`Open truck ${x.truck||""}`},
         ZZo_h("div",{className:"flex items-center gap-2"},ZZo_h("span",{className:"font-bold truncate flex-1 min-w-0"},ZZo_cname(e,x)),
           p.kept==null?null:ZZo_h(ve,{label:p.kept?`✓ Within ${ZZo_promShort(lim)}`:`✗ Over ${ZZo_promShort(lim)}`,color:p.kept?m.green:m.red,dot:!1})),
@@ -159,6 +160,11 @@ ZZYard=({doc:e,now:t,openTrailer:v})=>{
   return ZZo_h("div",{className:"space-y-4","data-zz":"yard"},
     ZZo_h("div",{className:"grid grid-cols-2 lg:grid-cols-6 gap-3"},tiles.map(x=>ZZo_h(ZZo_Tile,{key:x.stat,...x}))),
     dbl.length?ZZo_h(ZZo_Banner,{tone:"bad",title:dbl.map(([d,L])=>`Two trucks are marked at door ${d}: ${L.map(x=>"truck "+(x.truck||"—")).join(" and ")}.`).join(" ")},"Open the one that is not really there and move it to its door or the yard."):null,
+    /* damage snaps (photo now, details later) still waiting on any truck: staff only, no customer alert until finished */
+    snapG.length?ZZo_h("div",{className:"rounded-lg p-3 text-sm space-y-2",style:{background:"rgba(255,176,32,0.1)",border:"1px solid rgba(255,176,32,0.35)"},"data-zz":"snaps"},
+      ZZo_h("div",{className:"font-bold",style:{color:m.amber}},`Damage snaps waiting for details \xB7 ${snaps.length}`),
+      ZZo_h("div",{className:"text-xs",style:{color:m.mut}},"The crew photographed damaged pallets before touching them and adds the details at the count. Customers see nothing and no alert is queued until then."),
+      ZZo_h("div",{className:"flex gap-2 flex-wrap"},snapG.map(([x,L])=>ZZo_h(Z,{key:x.id,onClick:()=>open(x)},`Truck ${x.truck||"—"} \xB7 ${L.map(d=>d.ref||"load not picked yet").join(", ")}`)))):null,
     ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Goal: a door within ${goal} min of check-in. Promise: ${st.promiseText}. Change both in Setup. Tap a truck to open it.`),
     ZZo_h("div",{className:"grid lg:grid-cols-4 gap-3 items-start"},
       ZZo_h(ZZo_Lane,{lane:"coming",title:"Coming today",sub:"Booked, not checked in yet. Soonest first.",count:coming.length,color:m.blue},
@@ -387,10 +393,62 @@ ZZDockSet=({doc:e,actions:a})=>{
       dirty?ZZo_h(Z,{kind:"quiet",onClick:()=>{setF(init);setErr("")}},"Undo changes"):ZZo_h("span",{className:"text-xs",style:{color:m.dim}},`Now: ${st.promiseText} \xB7 goal ${st.waitGoalMin} min`))),
     ZZo_h(ZZo_Toasts,{items:toasts,onDismiss:drop}))},
 
+/* ========================== Crew truck flow, office side: jobs, load badges, load plan, photos, manifest, damage snaps ==========================
+   Engine contract (DEV.md "Crew truck flow rework"): ZZloadJob / ZZJOBS / zzLoadJob, ZZloadBadges, ZZloadOrder / ZZposSuggest /
+   zzLoadPlan, ZZmanifestFor, ZZdmgDrafts, ZZtrail {staff:true}. Photo owners: ship: (shipper reference, office or customer),
+   unload:, after:, strap:, bol:, row:<sid>, insp:<sid>. Damage snaps are staff only: no customer screen and no alert until finished. */
+/* a load badge: solid circle with the number (never the colour alone) and the PRO next to it */
+ZZo_Badge=({b,ref})=>b?ZZo_h("span",{title:`Load ${b.n} (${String(b.name||"").toLowerCase()})${b.ref?" \xB7 "+b.ref:""}`,"data-badge":b.n,style:{display:"inline-flex",alignItems:"center",gap:6,fontWeight:900,whiteSpace:"nowrap",verticalAlign:"middle"}},
+  ZZo_h("span",{style:{display:"inline-grid",placeItems:"center",minWidth:26,height:26,padding:"0 5px",borderRadius:13,background:b.color,color:b.fg,fontSize:14,fontWeight:900,lineHeight:1,fontVariantNumeric:"tabular-nums",boxShadow:"0 0 0 1px rgba(0,0,0,.2)"}},b.n),
+  ref===!1?null:ZZo_h("span",null,b.ref||`Load ${b.n}`)):null,
+/* badges for one truck, worked out once per doc (Nick's load rows ask once per row) */
+ZZo_bc={d:null,t:null,v:{}},
+ZZo_bdg=(doc,t,sid)=>{if(!doc||!t)return null;if(ZZo_bc.d!==doc||ZZo_bc.t!==t.id)ZZo_bc={d:doc,t:t.id,v:ZZloadBadges(doc,t)};return ZZo_bc.v[sid]||null},
+ZZo_bdgEl=(doc,t,sid)=>{let b=ZZo_bdg(doc,t,sid);return b?ZZo_h("span",{style:{marginRight:6}},ZZo_h(ZZo_Badge,{b,ref:!1})):null},
+ZZo_POS={nose:["NOSE","front of the trailer"],middle:["MIDDLE","middle of the trailer"],tail:["TAIL","by the doors"]},
+ZZo_JOBHELP={unpack:"Break the trailer down: count each load and sort it to its own lane. Inbound jobs follow the loads (East Coast origin or loads that reload).",
+  unload:"Count each load and put it away.",
+  pack:"Several loads built into one trailer: packing photos the whole time, how it is secured and what is used, then the forklift driver signs a manifest.",
+  delivery:"We deliver it: find the load, count, inspect, load it like the shipper did, photo of it strapped, photo of the bills.",
+  pickup:"The customer's carrier picks up: find, count, inspect, load it like the shipper did, strapped, bills."},
+/* multi-stop load plan draft: {multi, rows:{sid:{stop, pos, auto}}}; a place someone picked (auto false) stays,
+   the others follow ZZposSuggest (last stop -> nose, first stop -> tail) */
+ZZo_planInit=(L,multi)=>{let rows={},sg=ZZposSuggest(L.map(r=>r.stop??null));L.forEach((r,k)=>{rows[r.sid]={stop:r.stop??null,pos:r.pos||null,auto:!r.pos||r.pos===sg[k]}});return{multi:!!multi,rows}},
+ZZo_planSug=(L,rows)=>{let sg=ZZposSuggest(L.map(r=>(rows[r.sid]||{}).stop??null)),o={...rows};L.forEach((r,k)=>{let x=rows[r.sid]||{};if(x.auto!==!1)o[r.sid]={...x,pos:sg[k]||null,auto:!0}});return o},
+ZZo_planOn=(L,P,v)=>{if(!v)return{...P,multi:!1};let rows={...P.rows};L.forEach((r,k)=>{let x=rows[r.sid]||{};if(x.stop==null)rows[r.sid]={...x,stop:Math.min(k+1,9)}});return{multi:!0,rows:ZZo_planSug(L,rows)}},
+ZZo_planErr=(L,P)=>!P.multi?"":L.some(r=>(P.rows[r.sid]||{}).stop==null)?"Pick a stop for every load.":new Set(L.map(r=>P.rows[r.sid].stop)).size<2?"Give at least one load a different stop, or choose One stop.":"",
+ZZo_planOut=(L,P)=>L.map(r=>{let x=P.rows[r.sid]||{};return P.multi?{sid:r.sid,stop:x.stop??null,pos:x.pos||null}:{sid:r.sid,stop:null,pos:null}}),
+ZZo_LoadPlan=({t,doc:e,actions:a,toast,busy,once})=>{let[P,setP]=(0,H.useState)(null),[err,setErr]=(0,H.useState)(""),
+  L=ZZloadOrder(e,t),open=ZZactive(t),nStops=new Set(L.map(r=>r.stop).filter(v=>v!=null)).size,
+  cust=r=>{let c=ZZo_cust(e,r.s.customerId);return c&&c.id!==t.customerId?c.name:""},
+  save=()=>{let x=ZZo_planErr(L,P);if(x)return setErr(x);once(async()=>{let r=a.zzLoadPlan(t.id,{multiStop:!!P.multi,loads:ZZo_planOut(L,P)});r&&await r;toast("Load plan saved. The forklift driver sees it in the Load step.");setP(null);setErr("")})};
+  if(!L.length)return ZZo_h(ZZo_Sec,{title:"Load plan"},ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"No loads going out on this truck yet."));
+  return ZZo_h(ZZo_Sec,{title:`Load plan \xB7 ${t.multiStop&&nStops>1?`${nStops} stops, loading order (nose first)`:"one stop"}`,full:!0},
+    P?ZZo_h("div",{className:"space-y-3","data-zz":"plan-edit"},
+        ZZo_h(ZZo_Chips,{label:"Stops",value:P.multi?"multi":"one",opts:[["one","One stop"],["multi","More than one stop"]],onChange:k=>{setErr("");setP(ZZo_planOn(L,P,k==="multi"))}}),
+        P.multi?ZZo_h("div",{className:"text-xs",style:{color:m.mut}},"Last stop goes in the nose, first stop by the doors. Pick the stop for each load; the place is suggested and can be changed."):null,
+        P.multi?L.map(r=>{let x=P.rows[r.sid]||{},c=cust(r);return ZZo_h("div",{key:r.sid,className:"rounded-lg p-2.5 space-y-2",style:{background:m.panel,border:`1px solid ${m.line}`},"data-plan":r.sid},
+          ZZo_h("div",{className:"flex items-center gap-2 flex-wrap text-sm"},r.badge?ZZo_h(ZZo_Badge,{b:r.badge}):ZZo_h("b",null,r.s.ref),ZZo_h("span",{style:{color:m.mut}},[`${fe(r.s)} plt`,c].filter(Boolean).join(" \xB7 "))),
+          ZZo_h("div",{className:"flex items-end gap-2 flex-wrap"},
+            ZZo_h("div",{style:{width:120}},ZZo_h(xe,{label:"Stop"},ZZo_h(zj,{value:x.stop==null?"":String(x.stop),"aria-label":`Stop for ${r.s.ref}`,onChange:v=>{setErr("");let st=v.target.value===""?null:+v.target.value;setP({...P,rows:ZZo_planSug(L,{...P.rows,[r.sid]:{...x,stop:st}})})}},
+              ZZo_h("option",{value:""},"Pick"),[...Array(Math.max(2,Math.min(9,L.length)))].map((_,j)=>ZZo_h("option",{key:j,value:String(j+1)},`Stop ${j+1}`))))),
+            ZZo_h("div",{style:{minWidth:0}},ZZo_h(ZZo_Group,{label:x.pos&&x.auto!==!1?"Place in the trailer (suggested)":"Place in the trailer"},
+              ZZo_h(ZZo_Chips,{label:`Place for ${r.s.ref}`,value:x.pos||"",opts:ZZPOS.map(q=>[q.k,q.label]),onChange:k=>setP({...P,rows:{...P.rows,[r.sid]:{...x,pos:k,auto:!1}}})})))))}):null,
+        err?ZZo_h("div",{className:"text-xs",style:{color:m.red},role:"alert"},err):null,
+        ZZo_h("div",{className:"flex gap-2 flex-wrap"},ZZo_h(Z,{kind:"primary",icon:br,disabled:busy,onClick:save},"Save load plan"),ZZo_h(Z,{kind:"quiet",onClick:()=>{setP(null);setErr("")}},"Cancel")))
+      :ZZo_h(H.Fragment,null,
+        t.multiStop?ZZo_h("div",{className:"space-y-1.5","data-zz":"plan-view"},L.map((r,k)=>{let c=cust(r);return ZZo_h("div",{key:r.sid,className:"flex items-center gap-2 flex-wrap text-sm","data-plan":r.sid},
+            ZZo_h("span",{className:"text-xs font-bold tabular-nums",style:{color:m.dim,width:18}},k+1),r.badge?ZZo_h(ZZo_Badge,{b:r.badge}):ZZo_h("b",null,r.s.ref),
+            ZZo_h("span",null,[r.stop?`Stop ${r.stop}`:"No stop set",r.pos&&ZZo_POS[r.pos]?`${ZZo_POS[r.pos][0]} \u2014 ${ZZo_POS[r.pos][1]}`:"place not set"].join(" \xB7 ")),c?ZZo_h("span",{className:"text-xs",style:{color:m.mut}},c):null)}))
+          :ZZo_h("div",{className:"text-sm",style:{color:m.mut}},`All ${ZZo_plural(L.length,"load")} go to one place.`),
+        open?ZZo_h("div",null,ZZo_h(Z,{onClick:()=>setP(ZZo_planInit(L,!!t.multiStop))},t.multiStop?"Change the load plan":"Set stops (more than one stop)")):null))},
+
 /* ========================== Truck sheet extras (_Q) ========================== */
 /* pills next to the status pills: check-in code, needs-OK, ETA, promise */
-ZZo_Pills=({t,doc,now})=>{if(!t)return null;let code=/^\d{4}$/.test(String(t.code??""))?t.code:null,late=ZZactive(t)&&t.arrivedAt&&!t.workDoneAt&&ZZo_late(doc,t,now);
-  return ZZo_h(H.Fragment,null,code?ZZo_h(ve,{label:`Code ${code}`,color:m.orange,dot:!1}):null,ZZo_needsOk(doc,t)?ZZo_h(ve,{label:"Needs your OK",color:m.amber}):null,
+ZZo_Pills=({t,doc,now})=>{if(!t)return null;let code=/^\d{4}$/.test(String(t.code??""))?t.code:null,late=ZZactive(t)&&t.arrivedAt&&!t.workDoneAt&&ZZo_late(doc,t,now),job=ZZloadJob(doc,t),
+    snaps=ZZdmgDrafts(doc,t.id).length;
+  return ZZo_h(H.Fragment,null,job&&ZZJOBS[job]?ZZo_h(ve,{label:ZZJOBS[job].word,color:m.teal,dot:!1}):null,code?ZZo_h(ve,{label:`Code ${code}`,color:m.orange,dot:!1}):null,
+    snaps?ZZo_h(ve,{label:`${ZZo_plural(snaps,"damage snap")} waiting`,color:m.amber}):null,ZZo_needsOk(doc,t)?ZZo_h(ve,{label:"Needs your OK",color:m.amber}):null,
     t.stage==="scheduled"&&t.eta&&t.eta.at?ZZo_h(ve,{label:`ETA ${ZZo_hm(t.eta.at)}`,color:m.blue}):null,late?ZZo_h(ve,{label:`Past the ${ZZo_promShort(ZZS(doc).promiseMin)} promise`,color:m.red}):null)},
 ZZo_Sec=({title,children,full})=>ZZo_h("div",{className:"rounded-lg p-3 space-y-2",style:{...ne,...(full?{gridColumn:"1 / -1"}:{}),minWidth:0}},ZZo_h("div",{className:"text-xs font-bold",style:{color:m.mut}},title),children),
 /* the sheet grows in two places so Nick's own sections (loads, crew instructions, truck chat) stay near the top:
@@ -400,7 +458,7 @@ ZZo_Sec=({title,children,full})=>ZZo_h("div",{className:"rounded-lg p-3 space-y-
    part "end" (after the truck chat, E31): paperwork photos, securement report, this truck's messages. */
 ZZTruckExtra=({t,doc:e,now:n,actions:a,part})=>{
   let[etaOpen,setEtaOpen]=(0,H.useState)(!1),[etaT,setEtaT]=(0,H.useState)(""),[etaNote,setEtaNote]=(0,H.useState)(""),[etaErr,setEtaErr]=(0,H.useState)(""),
-    [ask,setAsk]=(0,H.useState)(!1),[res,setRes]=(0,H.useState)(null),[openM,setOpenM]=(0,H.useState)(null),[toasts,toast,drop]=ZZo_useToast(),[busy,once]=ZZo_useOnce(),
+    [ask,setAsk]=(0,H.useState)(!1),[res,setRes]=(0,H.useState)(null),[openM,setOpenM]=(0,H.useState)(null),[toasts,toast,drop]=ZZo_useToast(),[busy,once]=ZZo_useOnce(),[allTrail,setAllTrail]=(0,H.useState)(!1),
     tid=t&&t.id,top=part!=="end",end=part!=="top",msgs=(0,H.useMemo)(()=>tid&&end?ZZo_allMsgs(e,Date.now()).filter(q=>q.tid===tid):[],[e,tid,n,end]);
   if(!t)return null;
   let act=ZZactive(t),code=/^\d{4}$/.test(String(t.code??""))?String(t.code):null,st=ZZS(e),lang=ZZLANGS.find(l=>l.k===(t.driverLang||"en")),
@@ -478,16 +536,71 @@ ZZTruckExtra=({t,doc:e,now:n,actions:a,part})=>{
         ZZo_h("div",{className:"text-xs"},ZZGEAR.filter(g=>ie(sec.gear&&sec.gear[g.k]&&sec.gear[g.k].qty)>0).map(g=>`${ie(sec.gear[g.k].qty)} ${ZZo_gearW[g.k][ie(sec.gear[g.k].qty)===1?0:1]} (${sec.gear[g.k].owner==="driver"?"driver's":"ours"})`).join(", ")||"No gear used."),
         (sec.tags||[]).length?ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Tags: ${sec.tags.join(", ")}`):null,
         sec.note?ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Note: ${sec.note}`):null,
-        ZZo_h("div",{className:"space-y-1"},ZZSECSLOTS.map(sl=>ZZo_h(lr,{key:sl.k,ownerId:`sec:${t.id}:${sl.k}`,size:44,label:sl.label}))))
+        sec.photoOwner?ZZo_h("div",{className:"space-y-1"},ZZo_h(lr,{ownerId:sec.photoOwner,size:44,label:`Securing and what's used \xB7 ${ie(sec.photoCount)}`,empty:"not on this device"}),ZZo_h(lr,{ownerId:`sec:${t.id}:seal`,size:44,label:"Seal"}))
+          :ZZo_h("div",{className:"space-y-1"},ZZSECSLOTS.map(sl=>ZZo_h(lr,{key:sl.k,ownerId:`sec:${t.id}:${sl.k}`,size:44,label:sl.label}))))
       :ZZo_h("div",{className:"text-sm",style:{color:t.stage==="done"||t.stage==="departed"?m.red:m.amber}},t.stage==="done"||t.stage==="departed"?"No securement report.":"Not secured yet. The crew does this before the truck leaves.")):null,
     msgSec=ZZo_h(ZZo_Sec,{title:`Messages for this truck \xB7 ${msgs.length}`,full:!0},
       msgs.length?ZZo_h("div",{className:"space-y-1.5"},msgs.slice(0,8).map(q=>ZZo_h(ZZo_MsgRow,{key:q.id,q,doc:e,open:openM===q.id,onToggle:()=>setOpenM(openM===q.id?null:q.id),onTruck:null})))
         :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"No texts or emails for this truck yet."),
-      ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},`Not sent for real yet.${msgs.length>8?` Showing the newest 8 of ${msgs.length}.`:""} The Outbox tab has every message.`));
+      ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},`Not sent for real yet.${msgs.length>8?` Showing the newest 8 of ${msgs.length}.`:""} The Outbox tab has every message.`)),
+    /* ---- crew truck flow (Nick's review): the job, damage snaps, shipper photo, manifest, crew photos, staff trail ---- */
+    SH=(e.shipments||[]).filter(Boolean),job=ZZloadJob(e,t),J=job?ZZJOBS[job]:null,autoJob=out?ZZloadJob(e,{...t,loadJob:null}):job,
+    ord=ZZloadOrder(e,t),nStops=new Set(ord.map(r=>r.stop).filter(v=>v!=null)).size,
+    reloadN=out?0:SH.filter(s=>s.trailerInId===t.id&&be(s)==="sac").length,
+    setJob=j=>{if((t.loadJob??null)===j)return;once(async()=>{let r=a.zzLoadJob(t.id,j);if(!r)return;await r;toast(j?`Loading job set to ${ZZJOBS[j].word}. The crew screen follows it.`:`Loading job back to automatic: ${ZZJOBS[autoJob].word}.`)})},
+    jobSec=J?ZZo_h(ZZo_Sec,{title:"Loading job"},
+      ZZo_h("div",{className:"flex items-baseline gap-2 flex-wrap","data-zz":"job"},ZZo_h("span",{className:"text-lg font-black",style:{color:m.teal}},J.word),
+        ZZo_h("span",{className:"text-sm font-semibold"},job==="delivery"||job==="pickup"?`${J.label}${t.multiStop&&nStops>1?` \xB7 ${nStops} stops`:""}`:J.label),
+        out&&!t.loadJob?ZZo_h("span",{className:"text-[11px]",style:{color:m.dim}},"worked out from the loads"):null),
+      ZZo_h("div",{className:"text-xs",style:{color:m.mut}},ZZo_JOBHELP[job]),
+      reloadN?ZZo_h("div",{className:"text-xs font-semibold"},`Reload part: PACK \xB7 ${ZZo_plural(reloadN,"load")} go${reloadN===1?"es":""} back out`):null,
+      out&&act?ZZo_h(ZZo_Chips,{label:"Loading job",value:t.loadJob||"auto",opts:[["auto",`Auto (${(ZZJOBS[autoJob]||J).word})`],["pack","Pack"],["delivery","Delivery"],["pickup","Pickup"]],onChange:k=>{busy||setJob(k==="auto"?null:k)}}):null):null,
+    snaps=ZZdmgDrafts(e,t.id),
+    snapSec=snaps.length?ZZo_h(ZZo_Sec,{title:`Damage snaps waiting for details \xB7 ${snaps.length}`,full:!0},
+      ZZo_h("div",{className:"text-xs",style:{color:m.mut}},"The crew took these photos before touching the pallets. They add pallets, what is wrong and the fix price at the count. The customer sees nothing and no alert is queued until then. Wrap-up waits until each one is finished or thrown away."),
+      ZZo_h("div",{className:"space-y-2","data-zz":"snaps"},snaps.map(d=>{let b=d.sid?ZZo_bdg(e,t,d.sid):null;return ZZo_h("div",{key:d.id,className:"rounded-lg p-2.5 space-y-1.5",style:{background:m.panel,border:`1px solid ${m.line}`},"data-snap":d.id},
+        ZZo_h("div",{className:"flex items-center gap-2 flex-wrap text-sm"},b?ZZo_h(ZZo_Badge,{b}):d.sid?ZZo_h("b",null,d.ref||"Load"):ZZo_h("b",{style:{color:m.amber}},"Load not picked yet"),
+          d.customerId&&d.customerId!==t.customerId?ZZo_h("span",{className:"text-xs",style:{color:m.mut}},ZZo_cname(e,{customerId:d.customerId})):null),
+        ZZo_h("div",{className:"text-xs",style:{color:m.mut}},[ZZo_plural(d.photoCount,"photo"),d.by?`by ${d.by}`:"",d.at?ZZo_when(d.at,n):"",d.note?`\u201c${d.note}\u201d`:""].filter(Boolean).join(" \xB7 ")),
+        ZZo_h(lr,{ownerId:d.photoOwner,size:44,empty:"The photos are on the crew phone that took them."}))}))):null,
+    shipN=ie(t.shipperPhotoCount),
+    shipSec=out?ZZo_h(ZZo_Sec,{title:`How it came from the shipper${shipN?` \xB7 ${ZZo_plural(shipN,"photo")}`:""}`},
+      ZZo_h("div",{className:"text-xs",style:{color:m.mut}},"Reference photo from the dispatcher or the customer. The forklift driver loads it the same way, so the receiver has nothing to complain about."),
+      act&&!t.workDoneAt?ZZo_h("div",{"data-zz":"ship"},ZZo_h(Xn,{ownerId:`ship:${t.id}`,canAdd:!0,onCountChange:c=>{c!==shipN&&a.patchTrailer(t.id,{shipperPhotoCount:c})}}))
+        :ZZo_h(lr,{ownerId:`ship:${t.id}`,size:56,empty:shipN?`${ZZo_plural(shipN,"photo")} on file, not on this device.`:"No shipper photo was added."})):null,
+    mf=ZZmanifestFor(e,t,null),
+    mfSec=mf?ZZo_h(ZZo_Sec,{title:`Manifest \xB7 ${ZZo_plural(mf.total,"pallet")} loaded`,full:!0},
+        ZZo_h("div",{className:"space-y-1.5","data-zz":"manifest"},mf.lines.map(l=>{let b=l.sid?ZZo_bdg(e,t,l.sid):null,c=ZZo_cust(e,l.customerId),pl=ie(l.planned),ld=ie(l.loaded),off=(l.sid||pl)&&ld!==pl;
+          return ZZo_h("div",{key:l.id,className:"rounded-lg px-2.5 py-2 flex items-center gap-2 flex-wrap text-sm",style:{background:m.panel,border:`1px solid ${off?m.amber:m.line}`},"data-line":l.id},
+            b?ZZo_h(ZZo_Badge,{b}):ZZo_h("b",null,l.ref||"Extra line"),
+            ZZo_h("span",{className:"text-xs",style:{color:m.mut}},[c?c.name:l.sid?"":"Staff only",l.stop?`Stop ${l.stop}`:"",l.pos&&ZZo_POS[l.pos]?ZZo_POS[l.pos][0]:"",l.note?`\u201c${l.note}\u201d`:""].filter(Boolean).join(" \xB7 ")),
+            ZZo_h("span",{className:"ml-auto font-black tabular-nums",style:{color:off?m.amber:m.text}},l.sid||pl?`${ld} of ${pl} plt`:`${ld} plt`))})),
+        ZZo_h("div",{className:"text-xs",style:{color:m.mut}},`Total ${ZZo_plural(mf.total,"pallet")} (planned ${mf.planned}) \xB7 signed by ${mf.signedBy||"the crew"}${mf.signature&&mf.signature!==mf.signedBy?` ("${mf.signature}")`:""}${mf.signedAt?`, ${ZZo_when(mf.signedAt,n)}`:""}`),
+        ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},"Each customer sees only the lines of their own loads."))
+      :job==="pack"&&(out||reloadN)?ZZo_h(ZZo_Sec,{title:"Manifest"},ZZo_h("div",{className:"text-sm",style:{color:t.stage==="done"||t.stage==="departed"?m.amber:m.dim}},t.stage==="done"||t.stage==="departed"?"No manifest was signed for this truck.":"Not signed yet. The forklift driver fills it in at the end of packing.")):null,
+    /* crew photos: how many were taken of each kind (photos live on the device that took them in local mode) */
+    LIN=SH.filter(s=>s.trailerInId===t.id),LOUT=SH.filter(s=>s.trailerOutId===t.id),
+    phRows=[["before",out?"Before":"Before / ticket",t.beforePhotoCount],["unload","Unloading",t.unloadPhotoCount],["after",out?"Packing and loading":"After",t.afterPhotoCount],["strap","Securing and what's used",t.strapPhotoCount],["bol","Bills",t.bolPhotoCount]].filter(r=>ie(r[2])>0),
+    perLoad=[...LIN.filter(s=>ie(s.rowPhotoCount)>0).map(s=>[`row:${s.id}`,s,"in the warehouse",ie(s.rowPhotoCount)]),...LOUT.filter(s=>ie(s.inspPhotoCount)>0).map(s=>[`insp:${s.id}`,s,"inspected before loading",ie(s.inspPhotoCount)])],
+    phTotal=phRows.reduce((x,r)=>x+ie(r[2]),0)+perLoad.reduce((x,r)=>x+r[3],0),
+    photoSec=phTotal||t.workStartedAt?ZZo_h(ZZo_Sec,{title:`Crew photos \xB7 ${phTotal}`},
+      phTotal?ZZo_h("div",{className:"space-y-1.5","data-zz":"crew-photos"},
+        phRows.map(r=>ZZo_h("div",{key:r[0],"data-ph":r[0]},ZZo_h(lr,{ownerId:`${r[0]}:${t.id}`,size:44,label:`${r[1]} \xB7 ${ie(r[2])}`,empty:"not on this device"}))),
+        perLoad.map(r=>{let b=ZZo_bdg(e,t,r[1].id);return ZZo_h("div",{key:r[0],"data-ph":r[0]},ZZo_h(lr,{ownerId:r[0],size:44,label:`${b?b.label:r[1].ref} ${r[2]}`,empty:"not on this device"}))}))
+        :ZZo_h("div",{className:"text-sm",style:{color:m.dim}},"No crew photos yet."),
+      phTotal?ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},"Photos are saved where they were taken. In shared mode every staff device sees them."):null):null,
+    /* the staff trail: the truck and its customer's loads (ZZtrail), plus the loads of other companies on it (staff see all) */
+    trail=end?[...ZZtrail(e,t.id,null,{staff:!0}),...[...LIN,...LOUT].filter((s,k,A)=>A.indexOf(s)===k&&s.customerId&&t.customerId&&s.customerId!==t.customerId).flatMap(s=>ZZtrail(e,t.id,s.id,{staff:!0}))]
+      .sort((x,y)=>(ZZo_ms(x.at)||0)-(ZZo_ms(y.at)||0)):[],
+    trailSec=trail.length?ZZo_h(ZZo_Sec,{title:`Truck trail (staff view) \xB7 ${trail.length}`,full:!0},
+      ZZo_h("div",{className:"space-y-1","data-zz":"trail"},(allTrail?trail:trail.slice(-8)).map((r,k)=>ZZo_h("div",{key:k,className:"text-xs flex gap-2"},ZZo_h("span",{className:"tabular-nums shrink-0",style:{color:m.dim,width:120}},ZZo_when(r.at,n)),
+        ZZo_h("span",{style:{minWidth:0}},r.by?ZZo_h("b",null,r.by+": "):null,r.text)))),
+      trail.length>8&&!allTrail?ZZo_h("div",null,ZZo_h(Z,{size:"sm",kind:"quiet",onClick:()=>setAllTrail(!0)},`Show all ${trail.length}`)):null,
+      ZZo_h("div",{className:"text-[11px]",style:{color:m.dim}},"Shows damage snaps too. The customer's trail leaves them out until they are finished.")):null;
   return ZZo_h(H.Fragment,null,
-    top?ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3","data-zz":"truck-extra"},
-      ...(preArr?[codeSec,etaSec,bookSec,trackSec]:showCode?[clockSec,codeSec]:[ZZo_h("div",{key:"c",style:{gridColumn:"1 / -1",minWidth:0}},clockSec)])):null,
-    end?ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3","data-zz":"truck-more"},paperSec,secSec,msgSec):null,
+    top?ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3","data-zz":"truck-extra"},snapSec,
+      ...(preArr?[codeSec,etaSec,bookSec,trackSec]:showCode?[clockSec,codeSec]:[ZZo_h("div",{key:"c",style:{gridColumn:"1 / -1",minWidth:0}},clockSec)]),jobSec):null,
+    end?ZZo_h("div",{className:"grid sm:grid-cols-2 gap-3","data-zz":"truck-more"},out||reloadN||t.multiStop?ZZo_h(ZZo_LoadPlan,{t,doc:e,actions:a,toast,busy,once}):null,shipSec,mfSec,photoSec,paperSec,secSec,msgSec,trailSec):null,
     ZZo_h(ZZo_Toasts,{items:toasts,onDismiss:drop}))},
 
 /* ========================== TV exit: office PIN ========================== */

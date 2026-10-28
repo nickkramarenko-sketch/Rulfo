@@ -149,6 +149,95 @@ one-time setup lazily, like `ZZtr`). Change data only through `props.actions.*`;
 - Two A patches beyond the plan list: **A36** (Setup "Logins card" button follows the new showLogins rule) and
   **A37** (addTrailer renumbers `seq` after empty rows are dropped). Their anchors belong to A.
 
+## Crew truck flow rework (Nick's review, Oct 28): the engine contract
+
+Nick split the forklift truck screen into five jobs and wants the crew to photograph everything. Every part (crew D,
+customer B, office E) uses exactly these names. All actions save in **one write**; a refused call writes nothing
+(input checks before the save return `null` with a toast; a refusal inside the save resolves the unchanged doc).
+
+**Jobs.** `ZZloadJob(doc, t|tid)` -> `'unpack'` (inbound consolidated: an East Coast origin, a consolidate / reload job
+type, or loads that reload) | `'unload'` (inbound pickup trailer) | `'pack'` | `'delivery'` | `'pickup'` (outbound).
+Outbound order: `trailer.loadJob` (the office's choice) wins; else `'pack'` when its loads came in on 2+ trucks or belong to
+2+ customers, or the job type matches consolidate / reload; else `'delivery'` when a delivery request (`zzRequests`,
+type `delivery`, not cancelled) covers one of its loads or the job type says delivery ("Reno delivery"); else `'pickup'`.
+The reload part of an inbound truck is always packed (Pack -> Secure -> Manifest). `ZZJOBS[job]` = `{word:'UNPACK', label}`
+for headers. `zzLoadJob(tid, 'pack'|'delivery'|'pickup'|null)`: outbound trucks only; `null` (or `'auto'`) = worked out
+again (`loadJob:null`); history "Loading job: Delivery". A bad job: toast, `null`.
+
+**Load badges.** `ZZloadBadges(doc, t|tid, cid?)` -> `{[sid]: {n, color, fg, label:'① 118882', mark:'①', name:'Blue', ref,
+sid, dir:'in'|'out'}}`. Numbered in seq order: the loads that came in on the truck, then the loads going out on it (the
+same load keeps its badge on every staff screen; reordering loads renumbers). `ZZBADGE` is the fixed palette (Blue, Green,
+Orange, Purple, Gold, Pink, Teal, Brown, Gray, Olive; load 11 starts again): solid fill + its own text colour, about 3:1 or
+better against every page / panel / raised colour of the brand, clean and hi-vis looks. Always show the number (and the
+PRO) with the colour. With `cid` (customer screens) only that customer's loads are numbered 1..k.
+
+**Multi-stop.** Fields: `shipment.stop` (integer or null), `shipment.pos` (`'nose'|'middle'|'tail'|null`, for the truck the
+load goes out on), `trailer.multiStop` (bool). `ZZPOS` = the three places in loading order with labels and hints.
+`ZZposSuggest([1,3,2,3])` -> `['tail','nose','middle','nose']` (one per load, null without a stop or with one stop);
+`ZZposSuggest(3)` -> `{1:'tail',2:'middle',3:'nose'}`. `ZZloadOrder(doc, t|tid)` -> `[{s, sid, badge, stop, pos}]` in
+LOADING order: nose, then middle (and no position), then tail; inside a place the later stop first, then badge order. It
+lists the loads going out on the truck (an inbound truck: its reload loads and any load set to go out on it).
+`zzLoadPlan(tid, {multiStop?, loads:[{sid, stop?, pos?}]}, cid?)`: only loads on that truck; a missing stop / pos keeps the
+saved one; a bad value saves null; with `cid` (customer portal) only that customer's loads, and `multiStop` only on its
+own truck. Nothing changed: no write. History "Load plan: more than one stop" / "one stop" / "updated".
+
+**Damage snaps ("quick snap now, details later").** The crew makes the id (`Ce()`), takes the photos into `'dmg:'+id`
+(Xn / ls / ex), then:
+- `zzDamageSnap(tid, sid|null, {id, photoCount (1+), note})`. With a load (it must be on that truck): a Damage exception
+  `{id, kind:'Damage', draft:true, photoOwner:'dmg:'+id, photoCount, at, openedBy, note, snapNote, resolved:false,
+  trailerId:tid}` (`note` is the crew's words or "Damage photo, details to come"; `snapNote` the crew's words only). With
+  `null` ("Not sure which load"): `trailer.dmgDrafts:[{id, photoOwner, photoCount, at, by, note}]`. A used id: no write.
+  No touch, no auto-approve, no truck history line (the trail goes to customers); activity line only.
+- `zzDamageAssign(tid, id, sid|null)`: moves a truck snap onto a load of that truck, a load snap to another load of that
+  truck (picked wrong), or (sid null) a load snap back to the truck. Stays a draft, same photos.
+- `zzDamageFinish(sid, id, {pallets, kinds, what, lines, photoCount})`: refused under 2 photos (toast). `draft:false` plus
+  pallets, kinds, what (empty -> the snap words), photoCount, `est:{lines, sentAt}`, `answer:null`, `finishedAt`,
+  `finishedBy`; replaces the plain crew Damage exception, adds the damage touch and applies the auto-approve rule, exactly
+  like zzReportDamage. `at` stays the snap time. Only now is it a report: the customer sees it and the Outbox alert is
+  queued (timed at `finishedAt`).
+- `zzDamageDiscard(tid, sid|null, id)`: removes a snap (never a finished report). The screen may clear its photos:
+  `ex('dmg:'+id, [])`.
+- `ZZdmgDrafts(doc, tid|null)` -> `[{id, sid|null, ref|null, customerId|null, tid, photoOwner, photoCount, at, by, note,
+  where:'load'|'truck'}]`, oldest first: the snaps still waiting on one truck (wrap-up is blocked while any) or on every
+  truck (office "damage snaps waiting for details"). A load snap belongs to `x.trailerId`, else to the load's trucks.
+- Drafts are invisible to customers: `ZZdmgMonths`, `ZZweek`, `ZZmsgs` (damage alerts and the done text) skip them;
+  `ZZtrail(doc, tid, sid?, {staff:true})` shows "Damage photo taken on 118882 (details to come)" and truck snaps to staff
+  only; after finishing the trail shows "Damage photo taken on ..." (snap time) and "Damage reported on ..." (finishedAt).
+  `ZZnoDrafts(s)` (a load without its drafts; the same object when it has none) and `ZZcustView(doc, cid)` (no drafts, no
+  truck snaps, only that customer's manifest lines; the same doc when nothing is hidden, cached per doc) are used by
+  **A44** (Nick's shipment sheet for anyone but office / crew, and the public "track a shipment" page), **A45** (the customer
+  portal gets `ZZcustView(doc, customerId)`), **A46** (customer bell), **A47** (printed receiving report), **A48** (printed
+  truck sheet exception count). Customer code should still skip `x.draft` in its own lists (ZZneeds, ZZestOf's first
+  Damage). Office lists in Nick's code (shipment sheet, office bell, open-exception counts) show snaps to staff.
+- A crew photo sweep that removes unused `dmg:` photos must count `trailer.dmgDrafts[].photoOwner` as used.
+
+**Photos.** New owners: unloading photos `unload:<tid>` (`trailer.unloadPhotoCount`), packing / loadout photos stay
+`after:<tid>` (`afterPhotoCount`), shipper reference photo from the dispatcher `ship:<tid>` (`shipperPhotoCount`,
+customer or office), securing / what's used / strapped `strap:<tid>` (`strapPhotoCount`), bills `bol:<tid>`
+(`bolPhotoCount`), per-load inspect photo at load-out `insp:<sid>` (`shipment.inspPhotoCount`), the one warehouse photo
+per load stays Nick's `row:<sid>` (`rowPhotoCount`, `notePhotos(sid, n, 'row')`). Counts are set with `patchTrailer` /
+`patchShipment` like today. `ZZphotoCap(owner)` = 30 for `unload:` and `after:` (nonstop photos), else Nick's 12 (`xA`);
+**A33** (ex keeps the last ZZphotoCap photos) and **A49** (Xn's "N photos max here") use it, and so must any other
+photo grid. In local mode a list over 12 saves only while the browser keeps about 400k characters free for the dock data
+afterwards (a test write; `ZZa_photoRoom`), else "Photo NOT saved: this device is almost full ..." in the red banner;
+deleting always saves. **A32**: `dmg: sec: unload: after: strap: bol: ship: insp:` photos are kept past 30 days
+(`ZZa_KEEP`). Shared mode stores one document per photo under any owner key (nothing to change in sync-source.js).
+
+**Securing.** `zzSecure(tid, {gear, tags, seal, photoCount, confidence, note, checkedRows, signature})`: at least 1
+securing photo (`strap:<tid>`). Saved `secure = {gear, tags, seal, photos:null, photoOwner:'strap:'+tid, photoCount, v:2,
+confidence, note, checkedRows, signature, signedBy, signedAt}` and `trailer.strapPhotoCount`. The old 5-photo shape
+(`photos:{nose, middle, tail, closeup, seal}`) is still accepted, and old saved reports keep displaying: readers check
+`secure.photoOwner` (new) before `secure.photos` (old). Gear rows, seal, history and the "secured" message are unchanged.
+
+**Manifest.** `zzManifest(tid, {lines:[{id?, sid|null, ref?, customerId?, planned?, loaded, stop?, pos?, note?}], signature})`.
+Refused (toast, no write): no lines, a line without pallets loaded (a number 0 or more), no signature. A line with a load
+takes its PRO and customer from the load (never from the screen); `planned` defaults to the BOL pallets; an extra line
+(sid null, e.g. loose freight) keeps its own ref and customer (null = staff only). Saved
+`trailer.manifest = {lines:[{id, sid, ref, customerId, planned, loaded, stop, pos, note}], total, signature, signedBy,
+signedAt}`; signing again replaces it; history "Manifest signed" (no totals). `ZZmanifestFor(doc, t|tid, cid|null)` ->
+`{lines, total, planned, signature, signedBy, signedAt, all}`: staff every line, a customer only its own lines (null when
+it has none or there is no manifest).
+
 ## Test
 
 ```bash

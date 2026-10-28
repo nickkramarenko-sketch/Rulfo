@@ -135,13 +135,21 @@ PATCHES = [
     # ---------------- photos ----------------
     ('A32',
      r'r=a.filter(n=>!n.at||Date.now()-new Date(n.at).getTime()<SQ)',
-     r'r=/^(dmg|sec):/.test(e)?a:a.filter(n=>!n.at||Date.now()-new Date(n.at).getTime()<SQ)',
-     'Photo purge: damage (dmg:) and securement (sec:) photos are kept past 30 days.'),
+     r'r=ZZa_KEEP.test(e)?a:a.filter(n=>!n.at||Date.now()-new Date(n.at).getTime()<SQ)',
+     'Photo purge: proof photos are kept past 30 days: damage (dmg:), securement (sec:), and the crew-flow owners '
+     'unload:, after:, strap:, bol:, ship:, insp: (ZZa_KEEP in engine-source.js).'),
 
     ('A33',
-     r'console.error("photo save failed",a)',
-     r'console.error("photo save failed",a),ZZsync.failed(a,"photo")',
-     'Photo save failure: show it in the red banner instead of only a console line.'),
+     r'ex=async(e,t)=>{try{await window.storage.set(_j(e),JSON.stringify(t.slice(-xA)),!0)}catch(a){console.error("photo save failed",a)}}',
+     r'ex=async(e,t)=>{try{let v=t.slice(-ZZphotoCap(e));ZZa_photoRoom(e,v);await window.storage.set(_j(e),JSON.stringify(v),!0)}catch(a){console.error("photo save failed",a),ZZsync.failed(a,"photo")}}',
+     'Photo save: keeps ZZphotoCap(owner) photos (30 for nonstop unloading / loading photos unload: and after:, else 12); '
+     'in local mode a list over 12 saves only while the browser keeps room for the dock data (ZZa_photoRoom). '
+     'A failure shows in the red banner instead of only a console line.'),
+
+    ('A49',
+     r'if(r.length+g.length>xA){u(`${xA} photos max here \u2014 delete one first.`)',
+     r'if(r.length+g.length>ZZphotoCap(e)){u(`${ZZphotoCap(e)} photos max here \u2014 delete one first.`)',
+     'Photo grid (Xn): the "photos max here" limit follows ZZphotoCap(owner), so nonstop unloading / loading photos can go past 12.'),
 
     # ---------------- integration fixes ----------------
     ('A38',
@@ -169,6 +177,30 @@ PATCHES = [
      r'(0,i.jsx)("button",{onClick:t,"aria-label":"Close",className:"p-1 rounded",style:{color:m.mut},children:(0,i.jsx)(dn,{size:20})})',
      r'(0,i.jsx)("button",{onClick:t,"aria-label":"Close",className:"p-2.5 -m-1.5 rounded",style:{color:m.mut},children:(0,i.jsx)(dn,{size:20})})',
      'Sheet close (X): a 40 px tap target instead of 28 px (gloves, phones); the negative margin keeps the header the same size.'),
+    # ---------------- crew truck flow: damage snaps (drafts) never reach a customer ----------------
+    ('A44',
+     r'return j?ae((0,i.jsx)(MQ,{s:j,trailers:e.trailers,customers:e.customers,rates:Ln(e,j.customerId,p),now:p,role:a,actions:z,onBack:()=>s(null)})):d?ae((0,i.jsx)(yJ,{doc:e,',
+     r'return j?ae((0,i.jsx)(MQ,{s:a==="office"||a==="crew"?j:ZZnoDrafts(j),trailers:e.trailers,customers:e.customers,rates:Ln(e,j.customerId,p),now:p,role:a,actions:z,onBack:()=>s(null)})):d?ae((0,i.jsx)(yJ,{doc:ZZcustView(e,null),',
+     'Shipment sheet (MQ) for anyone but office and crew, and the public "track a shipment" page (yJ): damage snaps still '
+     'waiting for their details (draft:true) are left out (ZZnoDrafts / ZZcustView).'),
+    ('A45',
+     r'a==="client"?ae((0,i.jsx)(ZZCP,{doc:e,',
+     r'a==="client"?ae((0,i.jsx)(ZZCP,{doc:ZZcustView(e,n),',
+     'Customer portal: gets the customer view of the doc (no damage snaps, no truck-level snaps, only its own manifest lines). '
+     'The same doc object when there is nothing to hide; actions still work on the saved doc.'),
+    ('A46',
+     r'(g.exceptions||[]).filter(y=>!y.resolved).forEach(y=>o(`exc:${y.id}`',
+     r'(g.exceptions||[]).filter(y=>!y.resolved&&!y.draft).forEach(y=>o(`exc:${y.id}`',
+     'Customer bell (mQ, client): a damage snap waiting for its details is not listed (the office bell still shows it).'),
+    ('A47',
+     r'(e.exceptions||[]).length>0&&(0,i.jsxs)(i.Fragment,{children:[(0,i.jsx)("h2",{children:"Exceptions"}),(0,i.jsx)("table",{children:(0,i.jsx)("tbody",{children:e.exceptions.map(h=>',
+     r'(e.exceptions||[]).some(h=>h&&!h.draft)&&(0,i.jsxs)(i.Fragment,{children:[(0,i.jsx)("h2",{children:"Exceptions"}),(0,i.jsx)("table",{children:(0,i.jsx)("tbody",{children:e.exceptions.filter(h=>h&&!h.draft).map(h=>',
+     'Printed receiving report: damage snaps waiting for their details are not printed (the paper goes to customers and drivers).'),
+    ('A48',
+     r'(h.s.exceptions||[]).filter(v=>!v.resolved).length,0)||"none"',
+     r'(h.s.exceptions||[]).filter(v=>!v.resolved&&!v.draft).length,0)||"none"',
+     'Printed truck sheet: the exceptions count leaves out damage snaps waiting for their details.'),
+
     ('A43',
      r'J("div",{style:{marginTop:18,fontSize:14,padding:"10px 14px",borderRadius:4,background:"#FFF4E6",color:"#8A4A12",border:"1px solid #F2D2A8"}},"Test mode is on: each sign-in page has a list to open any account without a PIN. Turn this off before going live.")',
      r'e.settings?.showLogins===!0?J("div",{style:{marginTop:18,fontSize:14,padding:"10px 14px",borderRadius:4,background:"#FFF4E6",color:"#8A4A12",border:"1px solid #F2D2A8"}},"Test mode is on: each sign-in page has a list to open any account without a PIN. Turn this off before going live."):null',

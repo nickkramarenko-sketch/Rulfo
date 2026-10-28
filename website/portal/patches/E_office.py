@@ -159,4 +159,29 @@ PATCHES = [
      r'children:"Double-click anywhere to exit"',
      r'children:"Double-click anywhere to exit \xB7 office PIN"',
      'TV footer hint mentions the PIN.'),
+    # ---------------- crew truck flow (Nick's review, Oct 28): load badges in Nick's truck sheet ----------------
+    ('E33',
+     r'$j=({n:e,s:t,actions:a,onOpen:r,movable:n})=>{',
+     r'$j=({n:e,s:t,actions:a,onOpen:r,movable:n,zzB:zzB})=>{',
+     'Load row $j takes an optional load badge (zzB); without it the row is exactly as before (the load screen still uses it that way).'),
+
+    ('E34',
+     r'children:[t.ref," ",(0,i.jsxs)("span",{className:"font-normal text-xs",style:{color:m.mut},children:["\xB7 ",Ic[be(t)]',
+     r'children:[zzB?(0,i.jsx)("span",{style:{marginRight:6},children:(0,i.jsx)(ZZo_Badge,{b:zzB,ref:!1})}):null,t.ref," ",(0,i.jsxs)("span",{className:"font-normal text-xs",style:{color:m.mut},children:["\xB7 ",Ic[be(t)]',
+     'Load row $j: the load badge (number in its colour circle) in front of the PRO, the same badge the crew sees.'),
+
+    ('E35',
+     r'ir(y,t.shipments).map(O=>(0,i.jsx)($j,{n:O.n,s:O.s,',
+     r'ir(y,t.shipments).map(O=>(0,i.jsx)($j,{n:O.n,s:O.s,zzB:ZZo_bdg(t,y,O.s.id),',
+     'Truck sheet _Q "Loads on this trailer": each row gets its load badge (ZZloadBadges for this truck).'),
+
+    ('E36',
+     r'N.map(O=>(0,i.jsxs)("div",{className:"rounded-lg p-3 flex items-center gap-3",style:{...ne,borderLeft:`3px solid ${m.orange}`},children:[(0,i.jsxs)("div",{className:"flex-1 min-w-0",children:[(0,i.jsx)("div",{className:"font-black tabular-nums",children:O.ref})',
+     r'N.map(O=>(0,i.jsxs)("div",{className:"rounded-lg p-3 flex items-center gap-3",style:{...ne,borderLeft:`3px solid ${m.orange}`},children:[(0,i.jsxs)("div",{className:"flex-1 min-w-0",children:[(0,i.jsxs)("div",{className:"font-black tabular-nums",children:[ZZo_bdgEl(t,y,O.id),O.ref]})',
+     'Truck sheet _Q "On this truck" (outbound, loaded): the load badge in front of the PRO.'),
+
+    ('E37',
+     r'L.map(O=>(0,i.jsxs)("div",{className:"rounded-lg p-3 flex items-center gap-3",style:{...ne,borderLeft:`3px solid ${m.blue}`},children:[(0,i.jsxs)("div",{className:"flex-1 min-w-0",children:[(0,i.jsx)("div",{className:"font-black tabular-nums",children:O.ref})',
+     r'L.map(O=>(0,i.jsxs)("div",{className:"rounded-lg p-3 flex items-center gap-3",style:{...ne,borderLeft:`3px solid ${m.blue}`},children:[(0,i.jsxs)("div",{className:"flex-1 min-w-0",children:[(0,i.jsxs)("div",{className:"font-black tabular-nums",children:[ZZo_bdgEl(t,y,O.id),O.ref]})',
+     'Truck sheet _Q "Planned by the dispatcher" (outbound, not loaded yet): the load badge in front of the PRO.'),
 ]

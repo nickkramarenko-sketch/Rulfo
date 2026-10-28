@@ -119,11 +119,100 @@ ZZdmgLines=(doc,s,pallets)=>{let r=Ln(doc,s&&s.customerId),p=Math.max(0,ie(palle
 ZZrewrapBilled=s=>((s&&s.adjustments)||[]).some(a=>a&&/^Damage: /.test(String(a.label||""))&&/rewrap/i.test(String(a.label||""))),
 ZZestTotal=lines=>(lines||[]).filter(l=>l&&l.on!==!1).reduce((a,l)=>a+ie(l.qty,1)*ie(l.unit),0),
 ZZautoLimit=c=>{let v=c&&c.autoApproveUnder;if(v==null||v==="")return null;let n=+v;return Number.isFinite(n)&&n>0?n:null},
-/* [{month:'2026-10', reports, pallets, approved, declined, open, items:[{s,x}]}] newest first, Damage only */
-ZZdmgMonths=(doc,cid)=>{let g0={};((doc&&doc.shipments)||[]).forEach(s=>{if(cid&&s.customerId!==cid)return;(s.exceptions||[]).forEach(x=>{if(!x||x.kind!=="Damage")return;
+/* [{month:'2026-10', reports, pallets, approved, declined, open, items:[{s,x}]}] newest first, Damage only
+   (a damage snap still waiting for its details, draft:true, is not a report yet and is left out) */
+ZZdmgMonths=(doc,cid)=>{let g0={};((doc&&doc.shipments)||[]).forEach(s=>{if(cid&&s.customerId!==cid)return;(s.exceptions||[]).forEach(x=>{if(!x||x.kind!=="Damage"||x.draft)return;
     let mo=(ZZdockParts(x.at).ymd||"").slice(0,7)||"unknown",g=g0[mo]||(g0[mo]={month:mo,reports:0,pallets:0,approved:0,declined:0,open:0,items:[]}),st=x.answer&&x.answer.status;
     g.reports++;g.pallets+=ie(x.pallets);st==="accepted"?g.approved++:st==="declined"?g.declined++:x.resolved||g.open++;g.items.push({s,x})})});
   return Object.values(g0).sort((a,b)=>a.month<b.month?1:a.month>b.month?-1:0).map(g=>(g.items.sort((a,b)=>(ZZa_ms(b.x.at)||0)-(ZZa_ms(a.x.at)||0)),g))},
+
+/* ---------- crew truck jobs: unpack / unload / pack / delivery / pickup, load badges, stops, damage snaps, manifest ----------
+   Badge colours are fixed (the same on every device and look): each is a solid fill with its own text colour, mid-light
+   so it reads on the light 24 HR theme and on the dark Clean / Hi-vis themes (about 3:1 or better against every page,
+   panel and raised colour). Never show a colour alone: the number (and the PRO) always goes with it. Load 11 starts the colours again. */
+ZZBADGE=[{color:"#2F6FED",fg:"#FFFFFF",name:"Blue"},{color:"#1F8F4E",fg:"#FFFFFF",name:"Green"},{color:"#D9480F",fg:"#FFFFFF",name:"Orange"},{color:"#8556E0",fg:"#FFFFFF",name:"Purple"},{color:"#B8860B",fg:"#111111",name:"Gold"},
+  {color:"#CF2D66",fg:"#FFFFFF",name:"Pink"},{color:"#0B8A8A",fg:"#FFFFFF",name:"Teal"},{color:"#A05A2C",fg:"#FFFFFF",name:"Brown"},{color:"#687587",fg:"#FFFFFF",name:"Gray"},{color:"#4D7C0F",fg:"#FFFFFF",name:"Olive"}],
+/* where a load goes in the trailer on a multi-stop truck, in loading order (nose loads first) */
+ZZPOS=[{k:"nose",label:"Nose",hint:"Front of the trailer, loads first"},{k:"middle",label:"Middle",hint:"Middle of the trailer"},{k:"tail",label:"Tail",hint:"By the doors, loads last"}],
+/* the loading jobs a truck can be (ZZloadJob) */
+ZZJOBS={unpack:{word:"UNPACK",label:"Consolidated trailer (inbound)"},unload:{word:"UNLOAD",label:"Pickup trailer"},pack:{word:"PACK",label:"Consolidated trailer"},delivery:{word:"DELIVERY",label:"Delivery"},pickup:{word:"PICKUP",label:"Customer's carrier"}},
+/* photo owners kept past 30 days (proof photos), and the bigger per-owner cap for nonstop unloading / loading photos */
+ZZa_KEEP=/^(dmg|sec|unload|after|strap|bol|ship|insp):/,
+ZZPHOTO_BIG=30,
+ZZa_circ=n=>n>=1&&n<=20?String.fromCharCode(9311+n):`(${n})`,
+ZZa_tr=(doc,t)=>typeof t==="string"?((doc&&doc.trailers)||[]).find(k=>k&&k.id===t)||null:t||null,
+ZZa_stop=v=>{if(v==null||v==="")return null;let n=Math.round(+v);return Number.isFinite(n)&&n>=1&&n<=99?n:null},
+ZZa_pos=v=>v==="nose"||v==="middle"||v==="tail"?v:null,
+ZZa_bySeq=L=>L.map((s,i)=>({s,i})).sort((a,b)=>ie(a.s.seq??a.i,a.i)-ie(b.s.seq??b.i,b.i)).map(r=>r.s),
+/* the loads on a truck, in order: the loads that came in on it (seq order), then the loads going out on it (seq order) */
+ZZa_truckLoads=(doc,t)=>{if(!t)return[];let SH=((doc&&doc.shipments)||[]).filter(Boolean),inb=ZZa_bySeq(SH.filter(s=>s.trailerInId===t.id)),ids=new Set(inb.map(s=>s.id));
+  return[...inb,...ZZa_bySeq(SH.filter(s=>s.trailerOutId===t.id&&!ids.has(s.id)))]},
+/* what job a truck is: inbound 'unpack' (consolidated trailer: East Coast origin, consolidate / reload job, or loads that
+   reload) or 'unload' (pickup trailer); outbound: the office's choice (trailer.loadJob), else 'pack' (loads from 2+ inbound
+   trucks or 2+ customers, or job type "Consolidate & reload"), 'delivery' (a delivery request covers its loads, or the job
+   type says delivery), else 'pickup' (the customer's carrier picks up). The reload part of an inbound truck is always packed. */
+ZZloadJob=(doc,t)=>{t=ZZa_tr(doc,t);if(!t)return null;let SH=((doc&&doc.shipments)||[]).filter(Boolean),jt=String(t.jobType||"");
+  if(t.direction!=="outbound"){let L=SH.filter(s=>s.trailerInId===t.id),W=/,\s*(CA|NV|OR|WA|AZ|UT|ID)\b/i;
+    return L.some(s=>s.origin&&!W.test(s.origin))||/consolid|reload/i.test(jt)||L.some(s=>be(s)==="sac")?"unpack":"unload"}
+  if(t.loadJob==="pack"||t.loadJob==="delivery"||t.loadJob==="pickup")return t.loadJob;
+  let L=SH.filter(s=>s.trailerOutId===t.id),ins=new Set(L.map(s=>s.trailerInId).filter(Boolean)),cus=new Set(L.map(s=>s.customerId).filter(Boolean));
+  if(ins.size>=2||cus.size>=2||/consolid|reload/i.test(jt))return"pack";
+  let ids=new Set(L.map(s=>s.id)),rq=((doc&&doc.zzRequests)||[]).some(r=>r&&r.type==="delivery"&&r.status!=="cancelled"&&(r.loads||[]).some(id=>ids.has(id)));
+  return rq||/deliver/i.test(jt)?"delivery":"pickup"},
+/* {sid: {n, color, fg, label:'① 118882', mark:'①', name:'Blue', ref, sid, dir:'in'|'out'}} for the loads on that truck,
+   numbered in seq order (the loads that came in on it, then the loads going out on it). The same load keeps the same
+   badge on every staff screen. With cid (a customer screen) only that customer's loads are numbered (1..k), so the
+   numbers never show how many other companies' loads share the truck. */
+ZZloadBadges=(doc,t,cid)=>{t=ZZa_tr(doc,t);let o={};if(!t)return o;
+  ZZa_truckLoads(doc,t).filter(s=>!cid||s.customerId===cid).forEach((s,k)=>{let n=k+1,b=ZZBADGE[k%ZZBADGE.length],mk=ZZa_circ(n);
+    o[s.id]={n,color:b.color,fg:b.fg,label:`${mk} ${s.ref||""}`.trim(),mark:mk,name:b.name,ref:s.ref||"",sid:s.id,dir:s.trailerInId===t.id?"in":"out"}});return o},
+/* suggested trailer positions: last stop -> 'nose', first stop -> 'tail', the stops between -> 'middle'; one stop -> null.
+   ZZposSuggest([1,3,2,3]) -> ['tail','nose','middle','nose'] (one per load; null for a load with no stop);
+   ZZposSuggest(3) -> {1:'tail', 2:'middle', 3:'nose'} */
+ZZposSuggest=stops=>{if(Array.isArray(stops)){let ns=stops.map(ZZa_stop),u=[...new Set(ns.filter(v=>v!=null))].sort((a,b)=>a-b);
+    return ns.map(v=>v==null||u.length<2?null:v===u[u.length-1]?"nose":v===u[0]?"tail":"middle")}
+  let N=ZZa_stop(stops),o={};if(!N)return o;for(let k=1;k<=N;k++)o[k]=N<2?null:k===N?"nose":k===1?"tail":"middle";return o},
+/* the loads going out on a truck in LOADING order: nose first, then middle (and loads with no position), then tail;
+   inside a position the later stop first, then badge order. [{s, sid, badge, stop, pos}]. An inbound truck lists its
+   reload part (its loads that go back out) and any load set to go out on it. */
+ZZloadOrder=(doc,t)=>{t=ZZa_tr(doc,t);if(!t)return[];let bd=ZZloadBadges(doc,t),rk={nose:0,middle:1,tail:2},
+  L=ZZa_truckLoads(doc,t).filter(s=>t.direction==="outbound"?s.trailerOutId===t.id:s.trailerOutId===t.id||s.trailerInId===t.id&&be(s)==="sac");
+  return L.map(s=>({s,sid:s.id,badge:bd[s.id]||null,stop:ZZa_stop(s.stop),pos:ZZa_pos(s.pos)})).sort((a,b)=>(rk[a.pos]??1)-(rk[b.pos]??1)||(b.stop??0)-(a.stop??0)||((a.badge&&a.badge.n)||0)-((b.badge&&b.badge.n)||0))},
+/* every damage snap still waiting for its details (staff only): on a truck (tid) or on every truck (tid null).
+   [{id, sid|null, ref|null, customerId|null, tid, photoOwner, photoCount, at, by, note, where:'load'|'truck'}], oldest first.
+   A snap on a load belongs to the truck it was taken on (x.trailerId), else to the load's trucks. */
+ZZdmgDrafts=(doc,tid)=>{let out=[];
+  ((doc&&doc.shipments)||[]).forEach(s=>{if(!s)return;(s.exceptions||[]).forEach(x=>{if(!x||!x.draft||x.resolved)return;
+    if(tid&&!(x.trailerId?x.trailerId===tid:s.trailerInId===tid||s.trailerOutId===tid))return;
+    out.push({id:x.id,sid:s.id,ref:s.ref||"",customerId:s.customerId||null,tid:x.trailerId||s.trailerOutId||s.trailerInId||null,photoOwner:x.photoOwner||"dmg:"+x.id,photoCount:ie(x.photoCount),at:x.at||null,by:x.openedBy||"",note:x.snapNote||"",where:"load"})})});
+  ((doc&&doc.trailers)||[]).forEach(t=>{if(!t||tid&&t.id!==tid)return;(t.dmgDrafts||[]).forEach(d=>{d&&d.id&&out.push({id:d.id,sid:null,ref:null,customerId:null,tid:t.id,photoOwner:d.photoOwner||"dmg:"+d.id,photoCount:ie(d.photoCount),at:d.at||null,by:d.by||"",note:d.note||"",where:"truck"})})});
+  return out.sort((a,b)=>(ZZa_ms(a.at)||0)-(ZZa_ms(b.at)||0))},
+/* the manifest of what went in: staff (cid null) get every line; a customer gets only the lines of its own loads (null
+   when it has none). {lines, total (pallets loaded), planned, signature, signedBy, signedAt, all} or null */
+ZZmanifestFor=(doc,t,cid)=>{t=ZZa_tr(doc,t);let mf=t&&t.manifest;if(!mf||!Array.isArray(mf.lines))return null;let lines=mf.lines.filter(l=>l&&(!cid||l.customerId===cid));
+  if(cid&&!lines.length)return null;return{lines,total:lines.reduce((a,l)=>a+ie(l.loaded),0),planned:lines.reduce((a,l)=>a+ie(l.planned),0),signature:mf.signature||"",signedBy:mf.signedBy||"",signedAt:mf.signedAt||null,all:!cid}},
+/* photos one owner keeps: 30 for nonstop unloading / loading photos (unload:<tid>, after:<tid>), else Nick's 12 (xA) */
+ZZphotoCap=owner=>/^(unload|after):/.test(String(owner||""))?ZZPHOTO_BIG:xA,
+/* local mode only: a photo list longer than Nick's 12 is saved only while this browser keeps room for the dock data
+   afterwards (a test write of the new photo's size plus ~400k characters), so extra photos never make the next save fail */
+ZZa_ROOM=4e5,
+ZZa_photoRoom=(owner,list)=>{if(!list||list.length<=xA||typeof ZZsync==="undefined"||ZZsync.mode!=="local")return;let k="cdweb:cd6:photos:"+owner,probe="cdweb:cd6:zzroom",old=0;
+  try{old=(localStorage.getItem(k)||"").length}catch{return}let grow=JSON.stringify(list).length-old;if(grow<=0)return;let need=grow+ZZa_ROOM;
+  try{localStorage.setItem(probe,"x".repeat(need))}catch(e){try{localStorage.removeItem(probe)}catch{}
+    throw{name:"QuotaExceededError",zzKind:"photo",zzText:"Photo NOT saved: this device is almost full. Delete old photos or use another device, and tell the office."}}
+  try{localStorage.removeItem(probe)}catch{}},
+/* a load without its damage snaps (drafts); the same object when it has none */
+ZZnoDrafts=s=>!s||!(s.exceptions||[]).some(x=>x&&x.draft)?s:{...s,exceptions:s.exceptions.filter(x=>!(x&&x.draft))},
+/* what a customer screen may see (patches A44 / A45): no damage snaps waiting for details, no truck-level snaps, and only
+   that customer's manifest lines (cid null, the public "track a shipment" page: no manifest). The same doc object when
+   there is nothing to hide, and the same view object for the same doc (no extra renders). Never written back. */
+ZZa_cv={d:null,c:null,v:null},
+ZZa_mfView=(mf,cid)=>{if(!mf||!cid||!Array.isArray(mf.lines))return null;let lines=mf.lines.filter(l=>l&&l.customerId===cid);return lines.length?{...mf,lines,total:lines.reduce((a,l)=>a+ie(l.loaded),0)}:null},
+ZZcustView=(doc,cid)=>{if(!doc||typeof doc!=="object")return doc;cid=cid||null;if(ZZa_cv.d===doc&&ZZa_cv.c===cid)return ZZa_cv.v;
+  let SH=Array.isArray(doc.shipments)?doc.shipments:[],TR=Array.isArray(doc.trailers)?doc.trailers:[],hid=t=>!!t&&((t.dmgDrafts||[]).length>0||!!t.manifest),
+    sh=SH.some(s=>s&&(s.exceptions||[]).some(x=>x&&x.draft)),tr=TR.some(hid),v=doc;
+  if(sh||tr)v={...doc,...(sh?{shipments:SH.map(ZZnoDrafts)}:{}),...(tr?{trailers:TR.map(t=>hid(t)?{...t,dmgDrafts:[],manifest:ZZa_mfView(t.manifest,cid)}:t)}:{})};
+  ZZa_cv={d:doc,c:cid,v};return v},
 
 /* ---------- week, trail and messages ---------- */
 ZZweekKey=now=>{let p=ZZa_parts(ZZa_nowMs(now)),d=new Date(Date.UTC(p.y,p.mo-1,p.d));d.setUTCDate(d.getUTCDate()-((p.wd+6)%7));return d.toISOString().slice(0,10)},
@@ -132,7 +221,7 @@ ZZweek=(doc,cid,now)=>{now=ZZa_nowMs(now);let from=ZZzonedIso(ZZweekKey(now),"00
   trucks=T.filter(t=>t.stage!=="cancelled"&&(inR(t.arrivedAt)||inR(t.scheduledAt))),done=T.filter(t=>inR(t.workDoneAt)),
   waits=T.filter(t=>inR(t.arrivedAt)&&t.workStartedAt).map(t=>ZZwaitMs(t,now)/6e4),doorT=done.filter(t=>t.workStartedAt).map(t=>(ZZa_ms(t.workDoneAt)-ZZa_ms(t.workStartedAt))/6e4),
   pr=done.map(t=>ZZpromise(doc,t,now)).filter(p=>p.kept!=null),avg=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null,dmg=[];
-  Sh.forEach(s=>(s.exceptions||[]).forEach(x=>{x&&x.kind==="Damage"&&inR(x.at)&&dmg.push(x)}));
+  Sh.forEach(s=>(s.exceptions||[]).forEach(x=>{x&&x.kind==="Damage"&&!x.draft&&inR(x.at)&&dmg.push(x)}));
   return{from,trucks:trucks.length,done:done.length,palletsIn:Sh.filter(s=>inR(s.receivedAt)).reduce((a,s)=>a+fe(s),0),palletsOut:Sh.filter(s=>inR(s.shippedAt)).reduce((a,s)=>a+fe(s),0),
     avgWaitMin:avg(waits),avgDoorMin:avg(doorT),promiseKeptPct:pr.length?Math.round(100*pr.filter(p=>p.kept).length/pr.length):null,
     damageReports:dmg.length,damageApproved:dmg.filter(x=>x.answer&&x.answer.status==="accepted").length,gearOut:ZZgearOut(doc,cid)}},
@@ -141,8 +230,9 @@ ZZweek=(doc,cid,now)=>{now=ZZa_nowMs(now);let from=ZZzonedIso(ZZweekKey(now),"00
 ZZa_bookedFor=t=>{if(!t)return"";if(t.bookedFor&&isFinite(ZZa_ms(t.bookedFor)))return ZZa_when(t.bookedFor);
   let h=(t.history||[]).map(x=>x&&/^Time changed to .+ \(was (.+)\)$/.exec(String(x.text||""))).find(Boolean);
   if(h)return h[1]==="no time"?"":h[1];return t.scheduledAt?ZZa_when(t.scheduledAt):""},
-/* [{at, by, text, sid?}] oldest first. Safe for customers: never reads doc.activity. With sid, only that load's lines. */
-ZZtrail=(doc,tid,sid)=>{let T=((doc&&doc.trailers)||[]).find(t=>t.id===tid)||null,syn=[],ev=[],add=(arr,at2,by,text,s2)=>{if(!at2||!isFinite(ZZa_ms(at2)))return;let x={at:at2,by:by||"",text};if(s2)x.sid=s2;arr.push(x)};
+/* [{at, by, text, sid?}] oldest first. Safe for customers: never reads doc.activity. With sid, only that load's lines.
+   Damage snaps still waiting for their details are left out unless opts.staff (office and crew screens pass {staff:true}). */
+ZZtrail=(doc,tid,sid,opts)=>{let staff=!!(opts&&opts.staff),T=((doc&&doc.trailers)||[]).find(t=>t.id===tid)||null,syn=[],ev=[],add=(arr,at2,by,text,s2)=>{if(!at2||!isFinite(ZZa_ms(at2)))return;let x={at:at2,by:by||"",text};if(s2)x.sid=s2;arr.push(x)};
   if(T&&!sid){let t=T,out=t.direction==="outbound";
     t.createdAt&&add(syn,t.createdAt,t.bookedBy||(t.bookedVia==="client"?"Customer":t.bookedVia==="office"?"Office":""),`Booked${(w0=>w0?" for "+w0:"")(ZZa_bookedFor(t))}`);
     t.confirmedAt&&add(syn,t.confirmedAt,t.confirmedBy,"Time confirmed");
@@ -154,6 +244,7 @@ ZZtrail=(doc,tid,sid)=>{let T=((doc&&doc.trailers)||[]).find(t=>t.id===tid)||nul
     t.secure&&t.secure.signedAt&&add(syn,t.secure.signedAt,t.secure.signedBy,`Load secured: ${t.secure.confidence}/5${t.secure.seal?", seal "+t.secure.seal:""}`);
     t.departedAt&&add(syn,t.departedAt,"","Released, truck left");
     t.cancelledAt&&add(syn,t.cancelledAt,t.cancelledBy,"Cancelled");
+    staff&&(t.dmgDrafts||[]).forEach(d=>{d&&add(ev,d.at,d.by,"Damage photo taken (load not picked yet, details to come)")});
     let hs=new Set;(t.history||[]).forEach(h=>{if(!h)return;add(ev,h.at,h.by,h.text);hs.add(h.at)});
     syn.forEach(x=>{hs.has(x.at)||ev.push(x)})}
   /* a truck's trail lists only its loads of the truck's own customer (another company's load on it stays private) */
@@ -163,7 +254,10 @@ ZZtrail=(doc,tid,sid)=>{let T=((doc&&doc.trailers)||[]).find(t=>t.id===tid)||nul
     (s.touches||[]).forEach(tc=>{tc&&tc.what!=="receive"&&add(ev,tc.at,tc.who,`${lab[tc.what]||tc.what}: ${s.ref}`,s.id)});
     (s.corrections||[]).forEach(c=>{c&&add(ev,c.at,c.by,`Corrected ${s.ref} ${c.field||""}: ${c.from??""} → ${c.to??""}`,s.id)});
     (s.exceptions||[]).forEach(x=>{if(!x||x.kind!=="Damage")return;let pl=ie(x.pallets);
-      add(ev,x.at,x.openedBy,`Damage reported on ${s.ref}${pl?`: ${ZZa_plural(pl,"pallet")}`:""}${(x.kinds||[]).length?` (${x.kinds.join(", ")})`:""}`,s.id);
+      /* a snap: the photo first (while unloading or loading), the details later; only staff see it before the details */
+      if(x.draft){staff&&add(ev,x.at,x.openedBy,`Damage photo taken on ${s.ref} (details to come)`,s.id);return}
+      x.finishedAt&&add(ev,x.at,x.openedBy,`Damage photo taken on ${s.ref}`,s.id);
+      add(ev,x.finishedAt||x.at,x.finishedBy||x.openedBy,`Damage reported on ${s.ref}${pl?`: ${ZZa_plural(pl,"pallet")}`:""}${(x.kinds||[]).length?` (${x.kinds.join(", ")})`:""}`,s.id);
       let a=x.answer;a&&add(ev,a.at,a.by,a.status==="accepted"?`${a.auto?"Damage fix auto-approved":"Damage fix approved"} (${je(a.total)})`:a.status==="declined"?"Damage fix declined":"Customer asked for a call about the damage",s.id)});
     s.shippedAt&&add(ev,s.shippedAt,"",`Shipped ${s.ref}${s.dest?" to "+s.dest:""}`,s.id);
     if(s.invoiceId){let inv=((doc&&doc.invoices)||[]).find(v=>v.id===s.invoiceId);inv&&add(ev,inv.issuedAt,"",`Invoiced ${s.ref} on ${inv.number}`,s.id)}});
@@ -195,8 +289,8 @@ ZZmsgs=(doc,now)=>{now=ZZa_nowMs(now);let out=[];try{let T=(doc&&doc.trailers)||
       t.workStartedAt&&push("started",t.id,c,t,t.workStartedAt,{subject:`${out2?"Loading":"Unloading"} started: truck ${tk}`,sms:`${out2?"Loading":"Unloading"} started on truck ${tk}${door?" at door "+door:""}.`});
       let L=ld(t).filter(s=>(out2?s.trailerOutId===t.id:s.trailerInId===t.id)&&(!s.customerId||s.customerId===c.id));
       if(t.workDoneAt){let bol=L.reduce((a,s)=>a+fe(s),0),cnt=L.reduce((a,s)=>a+(out2?(s.pullCount!=null?ie(s.pullCount):s.loadedAt||s.shippedAt?fe(s):0):(s.qc&&s.qc.counted!=null?ie(s.qc.counted):s.receivedAt?fe(s):0)),0),
-          ph=ie(t.afterPhotoCount)+ie(t.beforePhotoCount)+L.reduce((a,s)=>a+ie(s.photoCount)+ie(s.rowPhotoCount)+ie(s.loadPhotoCount),0),
-          dm=L.reduce((a,s)=>a+(s.exceptions||[]).filter(x=>x&&x.kind==="Damage").length,0),pr=ZZpromise(doc,t,now),
+          ph=ie(t.afterPhotoCount)+ie(t.beforePhotoCount)+ie(t.unloadPhotoCount)+ie(t.strapPhotoCount)+ie(t.bolPhotoCount)+L.reduce((a,s)=>a+ie(s.photoCount)+ie(s.rowPhotoCount)+ie(s.loadPhotoCount)+ie(s.inspPhotoCount),0),
+          dm=L.reduce((a,s)=>a+(s.exceptions||[]).filter(x=>x&&x.kind==="Damage"&&!x.draft).length,0),pr=ZZpromise(doc,t,now),
           tm=pr.doneMin!=null?` ${ot(pr.doneMin*6e4)}, ${pr.kept?"within":"over"} our ${ZZa_promiseName(pr.limitMin)} promise.`:"",
           line=`Truck ${tk} is done: ${cnt} of ${ZZa_plural(bol,"pallet")} counted against the BOL, ${ZZa_plural(ph,"photo")}, ${ZZa_plural(dm,"damage report")}.${tm}`;
         push("done",t.id,c,t,t.workDoneAt,{subject:`Done: truck ${tk}`,sms:line})}
@@ -210,11 +304,12 @@ ZZmsgs=(doc,now)=>{now=ZZa_nowMs(now);let out=[];try{let T=(doc&&doc.trailers)||
       t.stage==="departed"&&t.departedAt&&dtx("released",t.departedAt,t.id);
       t.stage==="scheduled"&&t.scheduledAt&&!t.arrivedAt&&ZZa_ms(t.scheduledAt)-now<2*Nt&&ZZa_ms(t.scheduledAt)>now&&dtx("reminder",ZZa_ms(t.scheduledAt)-2*Nt,t.id)}
   }catch(x){console.error("ZZmsgs truck",t&&t.id,x)}});
-  /* damage: once per report (a load can sit on an inbound and a pickup truck), to the load's customer */
+  /* damage: once per report (a load can sit on an inbound and a pickup truck), to the load's customer. A damage snap
+     (draft) is not a report yet: its alert is queued when the crew adds the details (finishedAt). */
   let tm=new Map(T.map(t=>[t.id,t]));
   SH.forEach(s=>{try{let t=tm.get(s.trailerInId)||tm.get(s.trailerOutId)||null,c2=cu(s.customerId||(t&&t.customerId));
-    (s.exceptions||[]).forEach(x=>{if(!x||x.kind!=="Damage"||!x.id)return;let pl=ie(x.pallets);
-      push("damage",x.id,c2,t,x.at,{subject:`Damage found: ${s.ref}`,sms:`Damage found on ${s.ref}${pl?` (${ZZa_plural(pl,"pallet")})`:""}. We have photos and the fix price for you. Call 916-616-3481.`})})}catch(x){console.error("ZZmsgs load",s&&s.id,x)}})
+    (s.exceptions||[]).forEach(x=>{if(!x||x.kind!=="Damage"||!x.id||x.draft)return;let pl=ie(x.pallets);
+      push("damage",x.id,c2,t,x.finishedAt||x.at,{subject:`Damage found: ${s.ref}`,sms:`Damage found on ${s.ref}${pl?` (${ZZa_plural(pl,"pallet")})`:""}. We have photos and the fix price for you. Call 916-616-3481.`})})}catch(x){console.error("ZZmsgs load",s&&s.id,x)}})
   }catch(x){console.error("ZZmsgs",x)}
   return out.sort((a,b)=>b.ts-a.ts)},
 
@@ -234,7 +329,7 @@ ZZhdCSS=()=>`.zzhd .fixed.inset-0 div,.zzhd .fixed.inset-0 button,.zzhd .fixed.i
    S saves (one write), C adds an activity line, M / N patch a load / truck, L() role label, B() person, w toast. */
 ZZacts=({S,C,M,N,L,B,w})=>{
   /* auto-approve rule shared by zzEstLines and zzReportDamage; runs inside the same write */
-  let auto=(x,sid,xid)=>{let s=x.shipments.find(q=>q.id===sid),ex=s&&(s.exceptions||[]).find(q=>q.id===xid);if(!s||!ex)return!1;
+  let auto=(x,sid,xid)=>{let s=x.shipments.find(q=>q.id===sid),ex=s&&(s.exceptions||[]).find(q=>q.id===xid);if(!s||!ex||ex.draft)return!1;
     let cu=x.customers.find(c=>c.id===s.customerId),lim=ZZautoLimit(cu),est=ZZestOf(s,ex,Ln(x,s.customerId));
     if(ex.est&&ex.est.applied||lim==null||!(est.total>0&&est.total<lim))return!1;
     let now=ye(Date.now()),adds=est.lines.filter(l=>!l.auto).map(l=>({id:Ce(),label:`Damage: ${l.label}`,amount:l.amount})),
@@ -243,7 +338,14 @@ ZZacts=({S,C,M,N,L,B,w})=>{
       exceptions:(q.exceptions||[]).map(e2=>e2.id!==xid?e2:{...e2,answer:{status:"accepted",auto:!0,by:`Auto-approved (your setting: under ${ZZa_money(lim)})`,note:"",at:now,total:est.total},est:{...(e2.est||{}),applied:!0}})}));
     if(s.customerId)x.accountChat={...(x.accountChat||{}),[s.customerId]:[...((x.accountChat||{})[s.customerId]||[]),msg].slice(-500)};
     C(x,L(),"exception",`Damage fix auto-approved on ${s.ref} \xB7 ${je(est.total)} (under ${ZZa_money(lim)})`);return!0};
-  let truck=(x,tid)=>x.trailers.find(k=>k.id===tid);
+  let truck=(x,tid)=>x.trailers.find(k=>k.id===tid),
+    /* the plain Damage exception crewSaveReceiving opens for a "Damaged" count: a photo report replaces it */
+    plain=q=>q&&q.kind==="Damage"&&!q.resolved&&!q.draft&&!q.photoOwner&&!((q.est&&q.est.lines)||[]).length&&!q.answer&&/at the door$/.test(q.note||""),
+    onTruck=(s,tid)=>!!s&&!!tid&&(s.trailerInId===tid||s.trailerOutId===tid),
+    /* an exception or truck-level snap id already in use (a second tap on Save) */
+    used=(x,id)=>x.shipments.some(q=>(q.exceptions||[]).some(e2=>e2&&e2.id===id))||x.trailers.some(k=>(k.dmgDrafts||[]).some(d=>d&&d.id===id)),
+    snapX=(id,n,at,by,words,tid)=>({id,kind:"Damage",draft:!0,photoOwner:"dmg:"+id,photoCount:n,at,openedBy:by,note:words||"Damage photo, details to come",snapNote:words||"",resolved:!1,trailerId:tid}),
+    JOBN={pack:"Pack (consolidated trailer)",delivery:"Delivery",pickup:"Pickup (customer's carrier)"};
   return{
   /* 1. merge patch into the truck + a history line (time change, confirmation, driver link) */
   zzLog:(tid,text,patch)=>S(x=>{let t=truck(x,tid);if(!t)return null;let{id:_i,history:_h,bookedFor:_bf,...p}=patch||{},by=B();
@@ -270,7 +372,8 @@ ZZacts=({S,C,M,N,L,B,w})=>{
   zzCustomer:(cid,f={})=>{let{id:_i,name:_n,rates:_r,pin:_p,dispatch:_d,...p}=f||{};if(!Object.keys(p).length)return null;
     return S(x=>{let c=x.customers.find(q=>q.id===cid);if(!c)return null;x.customers=x.customers.map(q=>q.id===cid?{...q,...p}:q);return C(x,L(),"setup",`Account settings updated: ${c.name}`)})},
   /* 7. damage estimate lines (replaces ZZEst.save) + auto-approve under the customer's limit */
-  zzEstLines:(sid,xid,lines)=>S(x=>{let s=x.shipments.find(q=>q.id===sid),ex=s&&(s.exceptions||[]).find(q=>q.id===xid);if(!s||!ex||ex.est&&ex.est.applied)return null;
+  /* a damage snap (draft) gets its fix lines through zzDamageFinish, never here (nothing is priced or billed before the details) */
+  zzEstLines:(sid,xid,lines)=>S(x=>{let s=x.shipments.find(q=>q.id===sid),ex=s&&(s.exceptions||[]).find(q=>q.id===xid);if(!s||!ex||ex.draft||ex.est&&ex.est.applied)return null;
     let ls=ZZa_lines(lines),now=ye(Date.now());
     M(x,sid,q=>({exceptions:(q.exceptions||[]).map(e2=>e2.id!==xid?e2:{...e2,est:{...(e2.est||{}),lines:ls,sentAt:now},answer:e2.answer&&e2.answer.status==="call"?e2.answer:null})}));
     auto(x,sid,xid);return x}),
@@ -278,22 +381,24 @@ ZZacts=({S,C,M,N,L,B,w})=>{
   zzReportDamage:(sid,o={})=>{o=o||{};let n=ie(o.photoCount);if(n<2){w(R("Take at least 2 photos of the damage first."),{tone:"bad"});return null}
     return S(x=>{let s=x.shipments.find(q=>q.id===sid);if(!s)return null;let id=o.id||Ce();if((s.exceptions||[]).some(q=>q.id===id))return null;
       let now=ye(Date.now()),by=B(),kinds=(o.kinds||[]).map(String).filter(Boolean),pal=Math.max(0,ie(o.pallets)),what=String(o.what||"").trim(),ls=ZZa_lines(o.lines),
-        note=[pal?ZZa_plural(pal,"pallet"):"",kinds.join(", "),what].filter(Boolean).join(" \xB7 ")||"Damage reported",
-        plain=q=>q&&q.kind==="Damage"&&!q.resolved&&!q.photoOwner&&!((q.est&&q.est.lines)||[]).length&&!q.answer&&/at the door$/.test(q.note||"");
+        note=[pal?ZZa_plural(pal,"pallet"):"",kinds.join(", "),what].filter(Boolean).join(" \xB7 ")||"Damage reported";
       M(x,sid,q=>({exceptions:[...(q.exceptions||[]).filter(e2=>!plain(e2)),{id,kind:"Damage",note,at:now,openedBy:by,resolved:!1,pallets:pal,kinds,what,photoOwner:"dmg:"+id,photoCount:n,est:{lines:ls,sentAt:ls.length?now:null},answer:null}],
         touches:Fo(q,by,"damage")}));
       C(x,L(),"exception",`Damage reported on ${s.ref}: ${note} (${n} photos)`);auto(x,sid,id);return x})},
-  /* 9. secure the load: 5 photos, confidence 1-5 (note at 1-3), rows checked, signature */
-  zzSecure:(tid,sec={})=>{sec=sec||{};let ph=sec.photos||{},miss=ZZSECSLOTS.filter(sl=>!(ie(ph[sl.k])>0)).map(sl=>sl.label),cf=ie(sec.confidence),
-      why=miss.length?`Take all 5 photos (missing: ${miss.join(", ")}).`:!(cf>=1&&cf<=5&&Math.round(cf)===cf)?"Pick how solid the load is (1 to 5).":cf<=3&&!String(sec.note||"").trim()?"Say what would make it safer.":sec.checkedRows!==!0?"Check that every row is tight first.":!String(sec.signature||"").trim()?"Sign with your name.":"";
+  /* 9. secure the load: photos of how it is secured and what is used (strap:<tid>, photoCount 1 or more; the older
+     5 named photos {nose, middle, tail, closeup, seal} are still accepted), confidence 1-5 (note at 1-3), rows checked, signature */
+  zzSecure:(tid,sec={})=>{sec=sec||{};let ph=sec.photos&&typeof sec.photos==="object"?sec.photos:null,n=Math.max(0,Math.round(ie(sec.photoCount))),
+      miss=ZZSECSLOTS.filter(sl=>!(ie((ph||{})[sl.k])>0)).map(sl=>sl.label),five=!!ph&&!miss.length,cf=ie(sec.confidence),
+      why=n<1&&!five?(ph&&miss.length<5?`Take all 5 photos (missing: ${miss.join(", ")}).`:"Take at least 1 photo of how the load is secured."):!(cf>=1&&cf<=5&&Math.round(cf)===cf)?"Pick how solid the load is (1 to 5).":cf<=3&&!String(sec.note||"").trim()?"Say what would make it safer.":sec.checkedRows!==!0?"Check that every row is tight first.":!String(sec.signature||"").trim()?"Sign with your name.":"";
     if(why){w(R(why),{tone:"bad"});return null}
     return S(x=>{let t=truck(x,tid);if(!t)return null;let now=ye(Date.now()),by=B(),seal=String(sec.seal||"").trim().toUpperCase(),gear={},photos={};
-      ZZGEAR.forEach(g=>{let v=(sec.gear||{})[g.k]||{};gear[g.k]={qty:Math.max(0,Math.round(ie(v.qty))),owner:v.owner==="driver"?"driver":"ours"}});ZZSECSLOTS.forEach(sl=>{photos[sl.k]=ie(ph[sl.k])});
+      ZZGEAR.forEach(g=>{let v=(sec.gear||{})[g.k]||{};gear[g.k]={qty:Math.max(0,Math.round(ie(v.qty))),owner:v.owner==="driver"?"driver":"ours"}});ZZSECSLOTS.forEach(sl=>{photos[sl.k]=ie((ph||{})[sl.k])});
       let tags=(sec.tags||[]).map(v=>String(v).trim()).filter(Boolean),ours=ZZGEAR.map(g=>g.k).filter(k=>gear[k].owner==="ours"&&gear[k].qty>0),tagOn=ours.includes("bars")?"bars":ours[0],
         rows=ours.map(k=>({id:Ce(),customerId:t.customerId||null,trailerId:tid,type:k,qty:gear[k].qty,dir:"out",tags:k===tagOn?tags:[],at:now,by,note:"",src:"secure"})),
-        S2={gear,tags,seal,photos,confidence:cf,note:String(sec.note||"").trim(),checkedRows:!0,signature:String(sec.signature).trim(),signedBy:by,signedAt:now};
+        /* new reports: photos:null (never a missing key: shared data merges nested objects), photoOwner + photoCount */
+        S2={gear,tags,seal,...(n>=1?{photos:null,photoOwner:"strap:"+tid,photoCount:n,v:2}:{photos}),confidence:cf,note:String(sec.note||"").trim(),checkedRows:!0,signature:String(sec.signature).trim(),signedBy:by,signedAt:now};
       x.zzGear=[...(x.zzGear||[]).filter(g=>!(g&&g.src==="secure"&&g.trailerId===tid)),...rows];
-      N(x,tid,k=>({secure:S2,...(seal?{sealOut:seal}:{}),history:ZZa_hist(k,by,`Load secured: ${cf}/5${seal?", seal "+seal:""}`,now)}));
+      N(x,tid,k=>({secure:S2,...(seal?{sealOut:seal}:{}),...(n>=1?{strapPhotoCount:n}:{}),history:ZZa_hist(k,by,`Load secured: ${cf}/5${seal?", seal "+seal:""}`,now)}));
       (t.direction==="outbound"?x.shipments.filter(s=>s.trailerOutId===tid):x.shipments.filter(s=>s.trailerInId===tid&&be(s)==="sac")).forEach(s=>M(x,s.id,q=>({touches:Fo(q,by,"secure")})));
       return C(x,L(),"seal",`Truck ${t.truck||"—"} secured ${cf}/5${seal?" \xB7 seal "+seal:""}`)})},
   /* 10. gear ledger row (returns and manual moves) */
@@ -330,10 +435,84 @@ ZZacts=({S,C,M,N,L,B,w})=>{
   zzQueueFriday:async(week,entries)=>{let n=0;await S(x=>{let ob=x.zzOutbox||[],had=new Set(ob.filter(o=>o&&o.event==="friday"&&o.week===week).map(o=>o.customerId)),now=ye(Date.now()),add=[];n=0;
       (entries||[]).forEach(en=>{if(!en||!en.customerId||had.has(en.customerId))return;add.push({id:Ce(),at:now,event:"friday",week,customerId:en.customerId,trailerId:null,channel:en.channel==="sms"?"sms":"email",to:String(en.to||""),toName:String(en.toName||""),subject:String(en.subject||""),body:String(en.body||"")})});
       if(!add.length)return null;n=add.length;x.zzOutbox=[...add,...ob].slice(0,300);return C(x,L(),"outbox",`Queued ${ZZa_plural(n,"Friday summary")} for the week of ${ZZa_day(ZZzonedIso(week,"12:00"))||week}`)});
-    return n}
+    return n},
+  /* 15. damage snap: photo now, details later. The crew makes the id first and takes the photos into 'dmg:'+id, then
+     calls this with the photo count (1 or more). sid = the load (on this truck) or null ("Not sure which load": the snap
+     waits on the truck, trailer.dmgDrafts). A snap is a draft: customers never see it and no alert is queued until
+     zzDamageFinish. No truck history line (the trail is shown to customers); staff see it in ZZdmgDrafts / ZZtrail staff. */
+  zzDamageSnap:(tid,sid,o={})=>{o=o||{};let n=Math.max(0,Math.round(ie(o.photoCount)));if(n<1){w(R("Take a photo of the damage first."),{tone:"bad"});return null}
+    return S(x=>{let t=truck(x,tid);if(!t)return null;let id=String(o.id||Ce()),now=ye(Date.now()),by=B(),words=String(o.note||"").trim().slice(0,300);if(used(x,id))return null;
+      if(sid){let s=x.shipments.find(q=>q.id===sid);if(!onTruck(s,tid))return null;
+        M(x,sid,q=>({exceptions:[...(q.exceptions||[]),snapX(id,n,now,by,words,tid)]}));
+        return C(x,L(),"exception",`Damage photo on ${s.ref} (truck ${t.truck||"—"}), details to come (${ZZa_plural(n,"photo")})`)}
+      N(x,tid,k=>({dmgDrafts:[...(k.dmgDrafts||[]).filter(Boolean),{id,photoOwner:"dmg:"+id,photoCount:n,at:now,by,note:words}]}));
+      return C(x,L(),"exception",`Damage photo on truck ${t.truck||"—"}, load not picked yet (${ZZa_plural(n,"photo")})`)})},
+  /* 16. say which load a snap belongs to: a snap waiting on the truck, or a snap on another load of this truck (picked
+     wrong). sid null puts a load snap back on the truck ("Not sure which load"). It stays a draft. */
+  zzDamageAssign:(tid,xid,sid)=>S(x=>{let t=truck(x,tid);if(!t||!xid)return null;let to=sid?x.shipments.find(q=>q.id===sid):null;if(sid&&!onTruck(to,tid))return null;
+    let d=(t.dmgDrafts||[]).find(q=>q&&q.id===xid),from=null,fx=null;
+    if(!d){from=x.shipments.find(q=>(q.exceptions||[]).some(e2=>e2&&e2.id===xid));fx=from&&from.exceptions.find(e2=>e2&&e2.id===xid);
+      if(!fx||!fx.draft||(fx.trailerId?fx.trailerId!==tid:!onTruck(from,tid))||(to&&from.id===to.id))return null}
+    if(d&&!to)return null;
+    let r=d?{id:d.id,n:ie(d.photoCount),at:d.at,by:d.by,words:d.note||""}:{id:fx.id,n:ie(fx.photoCount),at:fx.at,by:fx.openedBy,words:fx.snapNote||""};
+    if(d)N(x,tid,k=>({dmgDrafts:(k.dmgDrafts||[]).filter(q=>q&&q.id!==xid)}));else M(x,from.id,q=>({exceptions:(q.exceptions||[]).filter(e2=>!(e2&&e2.id===xid))}));
+    if(to){M(x,to.id,q=>({exceptions:[...(q.exceptions||[]),{...(fx||{}),...snapX(r.id,r.n,r.at,r.by,r.words,tid)}]}));
+      return C(x,L(),"exception",`Damage photo matched to ${to.ref} (truck ${t.truck||"—"})`)}
+    N(x,tid,k=>({dmgDrafts:[...(k.dmgDrafts||[]).filter(Boolean),{id:r.id,photoOwner:"dmg:"+r.id,photoCount:r.n,at:r.at,by:r.by,note:r.words}]}));
+    return C(x,L(),"exception",`Damage photo on truck ${t.truck||"—"}, load not picked yet`)}),
+  /* 17. finish a snap: pallets, what's wrong, fix lines, 2+ photos (more can be added now). Only now is it a damage report
+     the customer sees, with its alert; exactly like zzReportDamage (replaces the plain crew exception, damage touch,
+     auto-approve under the customer's limit). The snap time stays in `at`; finishedAt / finishedBy say when it was finished. */
+  zzDamageFinish:(sid,xid,o={})=>{o=o||{};let n=ie(o.photoCount);if(n<2){w(R("Take at least 2 photos of the damage first."),{tone:"bad"});return null}
+    return S(x=>{let s=x.shipments.find(q=>q.id===sid),d=s&&(s.exceptions||[]).find(q=>q&&q.id===xid);if(!d||!d.draft)return null;
+      let now=ye(Date.now()),by=B(),kinds=(o.kinds||[]).map(String).filter(Boolean),pal=Math.max(0,ie(o.pallets)),what=String(o.what||d.snapNote||"").trim(),ls=ZZa_lines(o.lines),
+        note=[pal?ZZa_plural(pal,"pallet"):"",kinds.join(", "),what].filter(Boolean).join(" \xB7 ")||"Damage reported";
+      M(x,sid,q=>({exceptions:(q.exceptions||[]).filter(e2=>!plain(e2)).map(e2=>!e2||e2.id!==xid?e2:{...e2,draft:!1,note,pallets:pal,kinds,what,photoOwner:e2.photoOwner||"dmg:"+xid,photoCount:n,est:{lines:ls,sentAt:ls.length?now:null},answer:null,finishedAt:now,finishedBy:by}),
+        touches:Fo(q,by,"damage")}));
+      C(x,L(),"exception",`Damage reported on ${s.ref}: ${note} (${n} photos)`);auto(x,sid,xid);return x})},
+  /* 18. throw away a snap that is not damage after all (sid null: a snap waiting on the truck). Finished reports are never
+     removed here. The screen may then clear the photos: ex('dmg:'+id, []). */
+  zzDamageDiscard:(tid,sid,xid)=>S(x=>{if(!xid)return null;let t=tid?truck(x,tid):null;
+    if(sid){let s=x.shipments.find(q=>q.id===sid),d=s&&(s.exceptions||[]).find(q=>q&&q.id===xid);if(!d||!d.draft)return null;
+      M(x,sid,q=>({exceptions:(q.exceptions||[]).filter(e2=>!(e2&&e2.id===xid))}));return C(x,L(),"exception",`Damage photo on ${s.ref} thrown away (not damage)`)}
+    if(!t||!(t.dmgDrafts||[]).some(q=>q&&q.id===xid))return null;
+    N(x,tid,k=>({dmgDrafts:(k.dmgDrafts||[]).filter(q=>q&&q.id!==xid)}));return C(x,L(),"exception",`Damage photo on truck ${t.truck||"—"} thrown away (not damage)`)}),
+  /* 19. multi-stop load plan: trailer.multiStop, and per load its stop (1, 2 ...) and place in the trailer
+     ('nose' | 'middle' | 'tail'). Only loads going out on (or reloading onto) this truck. With cid (the customer portal)
+     only that customer's loads change, and multiStop only on that customer's own truck. Nothing changed: no write. */
+  zzLoadPlan:(tid,o={},cid)=>{o=o||{};let ls=Array.isArray(o.loads)?o.loads.filter(l=>l&&l.sid):[],hasMS=typeof o.multiStop==="boolean";if(!ls.length&&!hasMS)return null;
+    return S(x=>{let t=truck(x,tid);if(!t)return null;let by=B(),ch=0,ms=null;
+      ls.forEach(l=>{let s=x.shipments.find(q=>q.id===l.sid);if(!onTruck(s,tid)||cid&&s.customerId!==cid)return;
+        let st=l.stop===void 0?ZZa_stop(s.stop):ZZa_stop(l.stop),ps=l.pos===void 0?ZZa_pos(s.pos):ZZa_pos(l.pos);
+        if(ZZa_stop(s.stop)===st&&ZZa_pos(s.pos)===ps)return;M(x,s.id,{stop:st,pos:ps});ch++});
+      if(hasMS&&(!cid||t.customerId===cid)&&!!t.multiStop!==o.multiStop){ms=o.multiStop;ch++}
+      if(!ch)return null;
+      N(x,tid,k=>({...(ms!=null?{multiStop:ms}:{}),history:ZZa_hist(k,by,ms===!0?"Load plan: more than one stop":ms===!1?"Load plan: one stop":"Load plan updated")}));
+      return C(x,L(),"trailer",`Truck ${t.truck||"—"}: load plan updated${ms!=null?ms?" (multi-stop)":" (one stop)":""}`)})},
+  /* 20. the office picks the loading job of an outbound truck: 'pack' | 'delivery' | 'pickup', or null (worked out:
+     ZZloadJob). Inbound trucks are unpack / unload by their loads and refuse this. */
+  zzLoadJob:(tid,job)=>{let j=job==null||job===""||job==="auto"?null:job==="pack"||job==="delivery"||job==="pickup"?job:void 0;if(j===void 0){w(R("Pick pack, delivery or pickup."),{tone:"bad"});return null}
+    return S(x=>{let t=truck(x,tid);if(!t||t.direction!=="outbound"||(t.loadJob??null)===j)return null;let by=B();
+      N(x,tid,k=>({loadJob:j,history:ZZa_hist(k,by,j?`Loading job: ${JOBN[j]}`:"Loading job: worked out from the loads")}));
+      return C(x,L(),"trailer",`Truck ${t.truck||"—"}: loading job ${j?JOBN[j]:"automatic"}`)})},
+  /* 21. the manifest of what went in, signed by the forklift driver: one line per load (sid; ref and customer come from the
+     load) plus any extra line (sid null, e.g. loose freight), pallets loaded on every line, typed signature. Saved on the
+     truck in one write; signing again replaces it. Refused (nothing written): no lines, a line without pallets loaded,
+     no signature. History says only "Manifest signed" (customers read the trail; their lines come from ZZmanifestFor). */
+  zzManifest:(tid,mf={})=>{mf=mf||{};let sig=String(mf.signature||"").trim(),raw=(Array.isArray(mf.lines)?mf.lines:[]).filter(l=>l&&(l.sid||String(l.ref||"").trim()||String(l.note||"").trim())),
+      bad=v=>v==null||v===""||!Number.isFinite(+v)||+v<0,
+      why=!raw.length?"Add at least one line to the manifest.":raw.some(l=>bad(l.loaded))?"Fill in the pallets loaded on every line.":!sig?"Sign the manifest with your name.":"";
+    if(why){w(R(why),{tone:"bad"});return null}
+    return S(x=>{let t=truck(x,tid);if(!t)return null;let now=ye(Date.now()),by=B(),seen=new Set,
+      lines=raw.map(l=>{let s=l.sid?x.shipments.find(q=>q.id===l.sid):null,id=String(l.id||Ce());if(seen.has(id))id=Ce();seen.add(id);
+        return{id,sid:s?s.id:null,ref:String((s&&s.ref)||l.ref||"").trim().slice(0,60),customerId:s?s.customerId||null:l.customerId||null,
+          planned:l.planned==null||l.planned===""?s?fe(s):0:Math.max(0,Math.round(ie(l.planned))),loaded:Math.max(0,Math.round(ie(l.loaded))),stop:ZZa_stop(l.stop),pos:ZZa_pos(l.pos),note:String(l.note||"").trim().slice(0,300)}}),
+      total=lines.reduce((a,l)=>a+l.loaded,0);
+      N(x,tid,k=>({manifest:{lines,total,signature:sig.slice(0,80),signedBy:by,signedAt:now},history:ZZa_hist(k,by,"Manifest signed",now)}));
+      return C(x,L(),"trailer",`Truck ${t.truck||"—"} manifest signed: ${ZZa_plural(lines.length,"line")}, ${ZZa_plural(total,"pallet")}`)})}
   }},
 /* the red save banner on the kiosk (role "driver"): a driver cannot fix storage or retry a staff change, so the
    instruction becomes "Please see the office." (the reason stays, for staff); patch A08 */
 ZZa_kioskBanner=txt=>{let s=String(txt||""),r=s.replace(/\s*(Please try again|Shorten the long text[^.]*and try again|Delete old photos or use another device, and tell the office|Tell the owner: [^.]*)\.\s*$/,"");return r!==s?r+" Please see the office.":s},
 /* test probe: only rendered when the test harness sets window.__ZZTEST */
-ZZa_probe=({doc,actions,role})=>{(0,H.useEffect)(()=>{try{window.__zz={doc,actions,role,h:{ZZFLAGS,ZZPUBLIC_URL,ZZLANGS,ZZEVENTS,ZZALERTS,ZZGEAR,ZZSECSLOTS,ZZDMGKINDS,ZZS,ZZactive,ZZcode,ZZnewCode,ZZokCode,ZZbyCode,ZZetaLink,ZZsafeUrl,ZZzonedIso,ZZdockParts,ZZyardQ,ZZplace,ZZwaitMs,ZZtone,ZZtoneColor,ZZestWait,ZZpromise,ZZtruckSteps,ZZdayLoad,ZZcrewOnShift,ZZgearOut,ZZdmgLines,ZZestTotal,ZZautoLimit,ZZdmgMonths,ZZweekKey,ZZweek,ZZtrail,ZZrecips,ZZmsgs,ZZrewrapBilled,ZZa_kioskBanner,ZZdriverText:typeof ZZdriverText==="function"?ZZdriverText:void 0,pQ:(d,n)=>pQ(d,n),Im:(s,r,n)=>Im(s,r,n),Ln:(d,c)=>Ln(d,c),sync:ZZsync,photos:{ls:k=>ls(k),ex:(k,v)=>ex(k,v)}}}}catch{}});return null},
+ZZa_probe=({doc,actions,role})=>{(0,H.useEffect)(()=>{try{window.__zz={doc,actions,role,h:{ZZFLAGS,ZZPUBLIC_URL,ZZLANGS,ZZEVENTS,ZZALERTS,ZZGEAR,ZZSECSLOTS,ZZDMGKINDS,ZZS,ZZactive,ZZcode,ZZnewCode,ZZokCode,ZZbyCode,ZZetaLink,ZZsafeUrl,ZZzonedIso,ZZdockParts,ZZyardQ,ZZplace,ZZwaitMs,ZZtone,ZZtoneColor,ZZestWait,ZZpromise,ZZtruckSteps,ZZdayLoad,ZZcrewOnShift,ZZgearOut,ZZdmgLines,ZZestTotal,ZZautoLimit,ZZdmgMonths,ZZweekKey,ZZweek,ZZtrail,ZZrecips,ZZmsgs,ZZrewrapBilled,ZZa_kioskBanner,ZZBADGE,ZZPOS,ZZJOBS,ZZPHOTO_BIG,ZZloadJob,ZZloadBadges,ZZposSuggest,ZZloadOrder,ZZdmgDrafts,ZZmanifestFor,ZZphotoCap,ZZnoDrafts,ZZcustView,ZZdriverText:typeof ZZdriverText==="function"?ZZdriverText:void 0,pQ:(d,n)=>pQ(d,n),Im:(s,r,n)=>Im(s,r,n),Ln:(d,c)=>Ln(d,c),sync:ZZsync,photos:{ls:k=>ls(k),ex:(k,v)=>ex(k,v)}}}}catch{}});return null},
