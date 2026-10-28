@@ -809,7 +809,7 @@ H.main('d-crew', async (h, t) => {
     await p.getByRole('button', { name: 'Bills done — wrap up' }).click();
     await wait(p, 500);
     s = await h.text(p);
-    t.ok(/Loadout photos\s*1/.test(s) && /Inspect photos\s*2 \/ 2/.test(s) && /Strapped\s*5\/5/.test(s) && /Bills\s*1 photos/.test(s), 'the wrap-up summary: loadout photos, inspect photos, Strapped 5/5, Bills');
+    t.ok(/Loadout photos\s*1/.test(s) && /Inspect photos\s*2 \/ 2/.test(s) && /Strapped\s*5\/5/.test(s) && /Bills\s*1 photo(?!s)/.test(s) && /Loads on\s*2 \/ 2/.test(s) && /Counted vs BOL\s*1 off/.test(s), 'the wrap-up summary: loadout photos, inspect photos, Strapped 5/5, Bills 1 photo, Loads on 2 / 2, Counted vs BOL 1 off (the short count while loading)');
     await p.getByRole('button', { name: /Wrap up & send/ }).click();
     await wait(p);
     t.ok(!(await p.getByRole('button', { name: 'Send to dispatch', exact: true }).isDisabled()), 'Send to dispatch is open');

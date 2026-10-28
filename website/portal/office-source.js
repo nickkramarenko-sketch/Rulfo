@@ -437,9 +437,9 @@ ZZo_LoadPlan=({t,doc:e,actions:a,toast,busy,once})=>{let[P,setP]=(0,H.useState)(
         err?ZZo_h("div",{className:"text-xs",style:{color:m.red},role:"alert"},err):null,
         ZZo_h("div",{className:"flex gap-2 flex-wrap"},ZZo_h(Z,{kind:"primary",icon:br,disabled:busy,onClick:save},"Save load plan"),ZZo_h(Z,{kind:"quiet",onClick:()=>{setP(null);setErr("")}},"Cancel")))
       :ZZo_h(H.Fragment,null,
-        t.multiStop?ZZo_h("div",{className:"space-y-1.5","data-zz":"plan-view"},L.map((r,k)=>{let c=cust(r);return ZZo_h("div",{key:r.sid,className:"flex items-center gap-2 flex-wrap text-sm","data-plan":r.sid},
-            ZZo_h("span",{className:"text-xs font-bold tabular-nums",style:{color:m.dim,width:18}},k+1),r.badge?ZZo_h(ZZo_Badge,{b:r.badge}):ZZo_h("b",null,r.s.ref),
-            ZZo_h("span",null,[r.stop?`Stop ${r.stop}`:"No stop set",r.pos&&ZZo_POS[r.pos]?`${ZZo_POS[r.pos][0]} \u2014 ${ZZo_POS[r.pos][1]}`:"place not set"].join(" \xB7 ")),c?ZZo_h("span",{className:"text-xs",style:{color:m.mut}},c):null)}))
+        t.multiStop?ZZo_h("div",{className:"space-y-1.5","data-zz":"plan-view"},L.map((r,k)=>{let c=cust(r);return ZZo_h("div",{key:r.sid,className:"flex items-center gap-x-2 gap-y-0.5 flex-wrap text-sm pt-1.5","data-plan":r.sid,style:k?{borderTop:`1px solid ${m.line}`}:void 0},
+            ZZo_h("span",{className:"text-xs font-bold tabular-nums",style:{color:m.dim,width:18}},k+1),r.badge?ZZo_h(ZZo_Badge,{b:r.badge}):ZZo_h("b",null,r.s.ref),c?ZZo_h("span",{className:"text-xs",style:{color:m.mut}},c):null,
+            ZZo_h("span",{style:{flexBasis:"100%",paddingLeft:26}},[r.stop?`Stop ${r.stop}`:"No stop set",r.pos&&ZZo_POS[r.pos]?`${ZZo_POS[r.pos][0]} \u2014 ${ZZo_POS[r.pos][1]}`:"place not set"].join(" \xB7 ")))}))
           :ZZo_h("div",{className:"text-sm",style:{color:m.mut}},`All ${ZZo_plural(L.length,"load")} go to one place.`),
         open?ZZo_h("div",null,ZZo_h(Z,{onClick:()=>setP(ZZo_planInit(L,!!t.multiStop))},t.multiStop?"Change the load plan":"Set stops (more than one stop)")):null))},
 

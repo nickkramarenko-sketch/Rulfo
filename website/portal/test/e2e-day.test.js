@@ -726,7 +726,7 @@ H.main('e2e-day', async (h, t) => {
     await wait(p, 500);
     t.ok(await p.locator('[data-zz=step-wrap]').count() + (/Step 7 of 7: Wrap up/.test(norm(await h.text(p))) ? 1 : 0) >= 1, 'with the bills photo in, the screen moves on to Wrap up');
     const ws = norm(await h.text(p));
-    t.ok(/Loadout photos\s*1/.test(ws) && /Inspect photos\s*2 \/ 2/.test(ws) && /Strapped\s*3\/5/.test(ws) && /Bills\s*1 photos?/.test(ws), 'the wrap-up summary: loadout photos, inspect photos, Strapped 3/5, Bills');
+    t.ok(/Loadout photos\s*1/.test(ws) && /Inspect photos\s*2 \/ 2/.test(ws) && /Strapped\s*3\/5/.test(ws) && /Bills\s*1 photo(?!s)/.test(ws) && /Loads on\s*2 \/ 2/.test(ws) && /Counted vs BOL\s*1 off/.test(ws) && !/Loads off/.test(ws), 'the wrap-up summary: loadout photos, inspect photos, Strapped 3/5, Bills 1 photo, "Loads on 2 / 2" (not "Loads off"), Counted vs BOL 1 off');
     await p.getByRole('button', { name: /Wrap up & send/ }).click();
     await wait(p);
     t.ok(await p.locator('[data-zz=securefirst]').count() === 0 && (await p.locator('input[placeholder="SL-00000"]').last().inputValue()) === 'SL-4418', 'Send to dispatch is open and the seal is filled in (SL-4418)');
@@ -753,7 +753,7 @@ H.main('e2e-day', async (h, t) => {
       'secured section: 3 of 5 (OK) with the crew\'s note, seal SL-4418, signed by Roman');
     t.ok(/Plywood[^]*6[^]*Ours \(24 HR\)/.test(st) && /Load bars[^]*2[^]*Ours \(24 HR\)/.test(st) && /Straps[^]*4[^]*Driver's/.test(st) && st.includes('B-301') && st.includes('B-302'), 'gear table: plywood 6 and bars 2 ours, straps 4 the driver\'s; tags B-301, B-302');
     t.eq(await sec.locator('img').count(), 1, 'the strapped photo (strap:<truck>; no fixed nose / middle / tail slots)');
-    t.ok(st.includes("How it's secured and what's used"), 'the photo is labelled "How it\'s secured and what\'s used" (' + st + ')');
+    t.ok(/How it's secured and what's used/i.test(st), 'the photo is labelled "How it\'s secured and what\'s used"');
     const lp = p.locator('[data-zzb=load-plan]');
     t.ok(/2 stops/.test(await txt(lp)), 'truck sheet: the load plan says 2 stops');
     t.eq(await lp.locator('li[data-sid]').evaluateAll(xs => xs.map(x => x.dataset.sid)), [L2, L1], 'the load plan in loading order: E2E-B (stop 2, nose) then E2E-A (stop 1, by the doors)');
@@ -893,7 +893,9 @@ H.main('e2e-day', async (h, t) => {
     const got = {};
     for (const k of ['yard', 'doors', 'done', 'avg', 'longest', 'promise']) got[k] = (await p.locator(`[data-stat-value="${k}"]`).first().innerText()).trim();
     const nowB = await p.evaluate(() => Date.now());
-    const A = tilesAt(nowA), B = tilesAt(nowB), want = JSON.stringify(got) === JSON.stringify(B.want) ? B.want : A.want, done = A.done;
+    /* the board redraws on its own clock tick, so the number on screen can be up to a minute behind the moment we read it */
+    const A = tilesAt(nowA), B = tilesAt(nowB), A0 = tilesAt(nowA - MIN), done = A.done;
+    const want = [B, A, A0].map(x => x.want).find(w => JSON.stringify(got) === JSON.stringify(w)) || A.want;
     t.eq(got, want, `tiles match the data: ${want.yard} in yard, ${want.doors} at doors, ${want.done} done today, avg wait ${want.avg}, longest ${want.longest}, promise kept ${want.promise}`);
     t.ok(done.some(x => x.id === TID) && done.some(x => x.id === PID), '(the drop and the pickup are both in "done today")');
     await h.check(p, 'k-yard-1400', { full: true });

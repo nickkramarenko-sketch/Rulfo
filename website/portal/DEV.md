@@ -268,6 +268,8 @@ done modals). The rest comes from `crew-source.js`:
 - **Wrap-up.** `ZZd_wrapStop` lists what blocks "Send to dispatch" (snaps waiting, not secured, no signed manifest, no
   packing / loadout photo, no bills photo); D27 shows `ZZd_WrapBlock` (a box per block with a button to its step) and
   disables Send while any. D30 summary rows come from `ZZd_wrapRows`. The bottom bar says "N steps to go" (D51).
+  D50 (`ZZd_cntRows`): Nick's first two summary rows on a loading truck read "Loads on 2 / 2" (not "Loads off") and
+  "Counted vs BOL" from the counts taken while loading (`pullCount`).
 - **Small fields of the crew.** `trailer.foundAt` / `foundBy` (DELIVERY "Found them"), `trailer.zzPhotoBy`.
 - New crew words are in `ZZd_ES4` / `ZZd_RU4` (filled lazily by `ZZtr3`; existing words never change).
 
@@ -319,7 +321,15 @@ H.main('c-kiosk', async (h, t) => {
   device switching roles, `fresh()` clears `cd6:session` and closes the other pages), fixed dock clock (the next weekday
   11:00 AM Pacific, `page.clock`, moved on with `ctx.clock.fastForward`), the base demo moved in time to that clock,
   Altex made a non-dispatch account so its booking rings the office bell. Customer books a drop (2:17 PM, moved to
-  2:47 PM), office confirms, driver page (Russian) sets the ETA, kiosk check-in (Español), crew door / start / count /
-  damage, customer approves, crew finishes, office releases, pickup with Secure the load, gear, alerts, Outbox, Friday,
-  yard board, door map, TV, gear back. Shared mode: office, crew and kiosk pages on one mock database, plus a customer
+  2:47 PM), office confirms, driver page (Russian) sets the ETA, kiosk check-in (Español), crew door / start, then the
+  new crew flow (Nick's review): UNLOAD with nonstop unloading photos and a damage snap on E2E-B (hidden from the
+  customer, no bell, no Outbox row) finished at Sort-count-verify through Damaged + Save, one warehouse photo per load,
+  no photo log; customer approves; crew finishes; office releases; the customer books a 2-stop pickup with the shipper
+  photo, the office sets it to DELIVERY, the crew does Find (shipper photo + our unloading photos), Count (short with a
+  note), Inspect + photo, Load it up in plan order, Strapped (strap photo, gear, tags, seal), Bills, wrap; the customer
+  sees the strapped report, the load plan and the shipper photo; gear, alerts, Outbox, Friday, yard board, door map, TV,
+  gear back; last, section m PACKs a consolidated trailer (an Altex load + another company's load, added with
+  `addTrailer` / `pickupIds`): packing photos, Secure with what's-used photos, signed manifest, and the customer's truck
+  sheet shows only its own manifest line and never the other company. The yard tiles check allows the board to be one
+  clock tick (a minute) behind. Shared mode: office, crew and kiosk pages on one mock database, plus a customer
   page without `db`. Screenshots `<shots>/e2e-*.png` (it sets `SHOT_PREFIX=e2e`). About 2 minutes.

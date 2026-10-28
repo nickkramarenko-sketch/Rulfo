@@ -580,6 +580,8 @@ H.main('e-office', async (h, t) => {
       'saved with zzLoadPlan: multi-stop, stop 1 tail, stop 2 nose (suggested)');
     const pv = await sheet.locator('[data-zz="plan-view"]').innerText();
     t.ok(/Stop 2 · NOSE — front of the trailer[\s\S]*Stop 1 · TAIL — by the doors/.test(pv) && /Pine Ridge Freight/.test(pv), 'the plan shows in loading order (nose first) with the other company named for the office');
+    const prow = (await sheet.locator('[data-zz="plan-view"] [data-plan]', { hasText: 'Pine Ridge' }).innerText()).replace(/\s+/g, ' ');
+    t.ok(/^\d+ \S+ PK-\d Pine Ridge Freight Stop \d/.test(prow), 'each plan row names its company next to the badge, then the stop and place (' + prow + ')');
 
     /* shipper photo, crew photos, manifest not signed yet, staff trail */
     await sheet.locator('[data-zz="ship"] input[type=file]').setInputFiles(h.UPLOAD_PNG);
