@@ -667,6 +667,7 @@ ZZd_PullDmg=({s,doc,actions:a,open,setOpen})=>ZZh("div",null,
 
 /* Spanish and Russian words for the reworked truck jobs (filled in lazily by ZZtr3; existing words are never changed) */
 ZZd_ES4={
+  "Loads on":"Cargas arriba","1 photo":"1 foto",
   "UNPACK":"DESCONSOLIDAR","UNLOAD":"DESCARGAR","PACK":"CONSOLIDAR","DELIVERY":"ENTREGA","PICKUP":"RECOGIDA",
   "Consolidated trailer (inbound)":"Remolque consolidado (entrada)","Pickup trailer":"Remolque de recogida","Consolidated trailer":"Remolque consolidado",
   "Delivery":"Entrega","Customer's carrier":"Transportista del cliente","customer's carrier":"transportista del cliente",
@@ -763,6 +764,7 @@ ZZd_ES4={
   "Go to Strapped":"Ir a Amarrado","Damage":"Daño","{n} plt":"{n} tarimas","Planned on the loads: {n}":"Planeado en las cargas: {n}","1 load · {p} pallets":"1 carga · {p} tarimas","{n} loads · {p} pallets":"{n} cargas · {p} tarimas",
   "How points work: 1 per pallet moved, 10 per truck finished, 2 per load counted, 1 per photo (unloading and loading photos too), 5 per damage report (a damage photo counts once its details are in), 5 per load secured.":"Cómo se ganan puntos: 1 por tarima movida, 10 por camión terminado, 2 por carga contada, 1 por foto (también las de descarga y carga), 5 por reporte de daño (una foto de daño cuenta cuando tiene sus detalles), 5 por carga asegurada."},
 ZZd_RU4={
+  "Loads on":"Загружено грузов","1 photo":"1 фото",
   "UNPACK":"РАЗБОР","UNLOAD":"ВЫГРУЗКА","PACK":"СБОРКА","DELIVERY":"ДОСТАВКА","PICKUP":"САМОВЫВОЗ",
   "Consolidated trailer (inbound)":"Сборная фура (входящая)","Pickup trailer":"Фура с забора","Consolidated trailer":"Сборная фура",
   "Delivery":"Доставка","Customer's carrier":"Перевозчик клиента","customer's carrier":"перевозчик клиента",
@@ -1236,6 +1238,12 @@ ZZd_WrapBlock=({l,Wt,ZD,zn,zs,ZJ,onGo})=>{ZZtr3();let L=ZZd_wrapStop({l,Wt,ZD,zn
         b.go?ZZh(Z,{kind:"primary",size:"lg",className:"w-full",onClick:()=>go(b.go)},ZZd_f("Go to {s}",{s:R(ZZd_LBL[b.go]||b.go)})):null)}))},
 /* the bottom bar under "Wrap up & send": how many steps are still open */
 ZZd_left=W=>{let n=(W||[]).filter(s=>s.k!=="wrap"&&!s.done).length;return n===1?R("1 step to go"):ZZd_f("{n} steps to go",{n})},
+/* the first two wrap-up rows (Nick's): loads off / on and counted vs BOL. A loading truck counts the loads it loaded
+   (pullCount, Nick's pull card) and says "Loads on", not "Loads off". */
+ZZd_cntRows=({l,t,b,_,T,Y,k})=>{ZZtr3();let L=b?_:Y,c=U=>b?(U.qc&&U.qc.counted!=null?ie(U.qc.counted):null):(U.pullCount!=null?ie(U.pullCount):null),
+    nc=L.filter(U=>c(U)==null).length,off=L.filter(U=>c(U)!=null&&c(U)!==fe(U)).length,all=b?T.length:Math.max(Y.length,ZZd_outLoads(t,l).length);
+  return[[b?R("Loads off"):R("Loads on"),`${b?_.length:Y.length} / ${all}`,b?(k.length?m.amber:m.text):Y.length<all?m.amber:m.text],
+    [R("Counted vs BOL"),nc?`${nc} ${R("not counted")}`:off?`${off} ${R("off")}`:L.length?R("all match"):"\u2014",nc||off?m.amber:m.text]]},
 ZZd_wrapRows=({l,t,b,ZJ,T,Wt,zn,zs,ZD})=>{ZZtr3();let has=k=>(Wt||[]).some(s=>s.k===k),rows=[],ap=ie(l.afterPhotoCount),dl=ZJ==="delivery"||ZJ==="pickup",
     stay=(T||[]).filter(s=>be(s)!=="sac"&&s.receivedAt),wh=stay.filter(s=>ie(s.rowPhotoCount)>0).length,out=ZZd_outLoads(t,l),mf=l.manifest&&l.manifest.signedAt?l.manifest:null;
   b&&rows.push([R("Unloading photos"),String(ie(l.unloadPhotoCount)),m.text]);
@@ -1244,7 +1252,7 @@ ZZd_wrapRows=({l,t,b,ZJ,T,Wt,zn,zs,ZD})=>{ZZtr3();let has=k=>(Wt||[]).some(s=>s.
   has("insp")&&rows.push([R("Inspect photos"),`${out.filter(s=>ie(s.inspPhotoCount)>0).length} / ${out.length}`,out.every(s=>ie(s.inspPhotoCount)>0)?m.text:m.amber]);
   zn&&rows.push([dl?R("Strapped"):R("Secured"),zs?`${ie(l.secure&&l.secure.confidence)}/5`:l.secure&&l.secure.signedAt?R("Not safe"):R("not yet"),zs?m.text:m.red]);
   has("manifest")&&rows.push([R("Manifest"),mf?ZZd_f("{n} plt · signed",{n:ie(mf.total)}):R("not yet"),mf?m.text:m.red]);
-  has("bills")&&rows.push([R("Bills"),ie(l.bolPhotoCount)?ZZd_f("{n} photos",{n:ie(l.bolPhotoCount)}):R("none yet"),ie(l.bolPhotoCount)?m.text:m.red]);
+  has("bills")&&rows.push([R("Bills"),ie(l.bolPhotoCount)?ie(l.bolPhotoCount)===1?R("1 photo"):ZZd_f("{n} photos",{n:ie(l.bolPhotoCount)}):R("none yet"),ie(l.bolPhotoCount)?m.text:m.red]);
   (ZD||[]).length&&rows.push([R("Damage photos to finish"),String(ZD.length),m.red]);
   return rows},
 

@@ -63,6 +63,11 @@ const sheet = p => p.locator('.fixed.inset-0').last();
 const wait = (p, ms) => p.waitForTimeout(ms || 350);
 const T = (doc, id) => doc.trailers.find(x => x.id === id);
 const S = (doc, id) => doc.shipments.find(x => x.id === id);
+const fe2 = s => { const u = (s && s.units) || {}; return (+u.std || 0) + (+u.lg || 0) + (+u.crate || 0); };
+/* the crew truck's step bar (titles), a step button, and waiting for a camera count */
+const stepNames = p => p.$$eval('div[style*="sticky"] button[title]', bs => bs.map(b => b.title));
+const step = async (p, label) => { await p.getByRole('button', { name: label, exact: true }).first().click(); await p.waitForTimeout(400); };
+const countIs = (p, sel, n) => p.waitForFunction(([s, n]) => { const el = document.querySelector(s); return el && el.innerText.trim() === String(n); }, [sel, n], { timeout: 6000 });
 
 H.main('e2e-day', async (h, t) => {
   const NOW = nextWeekday11();
@@ -295,7 +300,7 @@ H.main('e2e-day', async (h, t) => {
   }
 
   /* ================= e) crew: wait clock, door picker, start, count (one short), damage report ================= */
-  t.section('e) crew (Roman 1111): wait clock, free door, start, count both loads (one short), damage report with 2 photos');
+  t.section('e) crew (Roman 1111): wait clock, free door, start, UNLOAD with nonstop photos, a damage snap finished at Sort-count-verify, one warehouse photo per load');
   let XID = null;
   {
     await ctx.clock.fastForward(25 * MIN);   // the driver waits in the yard
@@ -350,7 +355,40 @@ H.main('e2e-day', async (h, t) => {
     await wait(p, 500);
     no = await nextOff();
     t.ok(/E2E-B/.test(no) && /Hazmat/.test(no), 'then E2E-B, with the Hazmat pill');
+    t.eq(await stepNames(p), ['Paperwork', 'Photo before', 'Unload', 'Sort, count, verify', 'Wrap up'], 'UNLOAD steps: Paperwork, Photo before, Unload, Sort-count-verify, Wrap up (no photo log)');
+    t.ok(/^UNLOAD · Pickup trailer$/.test(norm(await p.locator('[data-zz=jobtitle]').innerText())) && /2 loads to count and put away · 20 pallets/.test(await p.locator('[data-zz=jobtask]').innerText()), 'the job in big words: "UNLOAD · Pickup trailer", "2 loads to count and put away · 20 pallets"');
+    // nonstop unloading photos while the loads come off (no minimum): the step's camera and the floating one
+    t.ok(await p.locator('[data-zz=floatbar] [data-zz=floatcam]').isVisible() && await p.locator('[data-zz=floatbar] [data-zz=floatsnap]').isVisible(), 'while unloading, the camera and Damage buttons float at the bottom');
+    await p.locator('[data-zz=step-off] [data-zz=caminput]').first().setInputFiles(h.UPLOAD_PNG);
+    await countIs(p, '[data-zz=step-off] [data-zz=camcount]', 1);
+    await p.locator('[data-zz=floatcaminput]').setInputFiles(h.UPLOAD_PNG);
+    await countIs(p, '[data-zz=step-off] [data-zz=camcount]', 2);
+    tr = T(await h.readDoc(p), TID);
+    t.ok(tr.unloadPhotoCount === 2, 'saved: 2 unloading photos (unload:<truck>)');
+    // a damaged pallet on E2E-B: snap it before anyone touches it, tap the load's badge, keep unloading
+    await p.locator('[data-zz=floatsnap]').click();
+    await p.locator('[data-zz=snapinput]').setInputFiles(h.UPLOAD_PNG);
+    await p.waitForFunction(() => !!document.querySelector('[data-zz=snappick]'), null, { timeout: 5000 });
+    t.ok(await p.locator('[data-zz=snappick] [data-zz=snapload]').count() === 2, 'the damage photo asks which load: one button per load badge');
+    await p.locator('[data-zz=snappick] [data-zz=snapnote]').fill('Forks caught the wrap on 2 pallets');
+    await h.check(p, 'e-crew-snap-pick-390');
+    await p.locator(`[data-zz=snappick] [data-zz=snapload][data-sid="${L2}"]`).click();
+    await wait(p, 600);
+    let d = await h.readDoc(p);
+    const snap = (S(d, L2).exceptions || []).find(x => x.draft);
+    XID = snap && snap.id;
+    t.ok(snap && snap.kind === 'Damage' && snap.photoOwner === 'dmg:' + XID && snap.photoCount === 1 && !snap.est, 'saved: a damage snap on E2E-B (draft, 1 photo, no price yet)');
+    t.ok(/saved on load 2 \(E2E-B\)/.test(await p.locator('[data-zz=snapmsg]').innerText()), 'the crew sees "Damage photo saved on load 2 (E2E-B)"');
+    const cv = await calc(p, (hh, dd, sid) => { const v = hh.ZZcustView(dd, 'cu_altex'); return { drafts: v.shipments.some(s => (s.exceptions || []).some(x => x.draft)), needs: (hh.ZZneeds ? hh.ZZneeds(dd, 'cu_altex', Date.now()) : []).filter(n => /damage/i.test(JSON.stringify(n))).length, msgs: hh.ZZmsgs(dd, Date.now()).filter(m => m.event === 'damage' && /E2E-B/.test(JSON.stringify(m))).length }; }, L2);
+    t.ok(!cv.drafts && cv.needs === 0 && cv.msgs === 0, 'the customer cannot see the snap yet: not on its screens, no bell, no damage alert in the Outbox (' + JSON.stringify(cv) + ')');
+    await p.getByRole('button', { name: /it's off, count it next/ }).click();
+    await wait(p, 500);
+    t.ok(await p.locator('[data-zz=step-verify]').count() === 1, 'with both loads off the truck, Sort-count-verify opens by itself');
+    t.ok(/1 damage to finish/.test(await h.text(p)), 'its header says 1 damage to finish');
+    // E2E-A: 11 of 12, Short, lane 21, the one warehouse photo
     const cardA = p.locator('div.rounded-lg').filter({ has: p.locator('span.font-black', { hasText: 'E2E-A' }) }).last();
+    if (await cardA.locator('input[type=number]').count() === 0) { await cardA.locator('button').first().click(); await wait(p); }
+    t.ok(await cardA.locator('[data-zz=badge]').count() >= 1, 'the count card shows the load badge');
     await cardA.locator('input[type=number]').fill('11');
     await cardA.getByRole('button', { name: 'Short', exact: true }).click();
     await cardA.getByRole('button', { name: '21', exact: true }).click();
@@ -358,35 +396,40 @@ H.main('e2e-day', async (h, t) => {
     t.ok(await saveA.isDisabled() && /Why is it short 1\? \(required\)/.test(await cardA.locator('[data-zz=countnote]').innerText()), 'a short count (11 of 12) cannot be saved without a note');
     await cardA.locator('[data-zz=countnote] input').fill('One pallet stayed at the shipper');
     t.ok(!(await saveA.isDisabled()), 'with the note it can be saved');
+    t.ok(/Photo of the load left in the warehouse/.test(await cardA.locator('[data-zz=whphoto]').innerText()) && !/on the dock, whole load|in the lane/.test(await cardA.innerText()), 'one photo per load: "Photo of the load left in the warehouse" (no dock or lane photo boxes)');
+    await cardA.locator('[data-zz=whphoto] [data-zz=caminput]').setInputFiles(h.UPLOAD_PNG);
+    await p.waitForFunction(() => [...document.querySelectorAll('[data-zz=whphoto] [data-zz=camcount]')].some(e => e.innerText.trim() === '1'), null, { timeout: 6000 });
     await cardA.locator('[data-zz=countnote]').scrollIntoViewIfNeeded();
     await h.check(p, 'e-crew-count-short-390');
     await saveA.click();
     await wait(p, 600);
-    let d = await h.readDoc(p);
+    d = await h.readDoc(p);
     const la = S(d, L1);
     const shortX = (la.exceptions || []).filter(x => x.kind === 'Short');
-    t.ok(la.receivedAt && la.qc.counted === 11 && la.qc.condition === 'Short' && la.qc.note === 'One pallet stayed at the shipper' && la.row === 'R21', 'saved: E2E-A counted 11, Short, the note, lane R21');
+    t.ok(la.receivedAt && la.qc.counted === 11 && la.qc.condition === 'Short' && la.qc.note === 'One pallet stayed at the shipper' && la.row === 'R21' && la.rowPhotoCount === 1, 'saved: E2E-A counted 11, Short, the note, lane R21, 1 warehouse photo');
     t.ok(shortX.length === 1 && /Counted 11 against 12 on the BOL: One pallet stayed at the shipper — Roman at the door/.test(shortX[0].note), 'one Short report that reads "Counted 11 against 12 on the BOL: One pallet stayed at the shipper — Roman at the door"');
-    await p.getByRole('button', { name: /it's off, count it next/ }).click().catch(() => {});
-    await wait(p, 500);
+    // E2E-B: Damaged + Save finishes the snap (the photo is already there), then the count saves
     const cardB = p.locator('div.rounded-lg').filter({ has: p.locator('span.font-black', { hasText: 'E2E-B' }) }).last();
+    if (await cardB.locator('input[type=number]').count() === 0) { await cardB.locator('button').first().click(); await wait(p); }
+    t.ok(await cardB.locator('[data-zz=snappill]').count() === 1, 'the E2E-B card has the red "Damage photo to finish" pill');
     await cardB.locator('input[type=number]').fill('8');
     await cardB.getByRole('button', { name: 'Damaged', exact: true }).click();
     await cardB.getByRole('button', { name: '22', exact: true }).click();
+    await cardB.locator('[data-zz=whphoto] [data-zz=caminput]').setInputFiles(h.UPLOAD_PNG);
+    await p.waitForFunction(() => [...document.querySelectorAll('[data-zz=whphoto] [data-zz=camcount]')].filter(e => e.innerText.trim() === '1').length >= 1, null, { timeout: 6000 });
+    await wait(p, 300);
     await cardB.getByRole('button', { name: 'Save', exact: true }).click();
     await wait(p, 500);
     const dm = p.locator('[data-zz=dmg]');
-    t.ok(await dm.count() === 1, 'Damaged + Save opens the damage report first');
+    t.ok(await dm.count() === 1 && await dm.getAttribute('data-snap') === XID, 'Damaged + Save opens the damage report on the snap (no second report)');
+    t.ok(/1 of 2/.test(await dm.locator('[data-zz=dmgcount]').innerText()) && (await dm.locator('textarea').inputValue()) === 'Forks caught the wrap on 2 pallets', 'the snap photo is already in (1 of 2) and the crew\'s words come along');
     const saveD = dm.getByRole('button', { name: 'Save damage report' });
     await dm.locator('[data-kind="Torn wrap"]').click();
     await dm.locator('button[aria-label="One more pallets"]').click();
-    await dm.locator('[data-shot-input=wide]').setInputFiles(h.UPLOAD_PNG);
-    await p.waitForFunction(() => /1 of 2/.test((document.querySelector('[data-zz=dmgcount]') || {}).innerText || ''), null, { timeout: 5000 });
     t.ok(await saveD.isDisabled() && /1 more photo/.test(await dm.locator('[data-zz=missing]').innerText()), 'with 1 photo Save stays disabled ("1 more photo")');
     await h.check(p, 'e-crew-dmg-1photo-390');
     await dm.locator('[data-shot-input=close]').setInputFiles(h.UPLOAD_PNG);
     await p.waitForFunction(() => /2 of 2/.test((document.querySelector('[data-zz=dmgcount]') || {}).innerText || ''), null, { timeout: 5000 });
-    await dm.locator('textarea').fill('Forks caught the wrap on 2 pallets');
     t.ok(/Customer will approve or decline/.test(await dm.locator('[data-zz=approve]').innerText()), 'auto-approve is off: "Customer will approve or decline"');
     const total = norm(await dm.locator('[data-zz=dmgtotal]').innerText());
     t.ok(/\$90\.00/.test(total), 'fix lines: rewrap 2 x $15 + labor 0.5 h x $120 = $90.00 (' + total + ')');
@@ -396,11 +439,11 @@ H.main('e2e-day', async (h, t) => {
     await wait(p, 800);
     d = await h.readDoc(p);
     const lb = S(d, L2), dx = (lb.exceptions || []).filter(x => x.kind === 'Damage');
-    XID = dx[0] && dx[0].id;
-    t.ok(dx.length === 1 && dx[0].photoOwner === 'dmg:' + XID && dx[0].photoCount === 2 && dx[0].pallets === 2 && dx[0].kinds.join() === 'Torn wrap' && dx[0].what === 'Forks caught the wrap on 2 pallets', 'saved: one Damage report on E2E-B with 2 photos (dmg:<id>), 2 pallets, Torn wrap, what happened');
+    t.ok(dx.length === 1 && dx[0].id === XID && dx[0].draft === false && dx[0].photoOwner === 'dmg:' + XID && dx[0].photoCount === 2 && dx[0].pallets === 2 && dx[0].kinds.join() === 'Torn wrap' && dx[0].what === 'Forks caught the wrap on 2 pallets', 'saved: the snap became the one Damage report on E2E-B (draft false, 2 photos, 2 pallets, Torn wrap, what happened)');
     t.ok(!dx[0].answer && dx[0].est && dx[0].est.lines.filter(l => l.on !== false).length === 2 && !dx[0].est.applied, 'auto-approve off: no answer, the estimate waits for the customer');
-    t.ok(lb.qc.condition === 'Damaged' && lb.qc.counted === 8 && lb.receivedAt && lb.row === 'R22' && !(Number(lb.rewrapPallets) > 0), 'saved: E2E-B counted 8, Damaged, lane R22; rewrap is priced in the report, not on the load');
+    t.ok(lb.qc.condition === 'Damaged' && lb.qc.counted === 8 && lb.receivedAt && lb.row === 'R22' && lb.rowPhotoCount === 1 && !(Number(lb.rewrapPallets) > 0), 'saved: E2E-B counted 8, Damaged, lane R22, 1 warehouse photo; rewrap is priced in the report, not on the load');
     t.eq(JSON.parse(await p.evaluate(k => localStorage.getItem(k), 'cdweb:cd6:photos:' + dx[0].photoOwner) || '[]').length, 2, 'the 2 damage photos are stored under dmg:<id>');
+    t.ok(await calc(p, (hh, dd, sid) => hh.ZZcustView(dd, 'cu_altex').shipments.find(s => s.id === sid).exceptions.some(x => x.kind === 'Damage' && !x.draft), L2), 'only now does the customer view have the damage report');
     await p.setViewportSize(DESK);
     await h.check(p, 'e-crew-counted-1400');
   }
@@ -452,7 +495,7 @@ H.main('e2e-day', async (h, t) => {
   }
 
   /* ================= g) crew finishes the drop; the customer sees done against the promise ================= */
-  t.section('g) crew finishes the drop (done photos); customer sees done in Xm within the promise, counts vs BOL, the trail');
+  t.section('g) crew finishes the drop (no photo log); customer sees done in Xm within the promise, counts vs BOL, the trail');
   {
     await ctx.clock.fastForward(30 * MIN);   // unloading and putting away
     const p = await as('crew');
@@ -462,11 +505,10 @@ H.main('e2e-day', async (h, t) => {
     t.ok(/Unloading now/.test(await txt(card0)), 'All trucks: truck 4417 is "Unloading now"');
     await card0.locator('button').last().click();
     await wait(p, 500);
-    t.ok(/Step 4 of 5: Photo log/.test(norm(await h.text(p))), 'the truck opens on step 4: Photo log (' + norm(await h.text(p)).slice(0, 300) + ')');
-    await p.locator('input[type=file]').first().setInputFiles(h.UPLOAD_PNG);
-    await wait(p, 800);
+    const gs = norm(await h.text(p));
+    t.ok(/Step 5 of 5: Wrap up/.test(gs) && !/Photo log/.test(gs), 'the truck opens on the last step, Wrap up; there is no photo log any more (' + gs.slice(0, 200) + ')');
+    t.ok(/Unloading photos\s*2/.test(gs) && /Warehouse photos\s*2 \/ 2/.test(gs), 'the wrap-up summary: 2 unloading photos, warehouse photos 2 / 2');
     let tr = T(await h.readDoc(p), TID);
-    t.ok(tr.afterPhotoCount === 1, 'saved: 1 done photo (afterPhotoCount)');
     await p.getByRole('button', { name: /Wrap up & send/ }).click();
     await wait(p, 400);
     await h.check(p, 'g-crew-wrap-390');
@@ -481,7 +523,7 @@ H.main('e2e-day', async (h, t) => {
     const q = await as('customer');
     const note = q.locator('[data-zzb=done-note]');
     const nt = await txt(note);
-    const want = `Truck 4417 is done: 19 of 20 pallets, 2 photos, 1 damage report. ${dur}, within our 2-hour promise.`;
+    const want = `Truck 4417 is done: 19 of 20 pallets, 5 photos, 1 damage report. ${dur}, within our 2-hour promise.`;
     t.ok(nt.includes(want), `Schedule: the done note "${want}"`);
     await h.check(q, 'g-customer-schedule-390', { full: true });
     await note.getByRole('button', { name: 'Open' }).click();
@@ -491,7 +533,9 @@ H.main('e2e-day', async (h, t) => {
     t.ok(card.includes(`Done in ${dur}, within our 2-hour promise`), `truck sheet: "Done in ${dur}, within our 2-hour promise"`);
     const ds = await txt(q.locator('[data-zzb=done]'));
     t.ok(ds.includes('Done in ' + dur + ', within our 2-hour promise') && /Load E2E-A 11 of 12 pallets on the BOL/.test(ds) && /Load E2E-B ✓ 8 of 8 pallets on the BOL/.test(ds), 'Done section: each load counted against the BOL (E2E-A 11 of 12, E2E-B ✓ 8 of 8)');
-    t.eq(await q.locator('[data-zzb=done] .zzb-ph img').count(), 2, 'Done section: the before and after photos the crew took');
+    await q.waitForFunction(() => document.querySelectorAll('[data-zzb=done] img').length >= 5, null, { timeout: 5000 }).catch(() => {});
+    t.eq(await q.locator('[data-zzb=done] .zzb-ph img').count(), 3, 'Done section: the photo before unloading and the 2 unloading photos');
+    t.eq(await q.locator('[data-zzb=done] img').count(), 5, 'plus one photo per load of where it sits in our warehouse (5 photos, as the done note says)');
     t.ok(/Damage on load E2E-B/.test(ds), 'Done section: links the damage on E2E-B');
     const tl = ts.locator('[data-zzb=trail]');
     const more = tl.getByRole('button', { name: /^Show all/ });
@@ -512,7 +556,7 @@ H.main('e2e-day', async (h, t) => {
   }
 
   /* ================= h) a pickup for Altex: crew loads it, secures it, wrap-up waits for the securement ================= */
-  t.section('h) pickup truck for Altex: release the drop, book the pickup, check in, load, Secure the load, finish');
+  t.section('h) Altex books a 2-stop pickup with the shipper photo; the office makes it a DELIVERY; crew: find, count, inspect + photo, load it up in plan order, strapped, bills');
   let PID = null;
   {
     // the office releases the finished drop truck (Nick's release), so door D6 is open again
@@ -528,7 +572,7 @@ H.main('e2e-day', async (h, t) => {
     let d = await h.readDoc(p);
     t.ok(T(d, TID).stage === 'departed' && T(d, TID).departedAt && !T(d, TID).dock && !S(d, L1).shippedAt && !S(d, L2).shippedAt, 'office releases truck 4417: it left, door D6 is open, the two loads stay on the floor');
 
-    // the customer books a pickup of the two loads for 3:30 PM
+    // the customer books a pickup of the two loads for 3:30 PM: 2 stops (E2E-A first stop, E2E-B second) and the shipper's photo
     p = await as('customer');
     await p.getByRole('button', { name: 'Schedule a truck' }).first().click();
     await wait(p, 300);
@@ -541,16 +585,25 @@ H.main('e2e-day', async (h, t) => {
     await f.locator('input[placeholder="e.g. 4521"]').fill('4418');
     await f.locator('input[placeholder="e.g. T880"]').fill('T418');
     t.ok(/2 loads selected/.test(await txt(f)) && /20 pallets/.test(await txt(f)), 'pickup form: 2 loads selected, 20 pallets');
+    const bp = f.locator('[data-zzb=book-plan]');
+    await bp.getByRole('button', { name: 'Yes', exact: true }).click();
+    await wait(p, 200);
+    const rows = await bp.locator('[data-sid]').evaluateAll(xs => xs.map(x => [x.dataset.sid, x.querySelector('select').value, ((x.querySelector('button[aria-pressed=true]') || { dataset: {} }).dataset.pos) || '']));
+    t.eq(rows, [[L1, '1', 'tail'], [L2, '2', 'nose']], 'more than one stop: E2E-A stop 1 by the doors (tail), E2E-B stop 2 in the nose (suggested)');
+    await f.locator('[data-zzb=book-ship] input[type=file]').setInputFiles(h.UPLOAD_PNG);
+    await p.waitForFunction(() => document.querySelectorAll('[data-zzb=book-ship] img').length === 1, null, { timeout: 5000 });
+    await tallShot(p, 'h-pickup-form-390');
     await f.getByRole('button', { name: 'Send request' }).click();
-    await wait(p, 700);
+    await wait(p, 900);
     d = await h.readDoc(p);
     const pu = d.trailers.find(x => x.truck === '4418');
     PID = pu && pu.id;
     t.ok(pu && pu.direction === 'outbound' && pu.customerId === 'cu_altex' && /^\d{4}$/.test(pu.code) && pu.scheduledAt === iso(dockIso(TODAY, '15:30')) && S(d, L1).trailerOutId === PID && S(d, L2).trailerOutId === PID,
       'saved: pickup truck 4418 (outbound, 3:30 PM, its own code), both loads planned onto it');
+    t.ok(pu.multiStop === true && pu.shipperPhotoCount === 1 && S(d, L1).stop === 1 && S(d, L1).pos === 'tail' && S(d, L2).stop === 2 && S(d, L2).pos === 'nose', 'saved: the load plan (zzLoadPlan) and the shipper photo (ship:<truck>)');
     await p.locator('[data-zzb=booked]').getByRole('button', { name: 'Done', exact: true }).click();
 
-    // the office confirms it and checks the driver in (the driver skipped the kiosk)
+    // the office confirms it, makes it a delivery (we drive it to the receivers) and checks the driver in
     p = await as('office', DESK);
     await p.locator('div.fixed.bottom-0 button', { hasText: /^Yard$/ }).first().click();
     await wait(p);
@@ -559,6 +612,10 @@ H.main('e2e-day', async (h, t) => {
     const sh = sheet(p);
     await sh.getByRole('button', { name: 'Confirm time' }).click();
     await wait(p, 400);
+    await sh.getByRole('group', { name: 'Loading job' }).getByRole('button', { name: 'Delivery', exact: true }).click();
+    await wait(p, 500);
+    d = await h.readDoc(p);
+    t.ok(T(d, PID).loadJob === 'delivery', 'the office sets the loading job to Delivery on the truck sheet');
     await sh.getByRole('button', { name: 'Check in now (driver skipped the kiosk)' }).click();
     await sh.getByRole('button', { name: 'Yes, check in' }).click();
     await wait(p, 700);
@@ -567,66 +624,80 @@ H.main('e2e-day', async (h, t) => {
     t.ok(/Checked in\. Send the driver to door D6\./.test(await txt(sh)), 'the office sheet says: send the driver to door D6');
     await ctx.clock.fastForward(5 * MIN);
 
-    // crew: load both loads (count, photo, load), then Secure the load
+    // crew: DELIVERY - find (shipper photo + our unloading photos), count, inspect + photo, load it up in plan order, strapped, bills
     p = await as('crew');
     await p.getByRole('button', { name: /All trucks/ }).first().click();
     await wait(p, 400);
     const card = p.locator(':text("Truck 4418 · Trailer T418")').locator('xpath=ancestor::*[.//button[contains(@class,"rounded-lg")]][1]');
-    t.ok(/FOR DELIVERY/.test(await txt(card)) && /20 to load/.test(await txt(card)), 'crew card: FOR DELIVERY, 20 to load');
+    t.ok(/^DELIVERY 2 stops/.test(await txt(card)) && /20 to load/.test(await txt(card)), 'crew card names the job: "DELIVERY 2 stops", 20 to load');
     await card.getByRole('button', { name: 'Start loading' }).click();
     await wait(p, 600);
     d = await h.readDoc(p);
     t.ok(T(d, PID).stage === 'working' && T(d, PID).workStartedBy === 'Roman', 'saved: loading started by Roman');
-    const pull = ref => p.locator('div.rounded-lg.p-3.space-y-3').filter({ hasText: ref + ' · ' }).first();
+    t.ok(/^DELIVERY · 2 stops$/.test(norm(await p.locator('[data-zz=jobtitle]').innerText())), 'the job in big words: "DELIVERY · 2 stops"');
+    t.eq(await stepNames(p), ['Find the load', 'Count it', 'Inspect + photo', 'Load it up', 'Strapped', 'Bills', 'Wrap up'], 'DELIVERY steps: Find, Count, Inspect + photo, Load it up, Strapped, Bills, Wrap up');
+    const ref = p.locator('[data-zz=step-find] [data-zz=ref]');
+    await p.waitForFunction(() => document.querySelectorAll('[data-zz=step-find] [data-zz=ref] img').length >= 3, null, { timeout: 6000 });
+    t.ok(/Load it like the shipper did/.test(await ref.innerText()) && await ref.locator(`[data-owner="ship:${PID}"] img`).count() === 1 && await ref.locator(`[data-owner="unload:${TID}"] img`).count() === 2,
+      '"Load it like the shipper did": the customer\'s shipper photo plus our 2 unloading photos from truck 4417');
+    const fr = await p.$$eval('[data-zz=findrow]', rs => rs.map(r => [r.getAttribute('data-sid'), r.innerText.replace(/\s+/g, ' ')]));
+    t.ok(fr.length === 2 && /R21/.test(fr.find(r => r[0] === L1)[1]) && /R22/.test(fr.find(r => r[0] === L2)[1]) && /Stop 2 · NOSE/.test(fr.find(r => r[0] === L2)[1]), 'Find: where each load sits (R21, R22) with its stop and place');
+    await h.check(p, 'h-find-390');
+    await p.getByRole('button', { name: 'Found them — count next' }).click();
+    await wait(p, 600);
     // E2E-A: only 11 on the floor (it came in short) -> a note, then confirm 11
-    let pa = pull('E2E-A');
-    await pa.locator('input[aria-label="Pallets counted"]').fill('11');
+    const ra = p.locator(`[data-zz=countrow][data-sid="${L1}"]`), rb = p.locator(`[data-zz=countrow][data-sid="${L2}"]`);
+    await ra.locator('input[aria-label="Pallets counted"]').fill('11');
     await wait(p, 200);
-    t.ok(await pa.getByRole('button', { name: /^Confirm 11/ }).isDisabled(), 'pull card: 11 of 12 cannot be confirmed without a note');
-    await pa.locator('[data-zz=countnote] input').fill('Came in 11, one short at receiving');
-    await pa.getByRole('button', { name: /^Confirm 11/ }).click();
+    t.ok(await ra.getByRole('button', { name: /^Confirm 11/ }).isDisabled(), 'count: 11 of 12 cannot be confirmed without a note');
+    await ra.locator('[data-zz=countnote] input').fill('Came in 11, one short at receiving');
+    await ra.getByRole('button', { name: /^Confirm 11/ }).click();
     await wait(p, 400);
-    await pa.locator('input[type=file]').first().setInputFiles(h.UPLOAD_PNG);
-    await wait(p, 600);
-    await pa.getByRole('button', { name: /^3\. Load it/ }).click();
-    await wait(p, 500);
-    // one load on: the step bar moves on to Secure (Nick's rule: the load step counts once something is loaded); go back for E2E-B
-    t.ok(/Step 2 of 4: Secure the load/.test(norm(await h.text(p))), 'with E2E-A on, the screen moves on to step 2 (Secure the load)');
-    await p.getByRole('button', { name: /Find, count, photo, load/ }).first().click();
+    await rb.getByRole('button', { name: 'Count is correct' }).click();
     await wait(p, 400);
-    let pb = pull('E2E-B');
-    await pb.getByRole('button', { name: 'Count is correct' }).click();
-    await wait(p, 400);
-    await pb.locator('input[type=file]').first().setInputFiles(h.UPLOAD_PNG);
-    await wait(p, 600);
-    await pb.getByRole('button', { name: /^3\. Load it/ }).click();
-    await wait(p, 600);
     d = await h.readDoc(p);
-    t.ok(S(d, L1).loadedAt && S(d, L2).loadedAt && S(d, L1).pullCount === 11 && S(d, L2).pullCount === 8, 'saved: both loads counted (11 and 8) and loaded');
+    t.ok(S(d, L1).pullCount === 11 && S(d, L2).pullCount === 8, 'saved: counts 11 and 8');
     const sh1 = S(d, L1).exceptions.filter(x => x.kind === 'Short');
     t.ok(sh1.length === 1 && /Counted 11 against 12 on the BOL: One pallet stayed at the shipper — Roman at the door · Counted 11 against 12 on the BOL while loading: Came in 11, one short at receiving$/.test(sh1[0].note),
       'the 11 of 12 at loading adds its count and note to the open Short report from receiving (one report, nothing lost)');
-    // wrap-up is blocked until the load is secured
+    await p.getByRole('button', { name: 'Counts done — inspect next' }).click();
+    await wait(p, 500);
+    for (const id of [L1, L2]) {
+      await p.locator(`[data-zz=insprow][data-sid="${id}"] [data-zz=caminput]`).setInputFiles(h.UPLOAD_PNG);
+      await countIs(p, `[data-zz=insprow][data-sid="${id}"] [data-zz=camcount]`, 1);
+    }
+    d = await h.readDoc(p);
+    t.ok(S(d, L1).inspPhotoCount === 1 && S(d, L2).inspPhotoCount === 1, 'saved: one inspect photo per load (insp:<load>)');
+    t.ok(/Damaged — report saved/.test(await p.locator(`[data-zz=insprow][data-sid="${L2}"]`).innerText()) && /Good — no damage reported/.test(await p.locator(`[data-zz=insprow][data-sid="${L1}"]`).innerText()), 'inspect: E2E-B shows its damage report, E2E-A is good');
+    await p.getByRole('button', { name: 'All checked — load it up' }).click();
+    await wait(p, 500);
+    t.eq(await p.$$eval('[data-zz=step-load] [data-zz=planrow]', rs => rs.map(r => r.getAttribute('data-sid'))), [L2, L1], 'Load it up: the plan in loading order (E2E-B for stop 2 in the nose first, then E2E-A by the doors)');
+    t.ok(await p.locator('[data-zz=step-load] [data-zz=ref]').count() === 1, 'the shipper reference shows again while loading');
+    await p.locator('[data-zz=step-load] [data-zz=caminput]').first().setInputFiles(h.UPLOAD_PNG);
+    await countIs(p, '[data-zz=step-load] [data-zz=camcount]', 1);
+    await h.check(p, 'h-load-390');
+    for (const id of [L2, L1]) { await p.locator(`[data-zz=loadrow][data-sid="${id}"]`).getByRole('button', { name: 'Load it' }).click(); await wait(p, 500); }
+    d = await h.readDoc(p);
+    t.ok(S(d, L1).loadedAt && S(d, L2).loadedAt && T(d, PID).afterPhotoCount === 1, 'saved: both loads on, 1 loadout photo (after:<truck>)');
+    // wrap-up is blocked until it is strapped and the bills are photographed
     await p.getByRole('button', { name: /Wrap up & send/ }).click();
     await wait(p);
-    t.ok(await p.locator('[data-zz=securefirst]').count() === 1 && await p.getByRole('button', { name: 'Send to dispatch', exact: true }).isDisabled(), 'Wrap up: "Send to dispatch" is blocked until the load is secured');
+    t.ok(await p.locator('[data-zz=securefirst]').count() === 1 && await p.getByRole('button', { name: 'Send to dispatch', exact: true }).isDisabled(), 'Wrap up: "Send to dispatch" is blocked until the load is strapped');
     await h.check(p, 'h-wrap-blocked-390');
     await p.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight));
-    await p.getByRole('button', { name: 'Go to Secure the load' }).click();
+    await p.getByRole('button', { name: /^Go to (Secure the load|Strapped)$/ }).first().click();
     await wait(p, 800);
     const sf = p.locator('[data-zz=secureform]');
-    t.ok(await sf.count() === 1, '"Go to Secure the load" opens the secure form');
+    t.ok(await sf.count() === 1 && /Photo of it strapped/.test(await p.locator('[data-zz=securestep]').innerText()), 'it opens the Strapped form (delivery words: "Photo of it strapped")');
     const save = sf.getByRole('button', { name: 'Save and sign' });
     const plus = async (k, n) => { for (let i = 0; i < n; i++) await sf.locator(`[data-gear=${k}] button[aria-label^="One more"]`).click(); };
     await plus('plywood', 6); await plus('bars', 2); await plus('straps', 4);
     await sf.locator('[data-gear=straps] [data-owner=driver]').click();
     for (const tg of ['b-301', 'B-302']) { await sf.locator('input[aria-label="Tag number"]').fill(tg); await sf.locator('[data-zz=tagadd]').click(); }
     await sf.locator('input[aria-label="Seal number"]').fill('sl-4418');
-    for (const k of ['nose', 'middle', 'tail', 'closeup']) { await sf.locator(`[data-slot=${k}] input[type=file]`).setInputFiles(h.UPLOAD_PNG); await wait(p, 300); }
-    await wait(p, 300);
-    t.ok(await save.isDisabled() && /1 more|seal photo/i.test(await sf.locator('[data-zz=missing]').innerText()), 'with 4 of 5 photos Save and sign is refused');
-    await sf.locator('[data-slot=seal] input[type=file]').setInputFiles(h.UPLOAD_PNG);
-    await p.waitForFunction(() => /5 of 5/.test((document.querySelector('[data-zz=seccount]') || {}).innerText || ''), null, { timeout: 5000 });
+    t.ok(await save.isDisabled() && /a photo of it strapped/.test(await sf.locator('[data-zz=missing]').innerText()), 'without a photo of it strapped Save and sign is refused ("a photo of it strapped")');
+    await sf.locator('[data-zz=secphotos] [data-zz=caminput]').setInputFiles(h.UPLOAD_PNG);
+    await countIs(p, '[data-zz=secphotos] [data-zz=camcount]', 1);
     await sf.locator('[data-conf="3"]').click();
     t.ok(await save.isDisabled() && /what would make it safer/.test(await sf.locator('[data-zz=missing]').innerText()), 'confidence 3 needs a note');
     await sf.locator('textarea').fill('One more strap at the tail would help');
@@ -641,29 +712,28 @@ H.main('e2e-day', async (h, t) => {
     await wait(p, 700);
     d = await h.readDoc(p);
     const sc = T(d, PID).secure;
-    t.ok(sc && sc.signedBy === 'Roman' && sc.signature === 'Roman' && sc.confidence === 3 && sc.note === 'One more strap at the tail would help' && sc.checkedRows === true && sc.seal === 'SL-4418' && T(d, PID).sealOut === 'SL-4418', 'saved: secure report signed by Roman, 3/5 with the note, rows checked, seal SL-4418 (sealOut too)');
+    t.ok(sc && sc.signedBy === 'Roman' && sc.signature === 'Roman' && sc.confidence === 3 && sc.note === 'One more strap at the tail would help' && sc.checkedRows === true && sc.seal === 'SL-4418' && T(d, PID).sealOut === 'SL-4418', 'saved: strapped report signed by Roman, 3/5 with the note, rows checked, seal SL-4418 (sealOut too)');
     t.eq(sc.gear, { plywood: { qty: 6, owner: 'ours' }, bars: { qty: 2, owner: 'ours' }, straps: { qty: 4, owner: 'driver' }, airbags: { qty: 0, owner: 'ours' } }, 'saved gear: plywood 6 ours, bars 2 ours, straps 4 driver\'s');
     t.eq(sc.tags, ['B-301', 'B-302'], 'saved tags B-301, B-302 (capitals)');
-    t.eq(sc.photos, { nose: 1, middle: 1, tail: 1, closeup: 1, seal: 1 }, 'saved: 5 securement photos');
+    t.ok(sc.photoOwner === 'strap:' + PID && sc.photoCount === 1 && sc.v === 2, 'saved: 1 strapped photo under strap:<truck> (no fixed photo slots)');
     const gr = (d.zzGear || []).filter(g => g.trailerId === PID);
     t.eq(gr.map(g => `${g.type}:${g.qty}:${g.dir}:${g.src}:${(g.tags || []).join('+')}`).sort(), ['bars:2:out:secure:B-301+B-302', 'plywood:6:out:secure:'], 'gear ledger: plywood 6 and bars 2 (with the tags) go out with Altex; the driver\'s straps do not');
-    // photo log, then wrap up and send
+    t.ok(await p.locator('[data-zz=step-bills]').count() === 1, 'then the Bills step');
+    await p.locator('[data-zz=step-bills] [data-zz=caminput]').setInputFiles(h.UPLOAD_PNG);
+    await p.waitForFunction(id => { const d = JSON.parse(localStorage.getItem('cdweb:cd6:doc')); return (d.trailers.find(x => x.id === id) || {}).bolPhotoCount === 1; }, PID, { timeout: 6000 });
+    await wait(p, 400);
+    if (await p.getByRole('button', { name: 'Bills done — wrap up' }).count()) await p.getByRole('button', { name: 'Bills done — wrap up' }).click();
+    await wait(p, 500);
+    t.ok(await p.locator('[data-zz=step-wrap]').count() + (/Step 7 of 7: Wrap up/.test(norm(await h.text(p))) ? 1 : 0) >= 1, 'with the bills photo in, the screen moves on to Wrap up');
+    const ws = norm(await h.text(p));
+    t.ok(/Loadout photos\s*1/.test(ws) && /Inspect photos\s*2 \/ 2/.test(ws) && /Strapped\s*3\/5/.test(ws) && /Bills\s*1 photos?/.test(ws), 'the wrap-up summary: loadout photos, inspect photos, Strapped 3/5, Bills');
     await p.getByRole('button', { name: /Wrap up & send/ }).click();
     await wait(p);
-    t.ok(await p.locator('[data-zz=securefirst]').count() === 0 && (await p.locator('input[placeholder="SL-00000"]').last().inputValue()) === 'SL-4418', 'after securing: Send to dispatch is open and the seal is filled in (SL-4418)');
-    await p.keyboard.press('Escape');
-    await wait(p);
-    await p.getByRole('button', { name: 'Photo log', exact: true }).click().catch(() => {});
-    await wait(p);
-    const logIn = p.locator(':text("shoot the load in the trailer")').locator('xpath=ancestor::*[.//input[@type="file"]][1]').locator('input[type=file]').first();
-    await logIn.setInputFiles(h.UPLOAD_PNG);
-    await wait(p, 800);
-    await p.getByRole('button', { name: /Wrap up & send/ }).click();
-    await wait(p);
+    t.ok(await p.locator('[data-zz=securefirst]').count() === 0 && (await p.locator('input[placeholder="SL-00000"]').last().inputValue()) === 'SL-4418', 'Send to dispatch is open and the seal is filled in (SL-4418)');
     await p.getByRole('button', { name: 'Send to dispatch', exact: true }).click();
     await wait(p, 700);
     d = await h.readDoc(p);
-    t.ok(T(d, PID).stage === 'done' && T(d, PID).workDoneAt && T(d, PID).afterPhotoCount >= 1, 'saved: the pickup is done (photo log taken)');
+    t.ok(T(d, PID).stage === 'done' && T(d, PID).workDoneAt && T(d, PID).bolPhotoCount === 1, 'saved: the delivery truck is done (bills photo taken)');
     await p.setViewportSize(DESK);
     await h.check(p, 'h-crew-done-1400');
   }
@@ -677,12 +747,19 @@ H.main('e2e-day', async (h, t) => {
     await p.locator('button.zzb-card, .zz-row', { hasText: 'Truck 4418' }).first().click();
     await wait(p, 500);
     const sec = p.locator('[data-zzb=secured]');
-    await p.waitForFunction(() => { const s = document.querySelector('[data-zzb=secured]'); return s && s.querySelectorAll('img').length === 5; }, null, { timeout: 5000 });
+    await p.waitForFunction(() => { const s = document.querySelector('[data-zzb=secured]'); return s && s.querySelectorAll('img').length === 1; }, null, { timeout: 5000 });
     const st = await txt(sec);
     t.ok(st.includes('Loaded and secured') && st.includes('3 of 5') && st.includes('OK') && st.includes('Seal SL-4418') && st.includes('Signed by Roman') && st.includes('One more strap at the tail would help'),
       'secured section: 3 of 5 (OK) with the crew\'s note, seal SL-4418, signed by Roman');
     t.ok(/Plywood[^]*6[^]*Ours \(24 HR\)/.test(st) && /Load bars[^]*2[^]*Ours \(24 HR\)/.test(st) && /Straps[^]*4[^]*Driver's/.test(st) && st.includes('B-301') && st.includes('B-302'), 'gear table: plywood 6 and bars 2 ours, straps 4 the driver\'s; tags B-301, B-302');
-    t.eq(await sec.locator('img').count(), 5, 'the 5 securement photos (nose, middle, tail, close-up, seal)');
+    t.eq(await sec.locator('img').count(), 1, 'the strapped photo (strap:<truck>; no fixed nose / middle / tail slots)');
+    t.ok(st.includes("How it's secured and what's used"), 'the photo is labelled "How it\'s secured and what\'s used" (' + st + ')');
+    const lp = p.locator('[data-zzb=load-plan]');
+    t.ok(/2 stops/.test(await txt(lp)), 'truck sheet: the load plan says 2 stops');
+    t.eq(await lp.locator('li[data-sid]').evaluateAll(xs => xs.map(x => x.dataset.sid)), [L2, L1], 'the load plan in loading order: E2E-B (stop 2, nose) then E2E-A (stop 1, by the doors)');
+    t.eq(await p.locator('[data-zzb=ship-photo] img').count(), 1, 'the shipper photo the customer gave is on the truck sheet');
+    const dn = await txt(p.locator('[data-zzb=done]'));
+    t.ok(/Load E2E-A 11 of 12 pallets on the BOL/.test(dn) && /Load E2E-B ✓ 8 of 8 pallets on the BOL/.test(dn), 'Done section: each load counted when loaded (E2E-A 11 of 12, E2E-B 8 of 8)');
     t.eq(await sec.locator('.zzb-bars i').count(), 5, 'confidence bars');
     await sec.scrollIntoViewIfNeeded();
     await h.check(p, 'i-secured-390');
@@ -884,6 +961,103 @@ H.main('e2e-day', async (h, t) => {
     t.ok(tagPart.includes('B-302') && !tagPart.includes('B-301') && /Back to us: 2 load bars/.test(gt), 'only tag B-302 is still out; "Back to us: 2 load bars" is in the last moves');
     await p.locator('[data-zzb=gear]').scrollIntoViewIfNeeded();
     await h.check(p, 'l-customer-gear-390');
+  }
+
+  /* ================= m) a consolidated PACK: packing photos, securing photos, a signed manifest; Altex sees only its lines ================= */
+  t.section('m) crew PACKs a consolidated trailer (Altex + another company): packing photos, Secure with what\'s-used photos, signed manifest; the customer sees only its own lines');
+  {
+    let p = await as('office', DESK);
+    // two loads on the floor: one of Altex and one of another company (Nick's demo), onto a new outbound trailer at a free door
+    const pick = await calc(p, (hh, d) => {
+      const T0 = new Set(d.trailers.filter(t => t.direction === 'outbound' && t.stage !== 'departed' && t.stage !== 'cancelled').map(t => t.id));
+      const free = d.shipments.filter(s => s.receivedAt && !s.shippedAt && !s.loadedAt && (!s.trailerOutId || !T0.has(s.trailerOutId)));
+      const a = free.find(s => s.customerId === 'cu_altex'), o = free.find(s => s.customerId && s.customerId !== 'cu_altex');
+      const busy = new Set(d.trailers.filter(t => t.dock && /^D\d$/.test(t.dock) && !['departed', 'cancelled'].includes(t.stage)).map(t => t.dock));
+      const door = ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8'].find(x => !busy.has(x)) || null;
+      return { a: a && a.id, ar: a && a.ref, o: o && o.id, or: o && o.ref, oc: o && o.customerId, door, d6: (d.trailers.find(t => t.dock === 'D6' && !['departed', 'cancelled'].includes(t.stage)) || {}).id || null };
+    });
+    t.ok(pick.a && pick.o, `(floor loads for the pack: Altex ${pick.ar}, ${pick.oc} ${pick.or})`);
+    if (!pick.door && pick.d6) await act(p, 'patchTrailer', pick.d6, { stage: 'departed', dock: null, departedAt: iso(await p.evaluate(() => Date.now())) });
+    const door = pick.door || 'D6';
+    const now0 = await p.evaluate(() => Date.now());
+    await act(p, 'addTrailer', { id: 'e2e_pk', bookedVia: 'office', truck: '4419', trailer: 'T419', carrier: 'Altex Transportation', direction: 'outbound', jobType: 'Consolidate & reload', customerId: 'cu_altex',
+      scheduledAt: iso(now0), pickupIds: [pick.a, pick.o], notes: '' });
+    await act(p, 'patchTrailer', 'e2e_pk', { arrivedAt: iso(now0), dockedAt: iso(now0), dock: door, stage: 'at-dock', confirmedAt: iso(now0) });
+    let d = await h.readDoc(p);
+    t.ok(T(d, 'e2e_pk') && S(d, pick.a).trailerOutId === 'e2e_pk' && S(d, pick.o).trailerOutId === 'e2e_pk', `saved: truck 4419 (outbound, ${door}) with both loads planned onto it`);
+
+    p = await as('crew');
+    await p.getByRole('button', { name: /All trucks/ }).first().click();
+    await wait(p, 400);
+    const card = p.locator(':text("Truck 4419 · Trailer T419")').locator('xpath=ancestor::*[.//button[contains(@class,"rounded-lg")]][1]');
+    await card.getByRole('button', { name: /^Start/ }).first().click();
+    await wait(p, 600);
+    t.ok(/^PACK · Consolidated trailer$/.test(norm(await p.locator('[data-zz=jobtitle]').innerText())) && /2 loads to build/.test(await p.locator('[data-zz=jobtask]').innerText()), 'the job in big words: "PACK · Consolidated trailer", "2 loads to build"');
+    t.eq(await stepNames(p), ['Pack', 'Secure the load', 'Manifest', 'Wrap up'], 'PACK steps: Pack, Secure the load, Manifest, Wrap up');
+    const bdg = await p.$$eval('[data-zz=jobcard] [data-zz=badge]', bs => bs.map(b => b.innerText.replace(/\s+/g, ' ').trim()));
+    t.ok(bdg.length === 2 && /^1 /.test(bdg[0]) && /^2 /.test(bdg[1]), 'each load has its number badge with its PRO (' + bdg.join(' / ') + ')');
+    // packing photos the whole time (the step camera and the floating one)
+    await p.locator('[data-zz=step-pack] [data-zz=caminput]').first().setInputFiles(h.UPLOAD_PNG);
+    await countIs(p, '[data-zz=step-pack] [data-zz=camcount]', 1);
+    await p.locator('[data-zz=floatcaminput]').setInputFiles(h.UPLOAD_PNG);
+    await countIs(p, '[data-zz=step-pack] [data-zz=camcount]', 2);
+    for (const r of [pick.ar, pick.or]) {
+      const pc = p.locator('div.rounded-lg.p-3.space-y-3').filter({ hasText: r }).first();
+      await pc.getByRole('button', { name: 'Count is correct' }).click();
+      await wait(p, 300);
+      await pc.getByRole('button', { name: /^3\. Load it/ }).click();
+      await wait(p, 500);
+    }
+    d = await h.readDoc(p);
+    t.ok(S(d, pick.a).loadedAt && S(d, pick.o).loadedAt && T(d, 'e2e_pk').afterPhotoCount === 2, 'saved: both loads on, 2 packing photos (after:<truck>)');
+    await h.check(p, 'm-pack-390');
+    // Secure: what's used, a photo of it, seal, confidence, sign
+    await step(p, 'Secure the load');
+    const sf = p.locator('[data-zz=secureform]');
+    await sf.locator('[data-gear=bars] button[aria-label^="One more"]').click();
+    await sf.locator('[data-gear=airbags] button[aria-label^="One more"]').click();
+    await sf.locator('[data-zz=secphotos] [data-zz=caminput]').setInputFiles([h.UPLOAD_PNG, h.UPLOAD_PNG]);
+    await countIs(p, '[data-zz=secphotos] [data-zz=camcount]', 2);
+    await sf.locator('input[aria-label="Seal number"]').fill('SL-4419');
+    await sf.locator('[data-conf="5"]').click();
+    await sf.locator('[data-zz=secchk]').check();
+    await sf.locator('[data-zz=secsign]').fill('Roman');
+    await sf.getByRole('button', { name: 'Save and sign' }).click();
+    await wait(p, 800);
+    d = await h.readDoc(p);
+    const pk = T(d, 'e2e_pk');
+    t.ok(pk.secure && pk.secure.photoOwner === 'strap:e2e_pk' && pk.secure.photoCount === 2 && pk.secure.confidence === 5 && pk.sealOut === 'SL-4419', 'saved: secured with 2 photos of the securing and what is used, 5/5, seal SL-4419');
+    // the manifest: one line per load, prefilled; sign it
+    t.ok(await p.locator('[data-zz=mfform]').count() === 1, 'saving the securement moves on to the Manifest');
+    t.eq((await p.$$eval('[data-zz=mfline]', ls => ls.map(l => l.getAttribute('data-sid')))).sort(), [pick.a, pick.o].sort(), 'the manifest has one line per load, prefilled');
+    await p.locator('[data-zz=mfsign]').fill('Roman');
+    await h.check(p, 'm-manifest-390');
+    await p.getByRole('button', { name: 'Save and sign the manifest' }).click();
+    await wait(p, 800);
+    d = await h.readDoc(p);
+    const mf = T(d, 'e2e_pk').manifest;
+    t.ok(mf && mf.lines.length === 2 && mf.signedBy === 'Roman' && mf.total === fe2(S(d, pick.a)) + fe2(S(d, pick.o)), `saved: the manifest on the truck, 2 lines, ${mf && mf.total} pallets, signed by Roman`);
+    await p.getByRole('button', { name: /Wrap up & send/ }).click();
+    await wait(p);
+    t.ok(!(await p.getByRole('button', { name: 'Send to dispatch', exact: true }).isDisabled()), 'packed, secured, manifest signed: Send to dispatch is open');
+    await p.getByRole('button', { name: 'Send to dispatch', exact: true }).click();
+    await wait(p, 700);
+    t.ok(T(await h.readDoc(p), 'e2e_pk').stage === 'done', 'truck 4419 is done');
+
+    // the customer sees only the line of its own load on the manifest; never the other company
+    p = await as('customer');
+    await p.locator('nav.zz-tabs button', { hasText: 'Trucks' }).first().click();
+    await wait(p, 300);
+    await p.locator('button.zzb-card, .zz-row', { hasText: 'Truck 4419' }).first().click();
+    await wait(p, 500);
+    const ts = p.locator('[data-zzb=truck]');
+    const mfc = ts.locator('[data-zzb=manifest]');
+    const mt = await txt(mfc);
+    const all = await txt(ts);
+    t.ok(await mfc.locator('[data-zzb=mf-line]').count() === 1 && mt.includes(pick.ar) && !all.includes(pick.or) && /Signed by Roman/.test(mt), `customer manifest: only its own line (${pick.ar}), never the other company's load (${pick.or})`);
+    const oname = await calc(p, (hh, dd, id) => (dd.customers.find(c => c.id === id) || {}).name || '', pick.oc);
+    t.ok(!oname || !all.includes(oname), 'the other company\'s name is not on the customer\'s truck sheet');
+    await tallShot(p, 'm-customer-manifest-390');
   }
 
   await ctx.close();

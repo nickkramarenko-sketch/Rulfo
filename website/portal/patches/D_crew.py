@@ -285,4 +285,9 @@ PATCHES = [
      U(r'''let Q=ZZd_kind(a,e);'''),
      'Truck card (xj) band: the job word (UNPACK, UNLOAD, PACK, DELIVERY, PICKUP) and its trailer / receiver, like the truck screen, '
      'instead of "CONSOLIDATED TRAILER / PICKUP / FOR DELIVERY".'),
+    ('D50',
+     U(r'''[R("Loads off"),b?`${_.length} / ${T.length}`:`${Y.length}`,b&&k.length?m.amber:m.text],[R("Counted vs BOL"),_.some(U=>U.qc?.counted==null)?`${_.filter(U=>U.qc?.counted==null).length} ${R("not counted")}`:_.filter(U=>U.qc.counted!==fe(U)).length?`${_.filter(U=>U.qc.counted!==fe(U)).length} ${R("off")}`:_.length?R("all match"):"~u2014",_.some(U=>U.qc?.counted==null||U.qc.counted!==fe(U))?m.amber:m.text],'''),
+     U(r'''...ZZd_cntRows({l,t,b,_,T,Y,k}),'''),
+     'Wrap-up summary on a loading truck: "Loads on 2 / 2" instead of "Loads off 2", and "Counted vs BOL" from the counts taken while loading (pullCount) instead of a dash.'),
+
 ]
