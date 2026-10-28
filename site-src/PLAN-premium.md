@@ -219,6 +219,57 @@ Service names in the quote form (`SVC` list in build.py) become: Cross-docking �
 Freight rework / restack · Pallet storage / warehousing · Third-party pickup or delivery · Fulfillment / FBA prep (Reno) · Not sure yet.
 Old `?svc=` values map to the new names.
 
+### 5.1 Fragment files and who writes them
+Every page body is a fragment in `site-src/pages/`. The first two lines of a fragment carry its title and description:
+`<!--title: Cross-Docking in Sacramento, CA | 24 HR Crossdock-->` and `<!--desc: 120-160 characters-->` (build.py reads and strips them).
+
+| URL | fragment | written by |
+|---|---|---|
+| `/` | `hub.html` (rewrite in place) | content: home |
+| `/services/` | `services.html` (new; the dock table comes from `<!--svctable-->`) | content: home |
+| `/about/`, `/get-started/` | `_old_company.html`, `_old_get-started.html` (tighten in place) | content: home |
+| `/cross-docking/` `/transloading/` `/freight-consolidation/` | `cross-docking.html` `transloading.html` `freight-consolidation.html` | content: company A |
+| `/freight-rework/` `/warehousing/` `/pickups-deliveries/` | `freight-rework.html` `warehousing.html` `pickups-deliveries.html` | content: company B |
+| `/sacramento/` + 3 | `loc-sac.html`, `sac-cross-docking.html`, `sac-transloading.html`, `sac-freight-consolidation.html` | content: Sacramento |
+| `/harrisburg/` + 3 | `loc-pa.html`, `pa-cross-docking.html`, `pa-freight-rework.html`, `pa-freight-consolidation.html` | content: Harrisburg |
+| `/reno/` + 4 | `loc-reno.html` (new, replaces reno_home() over `_old_warehousing.html`), `reno-cross-docking.html` (from `_old_cross-dock.html`), `reno-pallet-storage.html` (from `_old_pallet-storage-reno.html`), `reno-pickups-deliveries.html` (from `delivery.html`), `reno-transloading.html` (from `transload.html`) | content: Reno |
+| `/reno/fulfillment/` `/reno/fba-prep/` | `_old_fulfillment.html`, `_old_fba-prep-reno.html` (links fixed only) | framework |
+| `/client-portal/` `/drivers/` `/quote/` `/locations/` `/thanks/` 404 | as today (generated or `_old_*`), facts and links updated | framework |
+
+build.py must not crash when a fragment is missing: it builds a stub page (H1 from the registry, one line) and prints `STUB: <file>`. The finish
+step fails if any STUB remains. The old fragments that are replaced (`_old_warehousing.html`, `_old_cross-dock.html`, `_old_pallet-storage-reno.html`,
+`delivery.html`, `transload.html`, `trailers.html`, `_old_sacramento.html`, `_old_middletown.html`, `_old_locations.html`) are deleted by the finish step once nothing uses them.
+
+### 5.2 Markup the markers produce (the framework builds exactly this; the CSS styles exactly this)
+- `<!--img KEY-->` → `<figure class="ph r32"><picture><source type="image/webp" srcset="/assets/img/KEY.webp"><img src="/assets/img/KEY.jpg" alt="…" width="2400" height="1600" loading="lazy" decoding="async"></picture></figure>`
+  (`r32` 3:2 default; `<!--img KEY r169-->` 16:9, `r45` 4:5; the webp source only when the file exists; a `<figcaption>` when `MEDIA[KEY]['caption']` is set).
+  Inside `<section class="hero …">`, `<!--img KEY hero-->` → `<img class="hv" src="/assets/img/KEY.jpg" alt="" aria-hidden="true" fetchpriority="high">` and the section gets class `hasv` (same overlay as the video).
+- `<!--video KEY-->` (inside a hero) → `<video class="hv" muted loop playsinline preload="none" poster="/assets/video/KEY.jpg" data-src="/assets/video/KEY.mp4" aria-hidden="true"></video>` + class `hasv`; site.js attaches `src` and plays only when motion is allowed, the viewport is ≥ 700 px and `saveData` is off. When the mp4 is missing but the poster exists, the poster is used as a hero image; when neither exists, nothing.
+- `<!--facts LOC-->` → `<section class="facts f7"><div class="w"><dl>` with seven `<div><dt>…</dt><dd>…</dd></div>`: doors · sq ft · pallet storage · forklifts (4,500 lb) · pickups & deliveries radius · hours (dd = after-hours line) · address (`<dt class="ad">`, dd = Get directions link) `</dl></div></section>`
+- `<!--specialties LOC-->` → `<section class="s spec"><div class="w"><div class="intro rv"><h2>What {City} does best</h2><p>…</p></div><div class="cards three rv">` one `<article><span class="num">1</span><h3><a href="…">Cross-docking</a></h3><p>one line</p><p class="more"><a href="…">Cross-docking in {City} →</a></p></article>` per specialty (3 or 4) `</div></div></section>`
+- `<!--also LOC-->` → `<section class="s a also"><div class="w split"><div class="l"><h2>Everything else we do in {City}</h2><p>…</p></div><ul class="rows">…</ul></div></section>` (every service in §3.1 that is not a specialty there, with its company page linked)
+- `<!--freight-->` → `<section class="s freight"><div class="w"><div class="intro rv"><h2>Built to handle more than standard pallets</h2><p>…</p></div><div class="cards three rv">` six `<article><h3>Drums</h3><p>…</p></article>` `</div><p class="fine">Dry freight only…4,500 lb…call first…</p></div></section>` (+ `<!--img svc-freight-->` inside when present)
+- `<!--storage LOC-->` → the existing `<section class="s store">` block (navy), with the capacity, the terms (daily, weekly, monthly, long-term), floor and racked, billed weekly, no minimums, a storage quote button and a link to `/warehousing/` (Reno: to `/reno/pallet-storage/`).
+- `<!--pickups LOC-->` → `<section class="s pk"><div class="w split"><div class="l"><span class="tag">Pickups &amp; deliveries</span><h2>Pickups and deliveries within {radius} miles of {City}</h2><p>…</p><p class="ctas2"><a class="btn r" href="/quote/?…">Get a pickup or delivery quote</a><a class="btn o" href="/pickups-deliveries/">How it works</a></p></div><ul class="rows">One-time · Recurring · Windows confirmed first · Signed proof of delivery · Tied to cross-dock, storage, consolidation, rework</ul></div></section>`
+- `<!--loclinks SVC-->` → `<section class="s a loclinks"><div class="w"><div class="intro rv"><h2>{Service} at each dock</h2><p>…</p></div><div class="loccards rv">` one `<article><span class="tag">{short}</span><h3>{City}, {ST}</h3><p class="lsub">{doors} dock doors · {sq ft}</p><p>{one specific line}</p><div class="lbtns"><a class="btn r" href="…">{Service} in {City}</a></div></article>` per location (links to the location's page for that service when it exists, else to the location home) `</div></div></section>`
+- `<!--cta SVC LOC-->` → `<a class="btn r" href="/quote/?loc=…&amp;svc=…">Get a {service} quote</a>` (LOC optional); `<!--reach LOC-->` → the `facts3` drive-time block; `<!--drivers LOC-->` → driver_box(loc); `<!--manager LOC-->` → the "Talk to the {City} dock" section; `<!--svctable-->` → the services-by-dock table (all services at all docks; a ★ marks a specialty).
+- Unknown or unexpanded markers fail the build (check()).
+
+### 5.3 Fragment skeletons (keep pages short: 350–650 words of body copy; no two sibling pages may share more than a few sentences)
+Location home (`loc-*.html`, §1.5 order): hero (`hero sm` is too small: use `<section class="hero">` with the two-column grid like the home page;
+crumb, H1 with a `<span>` accent, 2-sentence sub, `<!--video LOC-->` + `<!--img loc-LOC-hero hero-->`, ctas) → `<!--facts LOC-->` → `<!--specialties LOC-->` →
+`<!--also LOC-->` → `<!--freight-->` → `<!--storage LOC-->` → `<!--pickups LOC-->` → local section (`split`: "Why {City}" lanes, ports, who uses this dock + `<!--reach LOC-->`)
+→ `<!--drivers LOC-->` → `<!--manager LOC-->`. The CTA band is added by page().
+Location service page (`sac-*.html`, `pa-*.html`, `reno-*.html`): `hero sm` (crumb "{City} / {Service}", H1, sub with one local hook, ctas incl. `<!--cta SVC LOC-->`,
+optional `<!--img KEY hero-->`) → `<!--facts LOC-->` → "How {service} works in {City}" (`split` + `rows` or `steps`, specific to the dock: doors, floor space,
+what arrives there, typical turn) → "Why {City} for {service}" (`split`: lanes, ports, drive times with "about", who uses it) → FAQ (`<div class="faq">` with 3–5
+`<details><summary>Q</summary><p>A</p></details>`, specific to this page) → related (`<!--loclinks SVC-->` + links to the location's other specialties).
+Company-wide service page: `hero sm` (H1 = service, sub = at three docks) → "What it is / how it works" (`steps` 4–5) → who it is for (`who` grid) →
+`<!--loclinks SVC-->` → `<!--freight-->` (cross-docking, warehousing and transloading pages only) → FAQ → quote CTA with `<!--cta SVC-->`.
+Allowed classes: the existing ones listed in §5 plus `cards three`, `num`, `more`, `ctas2`, `ph`, `faq`. No inline styles beyond `style="margin-top:24px"` on a button paragraph.
+Self-check before finishing a fragment: balanced tags (html.parser), exactly one `<h1>`, the title and desc comments present and within length, no words from §3.2,
+links only to URLs in §4 (or `{TEL}`, `{SMS}`, `{PORTAL}`), every number traceable to §3.
+
 ---------------------------------------------------------------------------------------------------
 ## 6. Media (photos and video)
 
