@@ -499,6 +499,10 @@ ZZacts=({S,C,M,N,L,B,w})=>{
      load) plus any extra line (sid null, e.g. loose freight), pallets loaded on every line, typed signature. Saved on the
      truck in one write; signing again replaces it. Refused (nothing written): no lines, a line without pallets loaded,
      no signature. History says only "Manifest signed" (customers read the trail; their lines come from ZZmanifestFor). */
+  /* 22. Setup > "Reload demo data" (local mode only, staff Setup): a fresh demo day in one write, like a first visit;
+     logins, settings and rates stay; the old demo's photos are removed from this device. Shared data: refused. */
+  zzDemoReload:()=>{if(typeof ZZsync==="undefined"||ZZsync.mode!=="local"){w(R("Reload demo data works only on this device's own copy."),{tone:"bad"});return null}
+    ZZa_wipeDemo();let p=S(x=>x.demoCleared?null:ZZdemoFresh(x));w(R("Fresh demo day loaded."),{tone:"good"});return p},
   zzManifest:(tid,mf={})=>{mf=mf||{};let sig=String(mf.signature||"").trim(),raw=(Array.isArray(mf.lines)?mf.lines:[]).filter(l=>l&&(l.sid||String(l.ref||"").trim()||String(l.note||"").trim())),
       bad=v=>v==null||v===""||!Number.isFinite(+v)||+v<0,
       why=!raw.length?"Add at least one line to the manifest.":raw.some(l=>bad(l.loaded))?"Fill in the pallets loaded on every line.":!sig?"Sign the manifest with your name.":"";
@@ -515,4 +519,118 @@ ZZacts=({S,C,M,N,L,B,w})=>{
    instruction becomes "Please see the office." (the reason stays, for staff); patch A08 */
 ZZa_kioskBanner=txt=>{let s=String(txt||""),r=s.replace(/\s*(Please try again|Shorten the long text[^.]*and try again|Delete old photos or use another device, and tell the office|Tell the owner: [^.]*)\.\s*$/,"");return r!==s?r+" Please see the office.":s},
 /* test probe: only rendered when the test harness sets window.__ZZTEST */
-ZZa_probe=({doc,actions,role})=>{(0,H.useEffect)(()=>{try{window.__zz={doc,actions,role,h:{ZZFLAGS,ZZPUBLIC_URL,ZZLANGS,ZZEVENTS,ZZALERTS,ZZGEAR,ZZSECSLOTS,ZZDMGKINDS,ZZS,ZZactive,ZZcode,ZZnewCode,ZZokCode,ZZbyCode,ZZetaLink,ZZsafeUrl,ZZzonedIso,ZZdockParts,ZZyardQ,ZZplace,ZZwaitMs,ZZtone,ZZtoneColor,ZZestWait,ZZpromise,ZZtruckSteps,ZZdayLoad,ZZcrewOnShift,ZZgearOut,ZZdmgLines,ZZestTotal,ZZautoLimit,ZZdmgMonths,ZZweekKey,ZZweek,ZZtrail,ZZrecips,ZZmsgs,ZZrewrapBilled,ZZa_kioskBanner,ZZBADGE,ZZPOS,ZZJOBS,ZZPHOTO_BIG,ZZloadJob,ZZloadBadges,ZZposSuggest,ZZloadOrder,ZZdmgDrafts,ZZmanifestFor,ZZphotoCap,ZZnoDrafts,ZZcustView,ZZdriverText:typeof ZZdriverText==="function"?ZZdriverText:void 0,pQ:(d,n)=>pQ(d,n),Im:(s,r,n)=>Im(s,r,n),Ln:(d,c)=>Ln(d,c),sync:ZZsync,photos:{ls:k=>ls(k),ex:(k,v)=>ex(k,v)}}}}catch{}});return null},
+ZZa_probe=({doc,actions,role})=>{(0,H.useEffect)(()=>{try{window.__zz={doc,actions,role,h:{ZZFLAGS,ZZPUBLIC_URL,ZZLANGS,ZZEVENTS,ZZALERTS,ZZGEAR,ZZSECSLOTS,ZZDMGKINDS,ZZS,ZZactive,ZZcode,ZZnewCode,ZZokCode,ZZbyCode,ZZetaLink,ZZsafeUrl,ZZzonedIso,ZZdockParts,ZZyardQ,ZZplace,ZZwaitMs,ZZtone,ZZtoneColor,ZZestWait,ZZpromise,ZZtruckSteps,ZZdayLoad,ZZcrewOnShift,ZZgearOut,ZZdmgLines,ZZestTotal,ZZautoLimit,ZZdmgMonths,ZZweekKey,ZZweek,ZZtrail,ZZrecips,ZZmsgs,ZZrewrapBilled,ZZa_kioskBanner,ZZBADGE,ZZPOS,ZZJOBS,ZZPHOTO_BIG,ZZloadJob,ZZloadBadges,ZZposSuggest,ZZloadOrder,ZZdmgDrafts,ZZmanifestFor,ZZphotoCap,ZZnoDrafts,ZZcustView,ZZDEMO_V,ZZDEMO_REFRESH,ZZdemoStale,ZZdemoMore,ZZdriverText:typeof ZZdriverText==="function"?ZZdriverText:void 0,pQ:(d,n)=>pQ(d,n),Im:(s,r,n)=>Im(s,r,n),Ln:(d,c)=>Ln(d,c),sync:ZZsync,photos:{ls:k=>ls(k),ex:(k,v)=>ex(k,v)}}}}catch{}});return null},
+
+/* ---------- demo day (Nick's private preview) ----------
+   ZZt10 (Nick's base) injects the zz demo trucks once; patch A50 hands its result to ZZdemoMore, which turns the set into
+   a believable busy day around "now": every truck state and every forklift job (UNPACK with 4 companies and a damage
+   snap, UNLOAD, PACK partly packed, DELIVERY with 3 stops, PICKUP), a finished damage report waiting for the customer,
+   a departed PACK with a signed manifest, inventory on the floor, open requests and messages. No photos are made
+   (every photo count is 0). tx() stamps a fresh demo (patch A51: zzDemo {v, at, day}).
+   ZZDEMO_REFRESH is false in the source; `build2.py --demo-refresh` bakes true into the PREVIEW build only: then, in
+   local mode, a demo doc (not demoCleared) older than today's dock day or than ZZDEMO_V is rebuilt on load (patch A06,
+   like a first visit; logins, settings and rates stay). Shared (db) mode is never touched. */
+ZZDEMO_V=2,
+ZZDEMO_REFRESH=!1,
+ZZdemoStamp=d=>d&&typeof d==="object"?{...d,zzDemo:{v:ZZDEMO_V,at:ye(Date.now()),day:ZZdockParts(Date.now()).ymd}}:d,
+ZZdemoStale=(d,now)=>{if(!ZZDEMO_REFRESH||typeof ZZsync==="undefined"||ZZsync.mode!=="local"||!d||typeof d!=="object"||d.demoCleared||!(d.zzT10||d.zzDemo))return!1;
+  let z=d.zzDemo;return!z||ie(z.v)<ZZDEMO_V||!z.day||String(z.day)<ZZdockParts(ZZa_nowMs(now)).ymd},
+/* local mode only: the old demo's photos (owners keyed by the old ids) and bell "seen" lists go with it */
+ZZa_wipeDemo=()=>{if(typeof ZZsync==="undefined"||ZZsync.mode!=="local")return;try{let ks=[];for(let k=0;k<localStorage.length;k++){let n=localStorage.key(k);n&&(n.startsWith("cdweb:cd6:photos:")||n.startsWith("cd6:seen:"))&&ks.push(n)}ks.forEach(n=>localStorage.removeItem(n))}catch{}},
+/* a fresh demo day; logins, settings and rates of the old doc stay */
+ZZdemoFresh=old=>{let f=tx();if(old&&typeof old==="object"){old.settings&&typeof old.settings==="object"&&(f.settings=old.settings);old.rates&&typeof old.rates==="object"&&(f.rates={...f.rates,...old.rates});f.rev=ie(old.rev)+1}return f},
+ZZdemoMore=d=>{try{
+  let now=Date.now(),H=h=>ye(now+h*Nt),day=ZZdockParts(now).ymd,TR=(d.trailers||[]).map(t=>({...t})),SH=(d.shipments||[]).map(s=>({...s})),
+    tk=id=>TR.find(t=>t.id===id),setT=(id,p)=>{let t=tk(id);t&&Object.assign(t,p)},setS=(id,p)=>{let s=SH.find(q=>q.id===id);s&&Object.assign(s,p)},
+    tc=(at,who,...w)=>w.map((what,k)=>({id:Ce(),at:H(at+k*.02),who,what})),
+    rc=(at,who,p,row,o={})=>({status:"staged",receivedAt:H(at),receivedBy:who,row:row||"",qc:{condition:o.cond||"Good",counted:o.cnt??p,note:o.qn||""},touches:tc(at,who,"receive","count",...(row?["row"]:[]))}),
+    NT=o=>({id:o.id,carrier:o.c,driver:o.drv,phone:o.ph||"",truck:o.tk,trailer:o.tl,direction:o.dir||"inbound",customerId:o.cu,needsMatch:!1,scheduledAt:H(o.sch),dock:o.dock||null,stage:o.stage,
+      arrivedAt:o.arr!=null?H(o.arr):null,dockedAt:o.dk!=null?H(o.dk):null,workStartedAt:o.ws!=null?H(o.ws):null,workDoneAt:o.wd!=null?H(o.wd):null,departedAt:o.dp!=null?H(o.dp):null,
+      sealIn:o.seal||"",sealOut:o.sealOut||"",sealVerified:o.seal?!0:null,notes:"",chat:[],instructions:o.ins||"",workStartedBy:o.ws!=null?o.by||"Roman":null,workDoneBy:o.wd!=null?o.by||"Roman":null,
+      jobType:o.jt||"",createdAt:H(o.sch-22),bookedVia:"office",confirmedAt:H(o.sch-20),confirmedBy:"Nick",driverLang:"en",...(o.arr!=null?{checkedInBy:"kiosk"}:{}),...(o.x||{})}),
+    NS=o=>({...gm(),id:o.id,ref:o.ref,customerId:o.cu,origin:o.org,dest:o.dst,lane:o.lane||"reno",units:{std:o.p,lg:0,crate:0},weight:o.p*(o.w||900),commodity:o.cm,status:"expected",
+      trailerInId:o.tin||null,trailerOutId:o.tout||null,row:"",bol:"BOL-"+o.ref,loadNotes:o.nt||"",deliverBy:H(24*(o.due||2)),seq:o.seq||0,
+      qc:{condition:"",counted:null,note:""},...(o.rcv!=null?rc(o.rcv,o.by||"Roman",o.p,o.row,o):{}),...(o.x||{})});
+  /* ---- the zz trucks Nick's ZZt10 made: spread over the day ---- */
+  setT("zzt1",{stage:"working",workStartedAt:H(-.15),workStartedBy:"Roman",scheduledAt:H(-.5),arrivedAt:H(-.35),dockedAt:H(-.3)});
+  setS("zzs1_1",rc(-.08,"Roman",8,"R14"));
+  setT("zzt2",{stage:"departed",scheduledAt:H(-3.5),arrivedAt:H(-3.1),dockedAt:H(-3),workStartedAt:H(-2.9),workStartedBy:"Sergio",workDoneAt:H(-2.1),workDoneBy:"Sergio",departedAt:H(-1.8)});
+  setS("zzs2_1",rc(-2.8,"Sergio",7,"R15"));setS("zzs2_2",rc(-2.6,"Sergio",9,"R16"));setS("zzs2_3",rc(-2.4,"Sergio",6,"R17"));
+  setT("zzt5",{stage:"departed",scheduledAt:H(-5.5),arrivedAt:H(-5.2),dockedAt:H(-5.1),workStartedAt:H(-5),workDoneAt:H(-3.7),workStartedBy:"Roman",workDoneBy:"Roman",departedAt:H(-3.4),
+    instructions:"East Coast consolidated. Unload all, sort. SSE-9001 waits on the floor for the Sacramento trailer (D8). The other two stay in Reno, one lane each."});
+  setS("zzs5_1",{...rc(-4.8,"Roman",11,""),trailerOutId:"zzt12",status:"loaded",loadedAt:H(-.35),pullCount:11,touches:[...tc(-4.8,"Roman","receive","count"),...tc(-.35,"Vlad","load")]});
+  setS("zzs5_2",{...rc(-4.7,"Roman",9,"R10",{cond:"Damaged",qn:"2 pallets crushed on the nose"}),touches:[...tc(-4.7,"Roman","receive","count","row"),...tc(-4,"Roman","damage")],
+    exceptions:[{id:"zzx_dmg1",kind:"Damage",draft:!1,note:"2 pallets \xB7 Crushed, Torn wrap \xB7 Forklift tine holes in 2 pallets on the nose",at:H(-4.7),openedBy:"Roman",resolved:!1,pallets:2,kinds:["Crushed","Torn wrap"],
+      what:"Forklift tine holes in 2 pallets on the nose",photoOwner:"dmg:zzx_dmg1",photoCount:0,est:{lines:[{id:"zzl1",label:"Rewrap pallet",qty:2,unit:15},{id:"zzl2",label:"Labor hours",qty:.5,unit:120}],sentAt:H(-4)},
+      answer:null,finishedAt:H(-4),finishedBy:"Roman",trailerId:"zzt5"}]});
+  setS("zzs5_3",rc(-4.5,"Roman",7,"R11"));
+  setT("zzt6",{dock:Ee,stage:"arrived",dockedAt:null,scheduledAt:H(-1),arrivedAt:H(-.9)});
+  setT("zzt3",{arrivedAt:H(-.35),scheduledAt:H(-.5)});
+  setT("zzt7",{arrivedAt:H(-.15)});
+  setT("zzt4",{eta:{at:H(.75),source:"driver",updatedAt:H(-.2),by:"Andre",note:"Chain-up at Donner, running a little late"},createdAt:H(-26),confirmedAt:H(-24),confirmedBy:"Nick"});
+  setT("zzt8",{arrivedAt:H(-.25),instructions:"The customer's own carrier picks up 3 loads from the floor, 24 pallets. Count, photo, load."});
+  setT("zzt9",{instructions:"The customer's carrier picks up 3 loads. Last one loads first."});
+  setT("zzt10",{instructions:"The customer's carrier picks up 3 loads, 25 pallets. Check the counts."});
+  /* ---- new trucks: the new forklift jobs ---- */
+  let gear=(p,b,s2,a)=>({plywood:{qty:p,owner:"ours"},bars:{qty:b,owner:"ours"},straps:{qty:s2,owner:"driver"},airbags:{qty:a,owner:"ours"}}),
+    nt=[
+    NT({id:"zzt11",c:"Keystone Linehaul",cu:"zzc11",drv:"Walt",ph:"775-555-0311",tk:"212",tl:"KL-5310",sch:-1.2,arr:-1,dk:-.9,ws:-.75,dock:"D6",stage:"working",seal:"SL-77120",jt:"Consolidate & reload",
+      ins:"East Coast consolidated from Edison, NJ: 5 loads, 4 companies. Sort each load to its own lane. BW-2201 and SSE-9050 go back on this trailer for Sacramento and Stockton. KL-7705 goes on the Sacramento trailer at D8."}),
+    NT({id:"zzt12",c:"Tahoe Freightways",cu:"zzc6",drv:"Ruben",ph:"775-555-0312",tk:"318",tl:"TF-882",dir:"outbound",sch:-.9,arr:-.8,dk:-.7,ws:-.5,dock:"D8",stage:"working",by:"Vlad",jt:"Consolidate & reload",
+      ins:"Consolidated trailer for Sacramento and Oakland: 3 loads from 3 companies. SSE-9001 is on. Pull WV-6120 and KL-7705, count, load, then secure it and fill in the manifest."}),
+    NT({id:"zzt13",c:"Carson Line Trucking",cu:"zzc3",drv:"Hector",ph:"775-555-0313",tk:"77",tl:"T612",dir:"outbound",sch:-.4,arr:-.3,dk:-.25,dock:"D5",stage:"at-dock",jt:"Reno delivery",
+      ins:"Delivery, 3 stops: Sparks first, Fernley second, Fallon last. Fallon goes in the nose, Sparks by the doors. Liftgate at Fallon.",x:{multiStop:!0}}),
+    NT({id:"zzt14",c:"Sparks Pallet Movers",cu:"zzc9",drv:"Dale",ph:"775-555-0314",tk:"140",tl:"SP-220",dir:"outbound",sch:-6,arr:-5.8,dk:-5.7,ws:-5.6,wd:-4.4,dp:-4.1,dock:"D8",stage:"departed",by:"Sergio",sealOut:"SL-91204",jt:"Consolidate & reload",
+      ins:"Consolidated trailer for Salt Lake City: 3 loads from 3 companies.",
+      x:{afterPhotoCount:0,strapPhotoCount:0,secure:{gear:gear(5,2,4,0),tags:["LB-2041","LB-2042"],seal:"SL-91204",photos:null,photoOwner:"strap:zzt14",photoCount:0,v:2,confidence:5,note:"",checkedRows:!0,signature:"Sergio",signedBy:"Sergio",signedAt:H(-4.5)},
+        manifest:{lines:[{id:"zzm1",sid:"zzs14_1",ref:"SP-3420",customerId:"zzc9",planned:8,loaded:8,stop:null,pos:null,note:""},{id:"zzm2",sid:"zzs14_2",ref:"GB-8320",customerId:"zzc4",planned:6,loaded:6,stop:null,pos:null,note:""},
+          {id:"zzm3",sid:"zzs14_3",ref:"NN-3520",customerId:"zzc10",planned:5,loaded:5,stop:null,pos:null,note:"Top row only"},{id:"zzm4",sid:null,ref:"Loose cartons",customerId:"zzc9",planned:0,loaded:1,stop:null,pos:null,note:"2 loose cartons shrink-wrapped onto one pallet"}],
+          total:20,signature:"Sergio",signedBy:"Sergio",signedAt:H(-4.45)},
+        history:[{id:Ce(),at:H(-4.5),by:"Sergio",text:"Load secured: 5/5, seal SL-91204"},{id:Ce(),at:H(-4.45),by:"Sergio",text:"Manifest signed"}]}})],
+    ns=[
+    NS({id:"zzs11_1",ref:"KL-7701",cu:"zzc11",org:"Edison, NJ",dst:"Reno, NV",p:10,cm:"Housewares",tin:"zzt11",seq:0,rcv:-.6,row:"R18"}),
+    NS({id:"zzs11_2",ref:"BW-2201",cu:"zzc12",org:"Edison, NJ",dst:"Sacramento, CA",lane:"sac",p:12,cm:"Imported tile",w:1400,tin:"zzt11",seq:1,rcv:-.5,nt:"Reloads nose-first \xB7 No double stack"}),
+    NS({id:"zzs11_3",ref:"KL-7705",cu:"zzc11",org:"Edison, NJ",dst:"Sacramento, CA",p:7,cm:"Small appliances",tin:"zzt11",tout:"zzt12",seq:2,rcv:-.4,row:"R19"}),
+    NS({id:"zzs11_4",ref:"JH-4410",cu:"zzc13",org:"Allentown, PA",dst:"Sparks, NV",p:8,cm:"Patio furniture",tin:"zzt11",seq:3,nt:"Fragile — top row only",
+      x:{exceptions:[{id:"zzx_snap1",kind:"Damage",draft:!0,photoOwner:"dmg:zzx_snap1",photoCount:0,at:H(-.1),openedBy:"Roman",note:"Corner crushed on the top pallet",snapNote:"Corner crushed on the top pallet",resolved:!1,trailerId:"zzt11"}]}}),
+    NS({id:"zzs11_5",ref:"SSE-9050",cu:"zzc5",org:"Baltimore, MD",dst:"Stockton, CA",lane:"sac",p:6,cm:"Building material",tin:"zzt11",seq:4}),
+    NS({id:"zzs2_4",ref:"WV-6120",cu:"zzc2",org:"Fresno, CA",dst:"Oakland, CA",p:8,cm:"Canned goods",tin:"zzt2",tout:"zzt12",seq:3,rcv:-2.3,by:"Sergio",row:"R13"}),
+    NS({id:"zzs13_1",ref:"CL-7310",cu:"zzc3",org:"Salt Lake City, UT",dst:"Fallon, NV",p:6,cm:"Tile",tout:"zzt13",seq:0,rcv:-22,row:"R05",x:{stop:3,pos:"nose"}}),
+    NS({id:"zzs13_2",ref:"CL-7311",cu:"zzc3",org:"Salt Lake City, UT",dst:"Fernley, NV",p:8,cm:"Grout",tout:"zzt13",seq:1,rcv:-22,row:"R06",x:{stop:2,pos:"middle"}}),
+    NS({id:"zzs13_3",ref:"CL-7312",cu:"zzc3",org:"Salt Lake City, UT",dst:"Sparks, NV",p:5,cm:"Fixtures",tout:"zzt13",seq:2,rcv:-22,row:"R07",x:{stop:1,pos:"tail"}}),
+    ...[["zzs14_1","SP-3420","zzc9","Salt Lake City, UT",8,"Pallet racking"],["zzs14_2","GB-8320","zzc4","Ogden, UT",6,"Lumber"],["zzs14_3","NN-3520","zzc10","Salt Lake City, UT",5,"Insulation"]].map(([id,ref,cu,dst,p,cm],k)=>
+      NS({id,ref,cu,org:"Reno, NV",dst,p,cm,tout:"zzt14",seq:k,rcv:-27,x:{status:"shipped",shippedAt:H(-4.1),loadedAt:H(-5.3+k*.2),pullCount:p,row:""}}))];
+  TR=[...TR,...nt];SH=[...SH,...ns];
+  /* a door an older (non-demo) truck holds sends the demo truck to the yard */
+  let held=new Set(TR.filter(t=>!/^zzt/.test(t.id)&&ZZactive(t)&&t.dock&&Gi.includes(t.dock)).map(t=>t.dock));
+  TR.forEach(t=>{/^zzt/.test(t.id)&&ZZactive(t)&&t.dock&&Gi.includes(t.dock)&&held.has(t.dock)&&Object.assign(t,{dock:Ee,dockedAt:null,stage:"arrived",workStartedAt:null,workStartedBy:null})});
+  let cus=[["zzc11","Keystone Linehaul","dispatch@keystone-linehaul.example"],["zzc12","Bluewater Imports","ops@bluewater-imports.example"],["zzc13","Juniper Home Goods","receiving@juniper-home.example"]],
+    have=new Set((d.customers||[]).map(c=>c.id)),
+    CU=[...(d.customers||[]).map(c=>/^zzc\d+$/.test(c.id)&&!c.contact?{...c,contact:`dispatch@${c.name.toLowerCase().replace(/[^a-z]+/g,"-").replace(/^-|-$/g,"")}.example`}:c),
+      ...cus.filter(([id])=>!have.has(id)).map(([id,name,contact],k)=>({id,name,aliases:[],contact,phone:"775-555-03"+String(20+k),rates:null,pin:String(5110+k),terms:30}))],
+    out={...d,customers:CU,trailers:TR,shipments:SH};
+  /* every active demo truck gets a real 4-digit check-in code (never a PIN) */
+  TR.forEach(t=>{/^zzt/.test(t.id)&&ZZactive(t)&&!/^\d{4}$/.test(String(t.code??""))&&(t.code=ZZnewCode(out))});
+  let ac={...(d.accountChat||{})},say=(cid,from,who,text,at,refs)=>{ac[cid]=[...(ac[cid]||[]),{id:Ce(),from,who,text,at:H(at),refs:refs||[]}]};
+  say("zzc12","dispatcher","Bluewater dispatch","BW-2201 has to reload nose-first for Sacramento. Can you send a photo when it is back on?",-.7,["zzs11_2"]);
+  say("zzc12","dispatcher","Bluewater dispatch","REQUEST R-1002 (Photos, size or weight): BW-2201 \xB7 Photos, Weight",-.65,["zzs11_2"]);
+  say("zzc5","office","Office","Damage on SSE-9002: 2 pallets crushed. The fix price is on the load, please approve or decline.",-3.9,["zzs5_2"]);
+  say("zzc13","dispatcher","Juniper receiving","REQUEST R-1003 (Something else): please hold JH-4410 on the floor until Monday.",-.5,["zzs11_4"]);
+  say("zzc3","office","Office","Your 3-stop delivery is at door D5. Sparks, Fernley, then Fallon.",-.25,[]);
+  out.accountChat=ac;
+  out.zzRequests=[...(d.zzRequests||[]),
+    {id:"zzr1",num:"R-1001",customerId:"zzc3",type:"delivery",status:"confirmed",createdAt:H(-26),by:"Dana",loads:["zzs13_1","zzs13_2","zzs13_3"],want:[],note:"3 stops: Sparks, Fernley, Fallon.",address:"Sparks, NV \xB7 Fernley, NV \xB7 Fallon, NV",date:day,time:"Any time",liftgate:!0,contact:"Dana",phone:"775-555-0213",back:"",repeat:!1,confirmedAt:H(-24)},
+    {id:"zzr2",num:"R-1002",customerId:"zzc12",type:"info",status:"new",createdAt:H(-.65),by:"Mia",loads:["zzs11_2"],want:["Photos","Weight"],note:"Need a photo before it goes back on the trailer.",address:"",date:"",time:"Any time",liftgate:!1,contact:"",phone:"",back:"",repeat:!1},
+    {id:"zzr3",num:"R-1003",customerId:"zzc13",type:"other",status:"new",createdAt:H(-.5),by:"Owen",loads:["zzs11_4"],want:[],note:"Please hold JH-4410 on the floor until Monday, the store is not ready.",address:"",date:"",time:"Any time",liftgate:!1,contact:"",phone:"",back:"",repeat:!1}];
+  out.chat=[...(d.chat||[]),{id:Ce(),from:"office",who:"Office",text:"D8 Tahoe trailer: SSE-9001 is on. KL-7705 comes off D6 next.",at:H(-.3)},{id:Ce(),from:"crew",who:"Roman",text:"D6 Keystone: crushed corner on JH-4410, snapped it, details after the sort.",at:H(-.1)}];
+  out.zzGear=[...(d.zzGear||[]),{id:"zzg1",customerId:"zzc9",trailerId:"zzt14",type:"plywood",qty:5,dir:"out",tags:[],at:H(-4.5),by:"Sergio",note:"",src:"secure"},{id:"zzg2",customerId:"zzc9",trailerId:"zzt14",type:"bars",qty:2,dir:"out",tags:["LB-2041","LB-2042"],at:H(-4.5),by:"Sergio",note:"",src:"secure"}];
+  out.activity=[...[{id:Ce(),ts:H(-.1),actor:"Crew \xB7 Roman",kind:"exception",text:"Damage photo on JH-4410 (truck 212), details to come"},{id:Ce(),ts:H(-.35),actor:"Crew \xB7 Vlad",kind:"load",text:"Loaded SSE-9001 \xB7 11 plt on truck 318"},
+    {id:Ce(),ts:H(-4),actor:"Crew \xB7 Roman",kind:"exception",text:"Damage reported on SSE-9002: 2 pallets"},{id:Ce(),ts:H(-4.45),actor:"Crew \xB7 Sergio",kind:"trailer",text:"Truck 140 manifest signed: 4 lines, 20 pallets"}].sort((a,b)=>b.ts<a.ts?-1:1),...(d.activity||[])];
+  return out}catch(x){console.error("ZZdemoMore",x);return d}},
+/* Setup > next to Nick's "Clear demo data" (patch A52; that card shows only while the demo is on): staff rebuild a fresh
+   demo day in local mode. The confirm is on the page (no confirm()). Hidden in shared mode. */
+ZZDemoReload=({actions:a})=>{let[o,setO]=(0,H.useState)(!1);if(typeof ZZsync==="undefined"||ZZsync.mode!=="local"||!a||!a.zzDemoReload)return null;
+  return(0,i.jsxs)("div",{className:"pt-2 space-y-2","data-zz":"demo-reload",children:[(0,i.jsx)("div",{className:"text-xs",style:{color:m.mut},children:"Trying things out? Put back a fresh, busy demo day: today's trucks, loads, damage reports and messages, all made up."}),
+    o?(0,i.jsxs)("div",{className:"space-y-2",children:[(0,i.jsx)("div",{className:"text-sm font-semibold",children:"Replace every demo truck, load, photo and message on this device with a fresh demo day? Logins and settings stay."}),
+      (0,i.jsxs)("div",{className:"flex gap-2 flex-wrap",children:[(0,i.jsx)(Z,{onClick:()=>setO(!1),children:"Keep it"}),(0,i.jsx)(Z,{kind:"primary",onClick:()=>{a.zzDemoReload();setO(!1)},children:"Yes — reload the demo"})]})]})
+    :(0,i.jsx)(Z,{onClick:()=>setO(!0),children:"Reload demo data"})]})},

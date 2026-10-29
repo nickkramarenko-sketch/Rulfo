@@ -6,6 +6,7 @@ Usage (from anywhere):
   python3 website/portal/build2.py --streams A,C         # only stream A and C files; B, D, E, F use the base copies / are skipped
   python3 website/portal/build2.py --streams ""          # base only (must behave exactly like today's portal)
   python3 website/portal/build2.py --streams A --out /tmp/mydist
+  python3 website/portal/build2.py --demo-refresh --out <dir>   # PREVIEW only: a stale local demo is rebuilt on load
 
 Streams:  A engine-source.js + sync-source.js + patches/A_*.py
           B customer-portal-source.js + patches/B_*.py
@@ -330,7 +331,11 @@ def load_patch_file(path, stream):
     return out
 
 
-def build(streams, out_dir, quiet=False):
+DEMO_FLAG_OFF = 'ZZDEMO_REFRESH=!1,'
+DEMO_FLAG_ON = 'ZZDEMO_REFRESH=!0,'
+
+
+def build(streams, out_dir, quiet=False, demo_refresh=False):
     log = (lambda *a: None) if quiet else (lambda *a: print(*a))
     for s in streams:
         if s not in STREAMS:
@@ -359,6 +364,10 @@ def build(streams, out_dir, quiet=False):
         path = os.path.join(HERE, fname)
         if stream in streams and os.path.exists(path):
             txt = read(path).strip()
+            if demo_refresh and fname == 'engine-source.js':
+                if txt.count(DEMO_FLAG_OFF) != 1:
+                    fail('--demo-refresh: %s must hold %s exactly once' % (fname, DEMO_FLAG_OFF))
+                txt = txt.replace(DEMO_FLAG_OFF, DEMO_FLAG_ON)
             chain_parts.append((fname, txt, base_copy is not None))
             used_files.append(fname)
         elif base_copy is not None:
@@ -456,7 +465,9 @@ def build(streams, out_dir, quiet=False):
     if outp.count('</html>') < 1:
         fail('output has no </html>')
     k = outp.rindex('</html>') + len('</html>')
-    tag = '<!-- build2 %s streams=%s -->' % (git_sha(), ''.join(streams) or 'base')
+    if demo_refresh and 'A' not in streams:
+        fail('--demo-refresh needs stream A (engine-source.js)')
+    tag = '<!-- build2 %s streams=%s%s -->' % (git_sha(), ''.join(streams) or 'base', ' demo-refresh' if demo_refresh else '')
     outp = outp[:k] + tag + outp[k:]
 
     # ---- write + syntax check
@@ -478,6 +489,8 @@ def build(streams, out_dir, quiet=False):
     log('  sources: ' + ', '.join(used_files))
     for p in sorted(patches, key=lambda p: (p['stream'], p['id'])):
         log('  applied %-5s %s' % (p['id'], p['why'][:100]))
+    if demo_refresh:
+        log('  demo-refresh: ON (preview build: a stale local demo is rebuilt on load)')
     log('  %d patches, %d top-level ZZ names from the injected sources' % (len(patches), len(all_named)))
     log('  node --check app.js: ok')
     if same_as_base:
@@ -492,6 +505,8 @@ def main(argv=None):
                     help='comma-separated stream letters (default all: A,B,C,D,E,F); "" = base only')
     ap.add_argument('--out', default=os.path.join(HERE, 'dist'), help='output folder (default website/portal/dist)')
     ap.add_argument('--quiet', action='store_true')
+    ap.add_argument('--demo-refresh', action='store_true',
+                    help='PREVIEW build only: in local mode a demo doc from an earlier day / demo version is rebuilt on load')
     a = ap.parse_args(argv)
     if a.streams is None:
         streams = list(STREAMS)
@@ -499,7 +514,7 @@ def main(argv=None):
         streams = [s.strip().upper() for s in a.streams.replace(' ', ',').split(',') if s.strip()]
         streams = sorted(set(streams), key=STREAMS.index if all(s in STREAMS for s in streams) else None)
     try:
-        build(streams, os.path.abspath(a.out), a.quiet)
+        build(streams, os.path.abspath(a.out), a.quiet, a.demo_refresh)
     except BuildError as e:
         print('build2 FAIL: ' + str(e), file=sys.stderr)
         return 1
