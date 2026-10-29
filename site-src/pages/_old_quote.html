@@ -1,0 +1,30 @@
+
+<section class="s">
+  <div class="w contact">
+    <div>
+      <h1 class="qh">Request a quote</h1>
+      <p class="lead">Four quick fields and we call you back within one hour, day or night. Add details if you have them.</p>
+      <div class="call">Rather talk? We answer 24/7.<a href="{TEL}">{PHONE}</a><p><a href="{SMS}">Text us</a> · Docks {HOURS}</p></div>
+      <dl>
+        <dt><a href="/reno/">Reno–Sparks</a></dt><dd>1095 Spice Islands Dr, Suites 105–106<br>Sparks, NV 89431</dd><dt><a href="/sacramento/">Sacramento</a></dt><dd>3036 Orange Grove Ave<br>North Highlands, CA 95660</dd><dt><a href="/harrisburg/">Harrisburg</a></dt><dd>2811 Turnpike Industrial Dr<br>Middletown, PA 17057</dd>
+        <dt>Email</dt><dd><a href="mailto:{EMAIL}">{EMAIL}</a></dd>
+        <dt>Hours</dt><dd>Docks {HOURS}<br>Nights and weekends by appointment; after-hours work carries a $100 fee. Phone answered 24/7.</dd>
+      </dl>
+    </div>
+    <form id="qf" class="qform" data-src="Quote page">
+      <label>Company<input name="Company" required autocomplete="organization"></label>
+      <label>Your name<input name="Name" required autocomplete="name"></label>
+      <label>Phone<input name="Phone" type="tel" autocomplete="tel"></label>
+      <label>Email<input name="Email" type="email" required autocomplete="email"></label>
+      
+      
+      <label>Pallets<input name="Pallets" inputmode="numeric" placeholder="e.g. 500"></label>
+      <label>Inbound type<select name="Inbound type"><option>Palletized trailers</option><option>Floor-loaded containers</option><option>Floor-loaded trailers</option><option>Mixed / not sure</option></select></label>
+      <label>Storage term<select name="Storage term"><option>Under 1 month</option><option>1 to 3 months</option><option>3 to 12 months</option><option>Ongoing</option></select></label>
+      <label class="f">Commodity and project details<textarea name="Details" placeholder="Commodity, pallet dimensions and weight, containers or trucks per month, outbound mode (LTL, FTL, parcel), start date"></textarea></label>
+      <button class="btn r" type="submit">Send quote request</button>
+      <small>Opens your email with the details filled in.</small>
+      <div class="next"><b>What happens next</b><ol><li>We review your request, usually the same day.</li><li>We call you to confirm the details. About 10 minutes.</li><li>You get your rates in writing.</li></ol></div>
+    </form>
+  </div>
+</section>
