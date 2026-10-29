@@ -273,6 +273,29 @@ done modals). The rest comes from `crew-source.js`:
 - **Small fields of the crew.** `trailer.foundAt` / `foundBy` (DELIVERY "Found them"), `trailer.zzPhotoBy`.
 - New crew words are in `ZZd_ES4` / `ZZd_RU4` (filled lazily by `ZZtr3`; existing words never change).
 
+## Demo day (Nick's preview) and `--demo-refresh`
+
+- Nick's base makes the demo once (`tx()` = `txO()` + `ZZt10`), anchored to `Date.now()` at that moment. **A50/A51** hand
+  ZZt10's result to `ZZdemoMore` (engine): it spreads the zz trucks over the day and adds `zzt11..zzt14`, `zzc11..zzc13`,
+  so "now" is a busy dock with every state (booked later today, on the way with an ETA, waiting in the yard, at doors
+  being worked, at a door not started, done today, departed) and every forklift job: UNPACK `zzt11` (truck 212, D6,
+  East Coast, 4 companies, 2 reloading, one damage snap draft on JH-4410), UNLOAD `zzt1` (41, D3), PACK `zzt12` (318, D8,
+  loads from 3 inbound trucks / 3 companies, SSE-9001 already loaded), DELIVERY `zzt13` (77, D5, 3 stops with
+  `stop` / `pos`, `multiStop`), PICKUP `zzt8` (118, yard). Also a finished damage report waiting for the customer
+  (SSE-9002), a departed PACK `zzt14` with `secure` v2 and a signed `manifest`, loads on the floor and waiting to reload,
+  requests R-1001..R-1003, account chat and crew chat lines. Every photo count is 0 (no photos are faked). Ids are
+  fixed (`zzt*`, `zzs*`, `zzx_*`), so the old demo's photos are removed when it is rebuilt.
+- **A53**: `tx()` stamps a fresh demo `zzDemo:{v:ZZDEMO_V, at, day}` (dock day). `ZZDEMO_V` is 2; raise it when the demo
+  changes so preview browsers rebuild.
+- `python3 build2.py --demo-refresh --out <dir>` bakes `ZZDEMO_REFRESH=!0` into **the preview build only** (the build
+  comment says `demo-refresh`). Then on load (**A06**), in local mode, a demo doc (`zzT10` or `zzDemo`, not
+  `demoCleared`) with no stamp, an older `v` or an earlier `day` is rebuilt like a first visit (`ZZdemoFresh`: settings,
+  logins and rates stay, rev + 1; `ZZa_wipeDemo` removes `cdweb:cd6:photos:*` and `cd6:seen:*` on this device). Without the
+  flag (the normal build, `website/portal/portal.html`) nothing is ever replaced. Shared (db) mode is never touched.
+- **A52**: Setup > "Going live?" card (shown only while the demo is on) gets `ZZDemoReload`: "Reload demo data" with an
+  on-page confirm, local mode only (hidden in shared mode). Action `zzDemoReload()` (one write, refused in shared mode).
+- Regression's crew walk (truck 52 at D5) now seeds Nick's base doc (`h.baseDoc()`), since the demo day moves truck 52 on.
+
 ## Test
 
 ```bash

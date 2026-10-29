@@ -138,7 +138,9 @@ H.main('regression', async (h, t) => {
 
   t.section('crew: start a truck, count a load, wrap up');
   {
-    const p = await h.openAs('crew', { viewport: PHONE });
+    // Nick's own demo (the base build's doc): truck 52 waits at D5. The newer demo day (ZZdemoMore) moves truck 52 on
+    // (departed) and puts the DELIVERY truck at D5, so this walk uses the base doc as the seed.
+    const p = await h.openAs('crew', { viewport: PHONE, seed: await h.baseDoc() });
     if (await p.getByRole('button', { name: 'Got it' }).count()) await p.getByRole('button', { name: 'Got it' }).click();
     await p.getByRole('button', { name: /^All trucks/ }).first().click();
     await p.waitForTimeout(250);
@@ -272,4 +274,94 @@ H.main('regression', async (h, t) => {
       await ctx.close();
     }
   }
+
+  /* ---------------- 4. demo day: preview refresh and Setup "Reload demo data" (stream A builds only) ---------------- */
+  t.section('demo day: preview refresh (build2 --demo-refresh) and Setup "Reload demo data"');
+  if (tag && tag[1].includes('A')) {
+    const os = require('os');
+    const { spawnSync } = require('child_process');
+    const flagOn = fs.readFileSync(path.join(h.dist, 'portal.html'), 'utf8').includes('ZZDEMO_REFRESH=!0,');
+    // a demo saved on an earlier visit: Nick's base demo (zzT10, no zzDemo stamp), with a marker and an extra office login
+    const stale = await h.baseDoc();
+    stale.trailers[0].notes = 'ZZSTALEMARK';
+    stale.settings.admins = [...stale.settings.admins, { name: 'Zed', pin: '4321' }];
+    const loadDoc = async (hh, seed, o = {}) => {
+      const ctx = await hh.newContext({ viewport: PHONE, seed });
+      if (o.photo) await ctx.addInitScript(() => { try { if (!localStorage.getItem('__zzph')) { localStorage.setItem('cdweb:cd6:photos:old-demo', '[{"id":"p1","at":"2026-01-01T00:00:00Z"}]'); localStorage.setItem('__zzph', '1'); } } catch (e) {} });
+      const p = await hh.open('#office', { context: ctx });
+      await p.waitForTimeout(900);
+      const raw = await hh.readDocRaw(p), photo = await p.evaluate(() => localStorage.getItem('cdweb:cd6:photos:old-demo'));
+      await ctx.close();
+      return { raw, d: JSON.parse(raw), photo };
+    };
+    const marked = d => d.trailers.some(x => x.notes === 'ZZSTALEMARK');
+    const dock = Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    if (!flagOn) {
+      const r = await loadDoc(h, stale);
+      t.ok(marked(r.d) && !r.d.zzDemo && r.raw === JSON.stringify(stale), 'flag off (the build for the live portal): a stale demo is kept as it was, nothing written');
+    }
+    // flag on: this build when it was made with --demo-refresh, else a throw-away --demo-refresh build of the current sources
+    let h2 = h, tmp = null;
+    if (!flagOn) {
+      tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'portal-demo-refresh-'));
+      const b = spawnSync('python3', [path.join(H.PORTAL, 'build2.py'), '--demo-refresh', '--quiet', '--out', tmp], { encoding: 'utf8' });
+      t.ok(b.status === 0 && fs.readFileSync(path.join(tmp, 'portal.html'), 'utf8').includes('ZZDEMO_REFRESH=!0,'), 'build2 --demo-refresh bakes the refresh switch into the preview build');
+      h2 = await H.start({ dist: tmp });
+    }
+    try {
+      let r = await loadDoc(h2, stale, { photo: true });
+      t.ok(!marked(r.d) && r.d.zzDemo && r.d.zzDemo.day === dock && r.d.trailers.some(x => x.id === 'zzt11') && r.d.rev === (stale.rev || 0) + 1,
+        'flag on: a demo from an earlier visit is rebuilt fresh on load (today ' + dock + ', the new demo trucks are there)');
+      t.ok(r.d.settings.admins.some(a => a.name === 'Zed' && a.pin === '4321') && r.photo === null, 'flag on: logins and settings stay; the old demo\'s photos are removed from this device');
+      const old = JSON.parse(r.raw);
+      r = await loadDoc(h2, { ...old, zzDemo: { ...old.zzDemo, day: '2001-01-01' }, trailers: old.trailers.map((x, k) => k ? x : { ...x, notes: 'ZZSTALEMARK' }) });
+      t.ok(!marked(r.d) && r.d.zzDemo.day === dock, 'flag on: a stamped demo from an earlier day is rebuilt');
+      const todays = { ...old, trailers: old.trailers.map((x, k) => k ? x : { ...x, notes: 'ZZSTALEMARK' }) };
+      r = await loadDoc(h2, todays);
+      t.ok(marked(r.d) && r.raw === JSON.stringify(todays), 'flag on: today\'s demo is kept as it is (nothing written on load)');
+      const cleared = { ...stale, customers: [], trailers: [], shipments: [], demoCleared: true };
+      r = await loadDoc(h2, cleared);
+      t.ok(r.d.demoCleared === true && r.d.trailers.length === 0 && r.raw === JSON.stringify(cleared), 'flag on: a cleared demo (demoCleared) is never filled again');
+      // shared data (db mode) is never touched: the helper says "not stale" there
+      const sctx = await h2.newContext({ viewport: DESK, mode: 'shared' });
+      const sp = await h2.open('#office', { context: sctx });
+      await sp.waitForFunction(() => window.__zz && window.__zz.h && window.__zz.h.sync && window.__zz.h.sync.mode === 'db', null, { timeout: 25000 });
+      const sh = await sp.evaluate(d => ({ mode: window.__zz.h.sync.mode, stale: window.__zz.h.ZZdemoStale(d) }), stale);
+      t.ok(sh.mode === 'db' && sh.stale === false, 'flag on, shared data: never called stale, never replaced');
+      await sctx.close();
+    } finally { if (h2 !== h) await h2.close(); if (tmp) fs.rmSync(tmp, { recursive: true, force: true }); }
+
+    // Setup > "Reload demo data" (office, local mode): confirm on the page, then a fresh demo day
+    {
+      const ctx = await h.newContext({ viewport: PHONE, seed: stale });
+      const p = await h.openAs('office', { context: ctx });
+      let dialogs = 0; p.on('dialog', dlg => { dialogs++; dlg.dismiss().catch(() => {}); });
+      await p.getByRole('button', { name: 'Setup', exact: true }).first().click();
+      await p.waitForTimeout(400);
+      const btn = p.locator('[data-zz="demo-reload"]').getByRole('button', { name: 'Reload demo data' });
+      t.ok(await btn.count() === 1, 'Setup shows "Reload demo data" next to "Clear demo data"');
+      await btn.click();
+      await p.waitForTimeout(250);
+      t.ok(await p.getByRole('button', { name: /reload the demo/ }).count() === 1 && dialogs === 0, 'the confirm is on the page (no browser dialog)');
+      await chk(p, 'regression-demo-reload-confirm');
+      await p.getByRole('button', { name: /reload the demo/ }).click();
+      await p.waitForTimeout(700);
+      const d = await h.readDoc(p);
+      t.ok(!marked(d) && d.zzDemo && d.trailers.some(x => x.id === 'zzt11') && d.settings.admins.some(a => a.name === 'Zed'), 'Reload demo data: a fresh demo day in one write; logins stay');
+      await p.getByRole('button', { name: 'Clear demo data', exact: true }).click();
+      await p.getByRole('button', { name: /wipe every demo truck/ }).click();
+      await p.waitForTimeout(600);
+      t.ok(await p.locator('[data-zz="demo-reload"]').count() === 0 && (await h.readDoc(p)).demoCleared === true, 'after Clear demo data the reload button is gone');
+      await ctx.close();
+    }
+    {
+      const sctx = await h.newContext({ viewport: DESK, mode: 'shared' });
+      const p = await h.openAs('office', { context: sctx });
+      await p.waitForFunction(() => window.__zz && window.__zz.h && window.__zz.h.sync.mode === 'db', null, { timeout: 25000 });
+      await p.getByRole('button', { name: 'Setup', exact: true }).first().click();
+      await p.waitForTimeout(400);
+      t.ok(await p.locator('[data-zz="demo-reload"]').count() === 0, 'shared data: no "Reload demo data" button');
+      await sctx.close();
+    }
+  } else console.log('  note - no stream A in this build: demo day checks skipped');
 });

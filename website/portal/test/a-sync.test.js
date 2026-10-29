@@ -88,9 +88,10 @@ H.main('a-sync', async (h, t) => {
     DUMP = await dump(a);
     const paths = Object.keys(DUMP);
     const cust = paths.filter(p => p.startsWith('customers/'));
-    t.ok(cust.length === 14 && !cust.some(p => /^customers\/cu_(0\d\d|[1-3]\d\d)$/.test(p) && !/cu_00[0-3]/.test(p)), 'staging seed is the trimmed demo: 14 accounts, none of the 396 filler accounts cu_004..cu_399');
-    t.ok(paths.filter(p => p.startsWith('trailers/')).length === BASE.trailers.length && paths.filter(p => p.startsWith('shipments/')).length === BASE.shipments.length,
-      'the demo trucks and loads are all there (' + BASE.trailers.length + ' trucks, ' + BASE.shipments.length + ' loads)');
+    t.ok(cust.length === 17 && !cust.some(p => /^customers\/cu_(0\d\d|[1-3]\d\d)$/.test(p) && !/cu_00[0-3]/.test(p)), 'staging seed is the trimmed demo: 17 accounts (14 + the 3 demo-day accounts zzc11..zzc13), none of the 396 filler accounts cu_004..cu_399');
+    // the demo day (ZZdemoMore) adds 4 trucks (zzt11..zzt14) and 12 loads to Nick's base demo
+    t.ok(paths.filter(p => p.startsWith('trailers/')).length === BASE.trailers.length + 4 && paths.filter(p => p.startsWith('shipments/')).length === BASE.shipments.length + 12 && paths.includes('trailers/zzt11'),
+      'the demo trucks and loads are all there (' + (BASE.trailers.length + 4) + ' trucks, ' + (BASE.shipments.length + 12) + ' loads)');
     t.ok(['portal/meta', 'portal/chat', 'portal/activity'].every(p => DUMP[p]) && paths.some(p => p.startsWith('accountChat/')), 'portal/meta, portal/chat, portal/activity and accountChat/<cid> exist');
     t.ok(DUMP['portal/meta'].v === 8 && !('rev' in DUMP['portal/meta']) && !('touchedAt' in DUMP['portal/meta']) && !('customers' in DUMP['portal/meta']),
       'portal/meta holds the plain keys (v 8, rates, settings, ...) and never rev, touchedAt or the record lists');
@@ -98,7 +99,7 @@ H.main('a-sync', async (h, t) => {
     const leases = await a.evaluate(() => window.__mockdb.leases());
     t.ok(!!leases['locks/bootstrap'], 'the seeding tab held the locks/bootstrap lease');
     const da = await screenDoc(a), db = await screenDoc(b);
-    t.ok(JSON.stringify(da.trailers.map(x => x.id)) === JSON.stringify(db.trailers.map(x => x.id)) && da.customers.length === 14,
+    t.ok(JSON.stringify(da.trailers.map(x => x.id)) === JSON.stringify(db.trailers.map(x => x.id)) && da.customers.length === 17,
       'both tabs show the same trucks, in the same order');
     t.ok(!da.customers.some(c => '_o' in c) && !da.trailers.some(x => '_o' in x), 'the screens never see the hidden _o field');
     t.ok(all.every(w => w.bytes <= LIMIT), 'no write is larger than 240 KB');
@@ -123,7 +124,7 @@ H.main('a-sync', async (h, t) => {
     await ready(c);
     t.eq((await state(c)).mode, 'local', 'customer page without the db capability stays in local mode');
     const local0 = await h.readDoc(c);
-    t.ok(local0 && local0.v === 8 && local0.customers.length === BASE.customers.length, 'it keeps the full doc in this browser, exactly as today');
+    t.ok(local0 && local0.v === 8 && local0.customers.length === BASE.customers.length + 3, 'it keeps the full doc in this browser, exactly as today');
     await act(c, 'addTrailer', { id: 'tCust1', truck: '6006', direction: 'inbound', customerId: 'cu_altex', scheduledAt: iso(Date.now() + 26 * HOUR), lines: [{ ref: 'C-1', units: { std: 4 } }] });
     const local1 = await h.readDoc(c);
     t.ok(local1.trailers.some(x => x.id === 'tCust1') && local1.rev === local0.rev + 1, 'a booking is saved in this browser (rev +1), as today');
@@ -142,14 +143,14 @@ H.main('a-sync', async (h, t) => {
     t.ok((await state(p)).mode === 'local' && (await writes(p)).length === 0, label + ': local mode, writes nothing');
     t.ok(has(await badge(p), 'Saved on this device only'), label + ': the badge says "Saved on this device only"');
     const d = await screenDoc(p);
-    t.ok(d.customers.length === BASE.customers.length, label + ': shows this device\'s own data, not the shared data');
+    t.ok(d.customers.length === BASE.customers.length + 3, label + ': shows this device\'s own data, not the shared data');
     await ctx.close();
   }
   {
     // a Contributor: not owner, not editor, but can("data.write") === true -> shared
     const ctx = await shared(h, { isOwner: false, canEdit: false, can: true, seed: DUMP });
     const p = await staff(h, ctx, 'crew', PHONE);
-    t.ok((await state(p)).mode === 'db' && (await screenDoc(p)).customers.length === 14, 'can("data.write") === true is enough: crew phone is in shared mode with the shared data');
+    t.ok((await state(p)).mode === 'db' && (await screenDoc(p)).customers.length === 17, 'can("data.write") === true is enough: crew phone is in shared mode with the shared data');
     t.ok(has(await badge(p), 'Live · shared'), 'crew screen shows "Live · shared"');
     t.ok((await writes(p)).length === 0, 'opening the page writes nothing');
     await h.check(p, 'sync-crew-live-390');
@@ -162,7 +163,7 @@ H.main('a-sync', async (h, t) => {
     const ctx = await shared(h, { cachedFirst: true, serverDelay: 600, seed: DUMP });
     const p = await staff(h, ctx, 'office');
     const st = await state(p), w = await writes(p);
-    t.ok(st.mode === 'db' && (await screenDoc(p)).customers.length === 14, 'with a cached EMPTY first snapshot the page waits for the server and shows the shared data');
+    t.ok(st.mode === 'db' && (await screenDoc(p)).customers.length === 17, 'with a cached EMPTY first snapshot the page waits for the server and shows the shared data');
     t.ok(w.length === 0, 'it never seeds over existing data (no writes at all)');
     await ctx.close();
   }
@@ -194,7 +195,7 @@ H.main('a-sync', async (h, t) => {
       await h.waitLoaded(op);
       return op;
     })();
-    await w.waitForFunction(() => !document.querySelector('[data-zz="sync-wait"]') && window.__zz && window.__zz.doc && window.__zz.doc.customers.length === 14, null, { timeout: 10000 });
+    await w.waitForFunction(() => !document.querySelector('[data-zz="sync-wait"]') && window.__zz && window.__zz.doc && window.__zz.doc.customers.length === 17, null, { timeout: 10000 });
     t.ok(true, 'after the owner opens the page once, the waiting phone opens by itself with the shared data');
     t.ok((await writes(w)).length === 0, 'the waiting phone still wrote nothing (only the owner seeds)');
     await ownerPage.close();
@@ -518,7 +519,7 @@ H.main('a-sync', async (h, t) => {
     });
     t.ok(r.threw, 'fresh() throws in shared mode (bQ can never write a demo over shared data)');
     t.ok(r.n > 0 && r.name !== 'Changed In A Copy', 'read() hands out a copy: changing it changes nothing');
-    t.ok(r.seed === 14 && r.lease === 7, 'seed() returns the shared data; lease() runs the function');
+    t.ok(r.seed === 17 && r.lease === 7, 'seed() returns the shared data; lease() runs the function');
     t.eq((await writes(p)).length, 0, 'none of that wrote anything');
     await ctx.close();
   }

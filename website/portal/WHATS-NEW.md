@@ -65,6 +65,10 @@ The portal picks the job by itself. The office can change it on the truck page. 
 
 **Still there:** Next job, All trucks, the door picker, wait clocks, the leaderboard (photos on the truck count as points), chat, the Gear tab, Spanish and Russian.
 
+## Demo data
+
+- **The preview opens on a busy day, every day.** Made-up customers and trucks in every state (coming, in the yard, at the doors, done, gone), with one truck of each forklift job (Unpack, Unload, Pack, Delivery with 3 stops, Pickup). On a new day the preview puts back a fresh demo by itself. Setup > "Reload demo data" does it any time. The real portal never does this.
+
 ## Office
 
 - **New tabs:** Yard, Outbox and Gear. On a phone the tab bar scrolls sideways.

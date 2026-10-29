@@ -1242,4 +1242,69 @@ H.main('a-engine', async (h, t) => {
     t.ok(jsx.includes('{s:a==="office"||a==="crew"?j:ZZnoDrafts(j),') && jsx.includes('(yJ,{doc:ZZcustView(e,null),') && jsx.includes('(ZZCP,{doc:ZZcustView(e,n),') && jsx.includes('e.exceptions.filter(h=>h&&!h.draft).map(h=>') && jsx.includes('filter(v=>!v.resolved&&!v.draft).length,0)||"none"'),
       'customer shipment sheet, public track page, customer portal and printed papers leave drafts out (patches A44-A48)');
   }
+
+  t.section('demo day: a fresh, busy dock around "now" (ZZdemoMore), stamped zzDemo; no refresh on a normal build');
+  {
+    // a fixed dock clock (a Tuesday, 10:00 AM Pacific) so "relative to the time the demo is built" is checked exactly
+    const T0 = Date.parse('2026-11-03T18:00:00Z');
+    const p = await h.openAs('office', { viewport: PHONE, now: T0 });
+    await ready(p);
+    const r = await calc(p, (h, d, T0) => {
+      const job = t => h.ZZloadJob(d, t), act = d.trailers.filter(h.ZZactive), zz = d.trailers.filter(t => /^zzt/.test(t.id)),
+        tr = id => d.trailers.find(t => t.id === id), loads = id => d.shipments.filter(s => s.trailerInId === id || s.trailerOutId === id),
+        ms = v => Date.parse(v), times = [], today = h.ZZdockParts(T0).ymd, isToday = v => !!v && h.ZZdockParts(v).ymd === today;
+      zz.forEach(t => ['scheduledAt', 'arrivedAt', 'dockedAt', 'workStartedAt', 'workDoneAt', 'departedAt'].forEach(k => t[k] && times.push(ms(t[k]) - T0)));
+      const u = tr('zzt11'), pk = tr('zzt12'), dl = tr('zzt13'), dp = tr('zzt14'), ul = loads('zzt11'), pl = d.shipments.filter(s => s.trailerOutId === 'zzt12');
+      const fin = d.shipments.flatMap(s => (s.exceptions || []).filter(x => x.kind === 'Damage' && !x.draft && !x.answer && !x.resolved && (x.est && x.est.lines || []).length).map(x => s.ref));
+      const pins = new Set([...d.customers.map(c => String(c.pin)), ...d.settings.admins.map(a => String(a.pin)), ...d.settings.crewMembers.map(c => String(c.pin))]);
+      const photos = [...zz.map(t => [t.unloadPhotoCount, t.afterPhotoCount, t.strapPhotoCount, t.bolPhotoCount, t.beforePhotoCount, t.secure && t.secure.photoCount, ...(t.dmgDrafts || []).map(x => x.photoCount)]),
+        ...d.shipments.filter(s => /^zzs/.test(s.id)).map(s => [s.photoCount, s.rowPhotoCount, s.inspPhotoCount, ...(s.exceptions || []).map(x => x.photoCount)])].flat().filter(v => v);
+      const lo = h.ZZloadOrder(d, dl);
+      return {
+        stamp: d.zzDemo, today, refresh: h.ZZDEMO_REFRESH, v: h.ZZDEMO_V, stale: h.ZZdemoStale(d), staleOld: h.ZZdemoStale({ ...d, zzDemo: { v: 1, day: '2000-01-01' } }),
+        jobs: [...new Set(act.map(job))].sort(),
+        states: {
+          bookedLater: act.filter(t => t.stage === 'scheduled' && ms(t.scheduledAt) > T0 && isToday(t.scheduledAt)).length,
+          eta: act.filter(t => !t.arrivedAt && t.eta && ms(t.eta.at) > T0).length,
+          yard: h.ZZyardQ(d).length, yardOver: h.ZZyardQ(d).filter(t => h.ZZtone(h.ZZwaitMs(t, T0), d) === 'bad').length,
+          working: act.filter(t => t.stage === 'working' && h.ZZtruckSteps(t, T0).some(s => s.k === 'working' && s.state === 'now')).length,
+          atDoorNotStarted: act.filter(t => t.stage === 'at-dock' && !t.workStartedAt).length,
+          doneToday: d.trailers.filter(t => isToday(t.workDoneAt)).length, departedToday: d.trailers.filter(t => t.stage === 'departed' && isToday(t.departedAt)).length },
+        doors: act.filter(t => t.dock && t.dock !== 'YD').map(t => t.dock).sort(),
+        unpack: { job: job(u), cust: new Set(ul.map(s => s.customerId)).size, east: ul.some(s => /, (NJ|PA|MD)$/.test(s.origin)), reload: ul.filter(s => s.lane === 'sac').length,
+          drafts: h.ZZdmgDrafts(d, 'zzt11').length, hidden: !h.ZZcustView(d, 'zzc13').shipments.some(s => (s.exceptions || []).some(x => x.draft)), working: u.stage },
+        pack: { job: job(pk), ins: new Set(pl.map(s => s.trailerInId)).size, cust: new Set(pl.map(s => s.customerId)).size, loaded: pl.filter(s => s.status === 'loaded').length, left: pl.filter(s => s.status !== 'loaded').length, working: pk.stage },
+        delivery: { job: job(dl), multi: dl.multiStop === true, stops: lo.map(x => x.stop), pos: lo.map(x => x.pos), sugg: h.ZZposSuggest(lo.map(x => x.stop)) },
+        pickup: act.filter(t => job(t) === 'pickup' && /^zzt/.test(t.id)).length,
+        fin, departedPack: { job: job(dp), lines: (h.ZZmanifestFor(d, dp, null) || {}).lines?.length, mine: (h.ZZmanifestFor(d, dp, 'zzc4') || {}).lines?.map(l => l.ref), other: h.ZZmanifestFor(d, dp, 'zzc1'), sec: dp.secure && dp.secure.v, owner: dp.secure && dp.secure.photoOwner },
+        floor: d.shipments.filter(s => /^zzs/.test(s.id) && s.status === 'staged' && s.row).length, reloadWaiting: d.shipments.filter(s => /^zzs/.test(s.id) && s.status === 'staged' && s.lane === 'sac' && !s.row).length,
+        requests: (d.zzRequests || []).filter(q => q.status === 'new').length, chats: Object.keys(d.accountChat || {}).filter(k => /^zzc/.test(k)).length,
+        span: [Math.min(...times) / 36e5, Math.max(...times) / 36e5], u11: (ms(u.arrivedAt) - T0) / 36e5,
+        codes: zz.filter(h.ZZactive).every(t => /^\d{4}$/.test(String(t.code)) && !pins.has(String(t.code))), photos,
+        cust: d.customers.filter(c => /^zzc/.test(c.id)).map(c => [c.id, c.name, c.pin]) };
+    }, T0);
+    t.ok(r.stamp && r.stamp.v === r.v && r.v >= 2 && r.stamp.day === r.today && Math.abs(Date.parse(r.stamp.at) - T0) < 6e4, 'a fresh demo is stamped zzDemo {v, at, day} with the dock day it was built (' + JSON.stringify(r.stamp) + ')');
+    t.ok(r.refresh === false && r.stale === false && r.staleOld === false, 'normal build: ZZDEMO_REFRESH is off, so nothing is ever called stale (no automatic replacement)');
+    t.eq(r.jobs, ['delivery', 'pack', 'pickup', 'unload', 'unpack'], 'every forklift job has an active demo truck');
+    t.ok(r.states.bookedLater >= 1 && r.states.eta >= 1 && r.states.yard >= 3 && r.states.yardOver >= 1 && r.states.working >= 4 && r.states.atDoorNotStarted >= 1 && r.states.doneToday >= 3 && r.states.departedToday >= 3,
+      'every truck state: booked later today, on the way with an ETA, waiting in the yard (one over the wait goal), at doors being worked, at a door not started, done today, departed (' + JSON.stringify(r.states) + ')');
+    t.ok(new Set(r.doors).size === r.doors.length && r.doors.length === 8, 'all 8 doors busy, never two trucks at one door (' + r.doors.join(' ') + ')');
+    t.ok(r.unpack.job === 'unpack' && r.unpack.cust >= 3 && r.unpack.east && r.unpack.reload >= 1 && r.unpack.drafts === 1 && r.unpack.hidden && r.unpack.working === 'working',
+      'UNPACK: East Coast consolidated, loads of ' + r.unpack.cust + ' companies, ' + r.unpack.reload + ' reloading, one damage snap waiting for details (hidden from the customer)');
+    t.ok(r.pack.job === 'pack' && r.pack.ins >= 2 && r.pack.cust >= 2 && r.pack.loaded >= 1 && r.pack.left >= 1 && r.pack.working === 'working', 'PACK: loads from ' + r.pack.ins + ' inbound trucks and ' + r.pack.cust + ' companies, partly packed');
+    t.ok(r.delivery.job === 'delivery' && r.delivery.multi && new Set(r.delivery.stops).size === 3 && r.delivery.pos.join() === 'nose,middle,tail' && r.delivery.sugg.join() === r.delivery.pos.join(),
+      'DELIVERY: multiStop, 3 stops in loading order nose / middle / tail, as ZZposSuggest suggests');
+    t.ok(r.pickup >= 1, 'PICKUP: the customer\'s carrier trucks');
+    t.ok(r.fin.length >= 1, 'a finished damage report waits for the customer\'s answer (' + r.fin.join() + ')');
+    t.ok(r.departedPack.job === 'pack' && r.departedPack.lines >= 3 && r.departedPack.mine.join() === 'GB-8320' && r.departedPack.other === null && r.departedPack.sec === 2 && r.departedPack.owner === 'strap:zzt14',
+      'departed PACK truck: signed manifest (a customer sees only its own line), securing report v2');
+    t.ok(r.floor >= 8 && r.reloadWaiting >= 1, 'inventory on the floor (' + r.floor + ' loads in rows) and loads waiting to reload (' + r.reloadWaiting + ')');
+    t.ok(r.requests >= 2 && r.chats >= 3, 'open requests (' + r.requests + ') and customer messages');
+    t.ok(r.span[0] > -8 && r.span[1] < 30 && Math.abs(r.u11 + 1) < 0.01, 'every demo time is relative to the clock when it is built (hours ' + r.span.map(x => x.toFixed(1)).join(' .. ') + ')');
+    t.ok(r.codes, 'every active demo truck has a real 4-digit check-in code that is nobody\'s PIN');
+    t.eq(r.photos, [], 'no photo counts point at photos that do not exist (all 0)');
+    t.ok(r.cust.length === 13 && r.cust.every(([, , pin], k) => pin === String(5100 + k)), 'demo customers zzc1..zzc13 sign in with PINs 5100..5112');
+    await h.check(p, 'demo-day-office');
+    await p.context().close();
+  }
 });
